@@ -1,3 +1,4 @@
+import log from "../modules/logger";
 import nodemailer from "nodemailer";
 
 // Email setup
@@ -12,21 +13,28 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export function send(email: string, subject: string, message: string): any {
-  return new Promise((resolve, reject) => {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: `${subject}`,
-      html: createHTML(subject, message),
-    };
-    transporter.sendMail(mailOptions, function (error: any) {
-      if (error) {
-        console.log(error);
-      } else {
-        resolve("Email sent successfully");
-      }
-    });
+export function send(email: string, subject: string, message: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: `${subject}`,
+        html: createHTML(subject, message),
+      };
+      
+      transporter.sendMail(mailOptions, function (error: any) {
+        if (error) {
+          log.error(error as string);
+          resolve("Email failed to send");
+        } else {
+          resolve("Email sent successfully");
+        }
+      });
+    } catch (err) {
+      log.error(err as string);
+      resolve("Email system error");
+    }
   });
 }
 
