@@ -120,14 +120,7 @@ const Server = Bun.serve<Packet>({
       // Subscribe to the CONNECTION_COUNT event and publish the current count
       ws.subscribe("CONNECTION_COUNT" as Subscription["event"]);
       ws.subscribe("BROADCAST" as Subscription["event"]);
-      ws.subscribe("LOAD_PLAYERS" as Subscription["event"]);
-      ws.subscribe("SPAWN_PLAYER" as Subscription["event"]);
-      ws.subscribe("MOVEXY" as Subscription["event"]);
       ws.subscribe("DISCONNECT_PLAYER" as Subscription["event"]);
-      ws.subscribe("CHAT" as Subscription["event"]);
-      ws.subscribe("STEALTH" as Subscription["event"]);
-      ws.subscribe("UPDATESTATS" as Subscription["event"]);
-      ws.subscribe("REVIVE" as Subscription["event"]);
       const _packet = {
         type: "CONNECTION_COUNT",
         data: connections.size,
@@ -167,14 +160,7 @@ const Server = Bun.serve<Packet>({
           ws.unsubscribe("CONNECTION_COUNT" as Subscription["event"]);
           // Unsubscribe from the BROADCAST event
           ws.unsubscribe("BROADCAST" as Subscription["event"]);
-          ws.unsubscribe("SPAWN_PLAYER" as Subscription["event"]);
-          ws.unsubscribe("LOAD_PLAYERS" as Subscription["event"]);
-          ws.unsubscribe("MOVEXY" as Subscription["event"]);
           ws.unsubscribe("DISCONNECT_PLAYER" as Subscription["event"]);
-          ws.unsubscribe("CHAT" as Subscription["event"]);
-          ws.unsubscribe("STEALTH" as Subscription["event"]);
-          ws.unsubscribe("UPDATESTATS" as Subscription["event"]);
-          ws.unsubscribe("REVIVE" as Subscription["event"]);
           // Remove the client from clientRequests
           for (let i = 0; i < ClientRateLimit.length; i++) {
             if (ClientRateLimit[i].id === ws.data.id) {

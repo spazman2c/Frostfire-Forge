@@ -46,6 +46,9 @@ app.use(
 // Disable x-powered-by header
 app.disable("x-powered-by");
 
+// Disable proxy trust
+app.set('trust proxy', false);
+
 // Rate limiting
 if (settings?.webserverRatelimit?.enabled) {
   const limiter = rateLimit({
@@ -67,11 +70,14 @@ if (settings?.webserverRatelimit?.enabled) {
 
 // Redirect to HTTPS
 if (_https) {
-  app.use((req: any, res: any, next: any) => {
-    if (!req.secure) {
-      res.redirect("https://" + req.headers.host + req.url);
-    } else {
+  app.enable('trust proxy'); // Trust X-Forwarded-* headers
+  app.use((req, res, next) => {
+    if (req.secure) {
+      // Request was via https, so do no special handling
       next();
+    } else {
+      // Redirect to https
+      res.redirect('https://' + req.headers.host + req.url);
     }
   });
 }
@@ -102,6 +108,18 @@ app.use(function (req: any, res: any, next: any) {
     );
   } else {
     next();
+  }
+});
+
+app.use(function (req: any, res: any, next: any) {
+  const allowedHost = process.env.DOMAIN?.replace("https://", "");
+  if (req.hostname === allowedHost || req.hostname === 'localhost') {
+    next();
+  } else {
+    res.status(403).send({
+      status: 403,
+      message: `Access denied from ${req.hostname}`
+    });
   }
 });
 
@@ -141,18 +159,39 @@ import { router as functionRouter } from "../../src/routes/functions";
 app.use(functionRouter);
 
 const server = http.createServer(app);
+let httpsServer: any;
 
 if (_https) {
   try {
     const cert = _https ? fs.readFileSync(_cert, "utf8") : "";
     const key = _https ? fs.readFileSync(_key, "utf8") : "";
-  
-    https.createServer({
+    
+    const tlsOptions = {
       cert: cert,
       key: key,
-    }, app).listen(sslport, () => {
+      requestCert: true,
+      rejectUnauthorized: false
+    }
+
+    // Create HTTPS server with Express app
+    httpsServer = https.createServer(tlsOptions, app);
+
+    httpsServer.on('error', (err: any) => {
+      console.error('HTTPS Server Error:', err);
+    });
+
+    // Make sure to listen on the SSL port
+    httpsServer.listen(sslport, async () => {
       log.success(`HTTPS server is listening on localhost:${sslport} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
     });
+  
+    httpsServer.on("stop", () => {
+      log.info("HTTPS server is stopping...");
+      httpsServer.close(() => {
+        log.info("HTTPS server stopped.");
+      });
+    });
+
   } catch (e: any) {
     log.error(`Error starting HTTPS server: ${e.message}`);
   }

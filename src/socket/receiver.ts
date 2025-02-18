@@ -36,7 +36,12 @@ export default async function packetReceiver(
     if (!message) return ws.close(1008, "Empty message");
     // Check if the message is too large
     const parsedMessage: Packet = tryParsePacket(message) as Packet;
-    if ((message.length > (1024 * 1024 * settings?.websocket?.maxPayloadMB || 1024 * 1024)) && (parsedMessage.type !== "BENCHMARK" && !settings?.websocket?.benchmarkenabled))
+    if (
+      message.length >
+        (1024 * 1024 * settings?.websocket?.maxPayloadMB || 1024 * 1024) &&
+      parsedMessage.type !== "BENCHMARK" &&
+      !settings?.websocket?.benchmarkenabled
+    )
       return ws.close(1009, "Message too large");
     // Check if the packet is malformed
     if (!parsedMessage) return ws.close(1007, "Malformed message");
@@ -240,7 +245,7 @@ export default async function packetReceiver(
         const npcsInMap = npcs.filter(
           (npc: Npc) => npc.map === spawnLocation.map.replace(".json", "")
         );
-        
+
         npcsInMap.forEach((npc: Npc) => {
           ws.send(
             packet.encode(
@@ -263,40 +268,32 @@ export default async function packetReceiver(
           );
         });
 
-        const playerCache = cache.list();
-        // Load players for the current map only
-        const players = Object.values(playerCache).filter(
-          (p) =>
-            p.location.map.replaceAll(".json", "") ===
-            spawnLocation.map.replaceAll(".json", "")
-        );
+        const players = filterPlayersByMap(spawnLocation.map);
 
         const playerData = [] as any[];
 
-        setTimeout(() => {
-          players.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "SPAWN_PLAYER",
-                  data: {
-                    id: ws.data.id,
-                    location: {
-                      map: spawnLocation.map,
-                      x: position.x || 0,
-                      y: position.y || 0,
-                      direction: position.direction,
-                    },
-                    username,
-                    isAdmin,
-                    isStealth,
-                    stats,
+        players.forEach((player) => {
+          player.ws.send(
+            packet.encode(
+              JSON.stringify({
+                type: "SPAWN_PLAYER",
+                data: {
+                  id: ws.data.id,
+                  location: {
+                    map: spawnLocation.map,
+                    x: position.x || 0,
+                    y: position.y || 0,
+                    direction: position.direction,
                   },
-                })
-              )
-            );
-          });
-        }, 5000);
+                  username,
+                  isAdmin,
+                  isStealth,
+                  stats,
+                },
+              })
+            )
+          );
+        });
 
         players.forEach((player) => {
           const location = player.location;
@@ -327,21 +324,40 @@ export default async function packetReceiver(
       }
       case "LOGOUT": {
         if (!currentPlayer) return;
-        await player.setLocation(currentPlayer.id, currentPlayer.location.map, currentPlayer.location.position);
+        await player.setLocation(
+          currentPlayer.id,
+          currentPlayer.location.map,
+          currentPlayer.location.position
+        );
         await player.logout(currentPlayer.id);
         break;
       }
       case "DISCONNECT": {
         if (!currentPlayer) return;
-        await player.setLocation(currentPlayer.id, currentPlayer.location.map, currentPlayer.location.position);
+        await player.setLocation(
+          currentPlayer.id,
+          currentPlayer.location.map,
+          currentPlayer.location.position
+        );
         await player.clearSessionId(currentPlayer.id);
         break;
       }
       case "MOVEXY": {
         if (!currentPlayer) return;
-        const direction = data.toString().toLowerCase() as keyof typeof directionAdjustments;
+        const direction = data
+          .toString()
+          .toLowerCase() as keyof typeof directionAdjustments;
         // Only allow the player to move in these directions
-        const directions = ["up", "down", "left", "right", "upleft", "upright", "downleft", "downright"];
+        const directions = [
+          "up",
+          "down",
+          "left",
+          "right",
+          "upleft",
+          "upright",
+          "downleft",
+          "downright",
+        ];
         if (!directions.includes(direction)) return;
 
         const speed = 2;
@@ -355,7 +371,11 @@ export default async function packetReceiver(
           Due to the packet being dropped, the player will move at the normally
           enforced speed without the need to kick them.
         */
-        if (time - currentPlayer.lastMovementPacket < 10 && time - currentPlayer.lastMovementPacket !== 0) return;
+        if (
+          time - currentPlayer.lastMovementPacket < 10 &&
+          time - currentPlayer.lastMovementPacket !== 0
+        )
+          return;
 
         currentPlayer.lastMovementPacket = time;
 
@@ -370,65 +390,75 @@ export default async function packetReceiver(
 
         const directionAdjustments = {
           up: {
-              tempX: 0,
-              tempY: -speed,
-              direction: "up",
-              collisionX: (tempPosition: PositionData) => tempPosition.x + (tileSize * 2) / 2,
-              collisionY: (tempPosition: PositionData) => tempPosition.y,
+            tempX: 0,
+            tempY: -speed,
+            direction: "up",
+            collisionX: (tempPosition: PositionData) =>
+              tempPosition.x + (tileSize * 2) / 2,
+            collisionY: (tempPosition: PositionData) => tempPosition.y,
           },
           down: {
-              tempX: 0,
-              tempY: speed,
-              direction: "down",
-              collisionX: (tempPosition: PositionData) => tempPosition.x + tileSize,
-              collisionY: (tempPosition: PositionData) => tempPosition.y + tileSize * 2 + tileSize,
+            tempX: 0,
+            tempY: speed,
+            direction: "down",
+            collisionX: (tempPosition: PositionData) =>
+              tempPosition.x + tileSize,
+            collisionY: (tempPosition: PositionData) =>
+              tempPosition.y + tileSize * 2 + tileSize,
           },
           left: {
-              tempX: -speed,
-              tempY: 0,
-              direction: "left",
-              collisionX: (tempPosition: PositionData) => tempPosition.x,
-              collisionY: (tempPosition: PositionData) => tempPosition.y + tileSize * 2 + tileSize / 2,
+            tempX: -speed,
+            tempY: 0,
+            direction: "left",
+            collisionX: (tempPosition: PositionData) => tempPosition.x,
+            collisionY: (tempPosition: PositionData) =>
+              tempPosition.y + tileSize * 2 + tileSize / 2,
           },
           right: {
-              tempX: speed,
-              tempY: 0,
-              direction: "right",
-              collisionX: (tempPosition: PositionData) => tempPosition.x + tileSize * 2,
-              collisionY: (tempPosition: PositionData) => tempPosition.y + tileSize * 2 + tileSize / 2,
+            tempX: speed,
+            tempY: 0,
+            direction: "right",
+            collisionX: (tempPosition: PositionData) =>
+              tempPosition.x + tileSize * 2,
+            collisionY: (tempPosition: PositionData) =>
+              tempPosition.y + tileSize * 2 + tileSize / 2,
           },
           upleft: {
-              tempX: -speed,
-              tempY: -speed,
-              direction: "upleft",
-              collisionX: (tempPosition: PositionData) => tempPosition.x,
-              collisionY: (tempPosition: PositionData) => tempPosition.y,
+            tempX: -speed,
+            tempY: -speed,
+            direction: "upleft",
+            collisionX: (tempPosition: PositionData) => tempPosition.x,
+            collisionY: (tempPosition: PositionData) => tempPosition.y,
           },
           upright: {
-              tempX: speed,
-              tempY: -speed,
-              direction: "upright",
-              collisionX: (tempPosition: PositionData) => tempPosition.x + tileSize * 2,
-              collisionY: (tempPosition: PositionData) => tempPosition.y,
+            tempX: speed,
+            tempY: -speed,
+            direction: "upright",
+            collisionX: (tempPosition: PositionData) =>
+              tempPosition.x + tileSize * 2,
+            collisionY: (tempPosition: PositionData) => tempPosition.y,
           },
           downleft: {
-              tempX: -speed,
-              tempY: speed,
-              direction: "downleft",
-              collisionX: (tempPosition: PositionData) => tempPosition.x,
-              collisionY: (tempPosition: PositionData) => tempPosition.y + tileSize * 2 + tileSize,
+            tempX: -speed,
+            tempY: speed,
+            direction: "downleft",
+            collisionX: (tempPosition: PositionData) => tempPosition.x,
+            collisionY: (tempPosition: PositionData) =>
+              tempPosition.y + tileSize * 2 + tileSize,
           },
           downright: {
-              tempX: speed,
-              tempY: speed,
-              direction: "downright",
-              collisionX: (tempPosition: PositionData) => tempPosition.x + tileSize * 2,
-              collisionY: (tempPosition: PositionData) => tempPosition.y + tileSize * 2 + tileSize,
+            tempX: speed,
+            tempY: speed,
+            direction: "downright",
+            collisionX: (tempPosition: PositionData) =>
+              tempPosition.x + tileSize * 2,
+            collisionY: (tempPosition: PositionData) =>
+              tempPosition.y + tileSize * 2 + tileSize,
           },
-      };
+        };
 
-      if (!directionAdjustments[direction]) return;
-      
+        if (!directionAdjustments[direction]) return;
+
         const adjustment = directionAdjustments[direction];
         tempPosition.x += adjustment.tempX;
         tempPosition.y += adjustment.tempY;
@@ -436,19 +466,17 @@ export default async function packetReceiver(
         collisionPosition.x = adjustment.collisionX(tempPosition);
         collisionPosition.y = adjustment.collisionY(tempPosition);
 
-        const collision = player.checkIfWouldCollide(currentPlayer.location.map, collisionPosition);
+        const collision = player.checkIfWouldCollide(
+          currentPlayer.location.map,
+          collisionPosition
+        );
         if (collision) return;
 
         currentPlayer.location.position = tempPosition;
-        const playerCache = cache.list();
         if (currentPlayer.isStealth) {
-          const players = Object.values(playerCache).filter(
-            (p) =>
-              p.isAdmin &&
-              p.location.map.replaceAll(".json", "") ===
-              currentPlayer.location.map.replaceAll(".json", "")
-          );
-          players.forEach((player) => {
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          const playersInMapAdmin = playersInMap.filter((p) => p.isAdmin);
+          playersInMapAdmin.forEach((player) => {
             player.ws.send(
               packet.encode(
                 JSON.stringify({
@@ -462,12 +490,8 @@ export default async function packetReceiver(
             );
           });
         } else {
-          const players = Object.values(playerCache).filter(
-            (p) =>
-              p.location.map.replaceAll(".json", "") ===
-            currentPlayer.location.map.replaceAll(".json", "")
-          );
-          players.forEach((player) => {
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          playersInMap.forEach((player) => {
             player.ws.send(
               packet.encode(
                 JSON.stringify({
@@ -488,11 +512,15 @@ export default async function packetReceiver(
         currentPlayer.location.position = data;
         currentPlayer.location.position.direction = "down";
         if (currentPlayer.isStealth) {
-          const playerCache = cache.list();
-          const players = Object.values(playerCache).filter((p) => p.isAdmin);
-          currentPlayer.location.position.x = Math.floor(Number(currentPlayer.location.position.x));
-          currentPlayer.location.position.y = Math.floor(Number(currentPlayer.location.position.y));
-          players.forEach((player) => {
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          const playersInMapAdmin = playersInMap.filter((p) => p.isAdmin);
+          currentPlayer.location.position.x = Math.floor(
+            Number(currentPlayer.location.position.x)
+          );
+          currentPlayer.location.position.y = Math.floor(
+            Number(currentPlayer.location.position.y)
+          );
+          playersInMapAdmin.forEach((player) => {
             player.ws.send(
               packet.encode(
                 JSON.stringify({
@@ -506,25 +534,27 @@ export default async function packetReceiver(
             );
           });
         } else {
-          server.publish(
-            "MOVEXY" as Subscription["event"],
-            packet.encode(
-              JSON.stringify({
-                type: "MOVEXY",
-                data: {
-                  id: ws.data.id,
-                  _data: currentPlayer.location.position,
-                },
-              })
-            )
-          );
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          playersInMap.forEach((player) => {
+            player.ws.send(
+              packet.encode(
+                JSON.stringify({
+                  type: "MOVEXY",
+                  data: {
+                    id: ws.data.id,
+                    _data: currentPlayer.location.position,
+                  },
+                })
+              )
+            );
+          });
         }
         break;
       }
       case "CHAT": {
         if (data.toString().length > 255) return;
         if (!currentPlayer) return;
-        
+
         // Send message to the sender
         const sendMessageToPlayer = (playerWs: any, message: string) => {
           playerWs.send(
@@ -544,14 +574,14 @@ export default async function packetReceiver(
 
         const playerCache = cache.list();
         let playersInMap = Object.values(playerCache).filter(
-          (p) => p.location.map === currentPlayer.location.map && p.id !== ws.data.id
+          (p) =>
+            p.location.map === currentPlayer.location.map && p.id !== ws.data.id
         );
 
         if (currentPlayer.isStealth) {
           // Filter only admins in the same map
           playersInMap = playersInMap.filter((p) => p.isAdmin);
         }
-
 
         // If there are no players in the map, return
         if (playersInMap.length === 0) return;
@@ -562,7 +592,7 @@ export default async function packetReceiver(
 
         // Check for swear words
         for (const swear of swears) {
-          const swearRegex = new RegExp(swear.id, 'gi');
+          const swearRegex = new RegExp(swear.id, "gi");
           if (swearRegex.test(englishMessage)) {
             // Replace it with an equal number of asterisks
             filteredMessage = englishMessage.replace(
@@ -649,13 +679,12 @@ export default async function packetReceiver(
       }
       case "TARGETCLOSEST": {
         if (!currentPlayer) return;
-        const playerCache = cache.list();
-        const players = Object.values(playerCache).filter(
-          (p) => p.location.map === currentPlayer.location.map && p.id !== ws.data.id
-        );
+        const playersInRange = filterPlayersByDistance(ws, 500, currentPlayer.location.map)
+          .filter(p => !p.isStealth && p.id !== currentPlayer.id); // Filter out stealth players and self
+        
         const closestPlayer = await player.findClosestPlayer(
           currentPlayer,
-          players,
+          playersInRange,
           500
         );
 
@@ -674,7 +703,7 @@ export default async function packetReceiver(
         break;
       }
       case "INSPECTPLAYER": {
-        if(currentPlayer){
+        if (currentPlayer) {
           ws.send(
             packet.encode(
               JSON.stringify({
@@ -682,44 +711,47 @@ export default async function packetReceiver(
                 data: {
                   id: currentPlayer?.id,
                   stats: currentPlayer?.stats,
-                  username: currentPlayer?.username
+                  username: currentPlayer?.username,
                 },
               })
             )
-          )
-        };
+          );
+        }
         break;
       }
       case "STEALTH": {
         if (!currentPlayer?.isAdmin) return;
         const isStealth = await player.toggleStealth(currentPlayer.username);
         currentPlayer.isStealth = isStealth;
-        server.publish(
-          "STEALTH" as Subscription["event"],
-          packet.encode(
-            JSON.stringify({
-              type: "STEALTH",
-              data: {
-                id: ws.data.id,
-                isStealth: isStealth,
-              },
-            })
-          )
-        );
-        // Send the player's new position to all players when they toggle stealth mode off
-        if (!isStealth) {
-          server.publish(
-            "MOVEXY" as Subscription["event"],
+        const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        playersInMap.forEach((player) => {
+          player.ws.send(
             packet.encode(
               JSON.stringify({
-                type: "MOVEXY",
+                type: "STEALTH",
                 data: {
                   id: ws.data.id,
-                  _data: currentPlayer.location.position,
+                  isStealth: currentPlayer.isStealth,
                 },
               })
             )
           );
+        });
+        // Send the player's new position to all players in the map when they toggle stealth mode off
+        if (!isStealth) {
+          playersInMap.forEach((player) => {
+            player.ws.send(
+              packet.encode(
+                JSON.stringify({
+                  type: "MOVEXY",
+                  data: {
+                    id: ws.data.id,
+                    _data: currentPlayer.location.position,
+                  },
+                })
+              )
+            );
+          });
         }
         break;
       }
@@ -729,96 +761,107 @@ export default async function packetReceiver(
         const target = cache.get(_data.id);
         if (!target) return;
 
-        const players = Object.values(cache.list()).filter(
-          (p) => p.location.map.replaceAll(".json", "") === currentPlayer.location.map.replaceAll(".json", "")
+        const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        const playersNearBy = filterPlayersByDistance(
+          ws,
+          700,
+          currentPlayer.location.map
         );
-
-        // Check if the player can attack
-        if (!player.canAttack(currentPlayer, target, 60)) return;
+        const playersInAttackRange = filterPlayersByDistance(
+          ws,
+          60,
+          currentPlayer.location.map
+        );
+        const playersInMapAdminNearBy = playersNearBy.filter((p) => p.isAdmin);
+        // Check if targetted player is included in the playersNearBy array and if the player can attack
+        if (!playersInAttackRange.includes(target) || !player.canAttack(currentPlayer, target)) return;
 
         // Generate a number for the pitch of the audio
         const pitch = Math.random() * 0.1 + 0.95;
-        
-        // Check if player is currently in stealth mode
-        // If the player is in stealth mode, only send an audio packet to admins
-        if (currentPlayer.isStealth) {
-          const adminPlayers = players.filter((p) => p.isAdmin);
-          adminPlayers.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "AUDIO",
-                  name: "attack_sword",
-                  data: assetCache.get("audio").find((a: SoundData) => a.name === "attack_sword"),
-                  pitch: pitch
-                })
-              )
-            );
-          });
-        } else {
-          players.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "AUDIO",
-                  name: "attack_sword",
-                  data: assetCache.get("audio").find((a: SoundData) => a.name === "attack_sword"),
-                  pitch: pitch,
-                  timestamp: performance.now()
-                })
-              )
-            );
-          });
-        }
 
         // Random whole number between 10 and 25
         const damage = Math.floor(Math.random() * (25 - 10 + 1) + 10);
         target.stats.health -= damage;
 
-        if (target.stats.health <= 0) {
-          target.stats.health = 100;
-          target.location.position = { x: 0, y: 0, direction: "down" };
-          server.publish(
-            "MOVEXY" as Subscription["event"],
-            packet.encode(
-              JSON.stringify({
-                type: "MOVEXY",
-                data: {
-                  id: target.id,
-                  _data: target.location.position,
-                },
-              })
-            )
-          );
-          server.publish(
-            "REVIVE" as Subscription["event"],
-            packet.encode(
-              JSON.stringify({
-                type: "REVIVE",
-                data: {
-                  id: ws.data.id,
-                  target: target.id,
-                  stats: target.stats,
-                },
-              })
-            )
-          );
+        // Check if player is currently in stealth mode
+        // If the player is in stealth mode, only send an audio packet to admins
+        if (currentPlayer.isStealth) {
+          playersInMapAdminNearBy.forEach((player) => {
+            player.ws.send(
+              packet.encode(
+                JSON.stringify({
+                  type: "AUDIO",
+                  name: "attack_sword",
+                  data: assetCache
+                    .get("audio")
+                    .find((a: SoundData) => a.name === "attack_sword"),
+                  pitch: pitch,
+                })
+              )
+            );
+          });
         } else {
-          server.publish(
-            "UPDATESTATS" as Subscription["event"],
-            packet.encode(
-              JSON.stringify({
-                type: "UPDATESTATS",
-                data: {
-                  id: ws.data.id,
-                  target: target.id,
-                  stats: target.stats,
-                },
-              })
-            )
-          );
-        }
+          playersNearBy.forEach((player) => {
+            player.ws.send(
+              packet.encode(
+                JSON.stringify({
+                  type: "AUDIO",
+                  name: "attack_sword",
+                  data: assetCache
+                    .get("audio")
+                    .find((a: SoundData) => a.name === "attack_sword"),
+                  pitch: pitch,
+                  timestamp: performance.now(),
+                })
+              )
+            );
+          });
 
+          if (target.stats.health <= 0) {
+            target.stats.health = 100;
+            target.location.position = { x: 0, y: 0, direction: "down" };
+            playersInMap.forEach((player) => {
+              player.ws.send(
+                packet.encode(
+                  JSON.stringify({
+                    type: "MOVEXY",
+                    data: {
+                      id: target.id,
+                      _data: target.location.position,
+                    },
+                  })
+                )
+              );
+              player.ws.send(
+                packet.encode(
+                  JSON.stringify({
+                    type: "REVIVE",
+                    data: {
+                      id: target.id,
+                      target: target.id,
+                      stats: target.stats,
+                    },
+                  })
+                )
+              );
+            });
+          } else {
+            playersInMap.forEach((player) => {
+              player.ws.send(
+                packet.encode(
+                  JSON.stringify({
+                    type: "UPDATESTATS",
+                    data: {
+                      id: ws.data.id,
+                      target: target.id,
+                      stats: target.stats,
+                    },
+                  })
+                )
+              );
+            });
+          }
+        }
         player.setStats(target.username, target.stats);
         currentPlayer.attackDelay = Date.now() + 1000;
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -832,7 +875,9 @@ export default async function packetReceiver(
             JSON.stringify({
               type: "MUSIC",
               name: "music_morning_dew",
-              data: assetCache.get("audio").find((a: SoundData) => a.name === "music_morning_dew"),
+              data: assetCache
+                .get("audio")
+                .find((a: SoundData) => a.name === "music_morning_dew"),
             })
           )
         );
@@ -846,6 +891,26 @@ export default async function packetReceiver(
   } catch (e) {
     log.error(e as string);
   }
+}
+
+// Function to filter players by map
+function filterPlayersByMap(map: string) {
+  const players = cache.list();
+  return Object.values(players).filter(
+    (p) =>
+      p.location.map.replaceAll(".json", "") === map.replaceAll(".json", "")
+  );
+}
+
+// Function to filter players by distance and map
+function filterPlayersByDistance(ws: any, distance: number, map: string) {
+  const players = filterPlayersByMap(map);
+  const currentPlayer = cache.get(ws.data.id);
+  return players.filter((p) => {
+    const dx = p.location.position.x - currentPlayer.location.position.x;
+    const dy = p.location.position.y - currentPlayer.location.position.y;
+    return Math.sqrt(dx * dx + dy * dy) <= distance;
+  });
 }
 
 // Try to parse the packet data

@@ -312,9 +312,9 @@ const player = {
         const response = await query("UPDATE accounts SET banned = 1 WHERE username = ?", [username]);
         return response;
     },
-    canAttack: (self: Player, target: Player, range: number): boolean => {
+    canAttack: (self: Player, target: Player): boolean => {
         // No self or target or no range
-        if (!self || !target || !range) return false;
+        if (!self || !target) return false;
 
         // Prevent attacks on self
         if (self.id === target.id) return false;
@@ -325,50 +325,33 @@ const player = {
         // Check if the target is in the same map
         if (!self.location || !target.location || target.location.map !== self.location.map) return false;
 
-        if (self.isStealth  || target.isStealth) return false;
+        if (self.isStealth || target.isStealth) return false;
 
-        // Get direction and position data
+        // Check if facing the right direction
         const targetPosition = target.location.position as unknown as PositionData;
         const selfPosition = self.location.position as unknown as PositionData;
         const direction = selfPosition.direction;
-        
-        if (direction === "up" && (selfPosition.y - targetPosition.y <= range
-            && selfPosition.y - targetPosition.y >= 0)
-            && (Math.abs(selfPosition.x - targetPosition.x) <= range)) return true;
 
-        if (direction === "down" && (targetPosition.y - selfPosition.y <= range
-            && targetPosition.y - selfPosition.y >= 0)
-            && (Math.abs(selfPosition.x - targetPosition.x) <= range)) return true;
+        // Calculate angle between players
+        const dx = targetPosition.x - selfPosition.x;
+        const dy = targetPosition.y - selfPosition.y;
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-        if (direction === "left" && (selfPosition.x - targetPosition.x <= range
-            && selfPosition.x - targetPosition.x >= 0)
-            && (Math.abs(selfPosition.y - targetPosition.y) <= range)) return true;
+        // Check if player is facing the target based on direction
+        const directionAngles = {
+            'up': angle > -135 && angle < -45,
+            'down': angle > 45 && angle < 135,
+            'left': angle > 135 || angle < -135,
+            'right': angle > -45 && angle < 45,
+            'upleft': angle > 135 || (angle > -180 && angle < -135),
+            'upright': angle > -135 && angle < -45,
+            'downleft': angle > 135 && angle < 180,
+            'downright': angle > 45 && angle < 135
+        };
 
-        if (direction === "right" && (targetPosition.x - selfPosition.x <= range
-            && targetPosition.x - selfPosition.x >= 0)
-            && (Math.abs(selfPosition.y - targetPosition.y) <= range)) return true;
-        
-        if (direction === "up-left" && (selfPosition.y - targetPosition.y <= range
-            && selfPosition.y - targetPosition.y >= 0)
-            && (selfPosition.x - targetPosition.x <= range
-            && selfPosition.x - targetPosition.x >= 0)) return true;
+        if (!directionAngles[direction as keyof typeof directionAngles]) return false;
 
-        if (direction === "up-right" && (selfPosition.y - targetPosition.y <= range
-            && selfPosition.y - targetPosition.y >= 0)
-            && (targetPosition.x - selfPosition.x <= range
-            && targetPosition.x - selfPosition.x >= 0)) return true;
-
-        if (direction === "down-left" && (targetPosition.y - selfPosition.y <= range
-            && targetPosition.y - selfPosition.y >= 0)
-            && (selfPosition.x - targetPosition.x <= range
-            && selfPosition.x - targetPosition.x >= 0)) return true;
-
-        if (direction === "down-right" && (targetPosition.y - selfPosition.y <= range
-            && targetPosition.y - selfPosition.y >= 0)
-            && (targetPosition.x - selfPosition.x <= range
-            && targetPosition.x - selfPosition.x >= 0)) return true;
-
-        return false;
+        return true;
     },
     findClosestPlayer: async (self: Player, players: Player[], range: number): Promise<NullablePlayer> => {
         if (!players) return null;

@@ -22,7 +22,7 @@ export function send(email: string, subject: string, message: string): any {
     };
     transporter.sendMail(mailOptions, function (error: any) {
       if (error) {
-        reject(error);
+        console.log(error);
       } else {
         resolve("Email sent successfully");
       }
