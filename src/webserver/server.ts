@@ -158,6 +158,12 @@ app.use(tilesetRouter);
 import { router as functionRouter } from "../../src/routes/functions";
 app.use(functionRouter);
 
+
+// 404 redirect to /
+app.use(function (req: any, res: any) {
+  res.redirect("/");
+});
+
 const server = http.createServer(app);
 let httpsServer: any;
 
