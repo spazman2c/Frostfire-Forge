@@ -32,7 +32,7 @@ router.post("/login", async (req, res) => {
   }
 
   if (req.body.username.length < 3) {
-    res.status(403).send({ message: "Invaldi credentials" });
+    res.status(403).send({ message: "Invalid credentials" });
     return;
   }
 
@@ -72,7 +72,7 @@ router.post("/login", async (req, res) => {
   });
 
   // Auto verify the account if 2fa is disabled
-  if (!settings["2fa"].enabled) {
+  if (!settings["2fa"].enabled || !process.env.EMAIL_SERVICE || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
     // Update the account to verified
     await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
 

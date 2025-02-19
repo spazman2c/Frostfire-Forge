@@ -1,3 +1,4 @@
+import '../utility/validate_config';
 const now = performance.now();
 import express from "express";
 import compression from "compression";
@@ -9,9 +10,8 @@ import http from "http";
 import https from "https";
 import path from "path";
 import fs from "fs";
-const port = process.env.WEBSRV_PORT || 80;
-const sslport = process.env.WEBSRV_PORTSSL || 443;
 const app = express();
+
 import log from "../../src/modules/logger";
 import "../../src/services/security";
 
@@ -112,14 +112,15 @@ app.use(function (req: any, res: any, next: any) {
 });
 
 app.use(function (req: any, res: any, next: any) {
+  if (!process.env.DOMAIN) {
+    next();
+    return;
+  }
   const allowedHost = process.env.DOMAIN?.replace("https://", "");
   if (req.hostname === allowedHost || req.hostname === 'localhost') {
     next();
   } else {
-    res.status(403).send({
-      status: 403,
-      message: `Access denied from ${req.hostname}`
-    });
+    res.status(403).redirect(`https://${allowedHost}`);
   }
 });
 
@@ -187,8 +188,8 @@ if (_https) {
     });
 
     // Make sure to listen on the SSL port
-    httpsServer.listen(sslport, async () => {
-      log.success(`HTTPS server is listening on localhost:${sslport} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
+    httpsServer.listen(process.env.WEBSRV_PORTSSL, async () => {
+      log.success(`HTTPS server is listening on localhost:${process.env.WEBSRV_PORTSSL} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
     });
   
     httpsServer.on("stop", () => {
@@ -203,8 +204,8 @@ if (_https) {
   }
 }
 
-server.listen(port, async () => {
-  log.success(`HTTP server is listening on localhost:${port} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
+server.listen(process.env.WEBSRV_PORT, async () => {
+  log.success(`HTTP server is listening on localhost:${process.env.WEBSRV_PORT} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
   await import("../../src/socket/server");
 });
 
