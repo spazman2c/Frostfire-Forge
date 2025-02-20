@@ -158,6 +158,7 @@ const PacketTypes: PacketType = {
   31: "INSPECTPLAYER",
   32: "MUSIC",
   33: "STARTGAME",
+  34: "CREATE_NPC",
 };
 ```
 

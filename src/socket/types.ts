@@ -33,7 +33,5 @@ export const packetTypes: PacketType = {
   31: "INSPECTPLAYER",
   32: "MUSIC",
   33: "STARTGAME",
-  34: "EXECUTE_NPC",
-  35: "NPCDIALOG",
-  36: "CREATE_NPC",
+  34: "CREATE_NPC",
 };
