@@ -7,7 +7,7 @@ declare interface Packet {
   id: Nullable<string>;
   useragent: Nullable<string>;
   language: Nullable<string>;
-  secret: Nullable<string>;
+  publicKey: Nullable<string>;
 }
 
 // Define the packet type
@@ -29,7 +29,7 @@ declare interface Subscription {
 declare interface Identity {
   id: string;
   useragent: string;
-  secret: string;
+  publicKey: string;
 }
 
 // Define client rate limit

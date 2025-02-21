@@ -574,6 +574,7 @@ socket.onmessage = async (event) => {
       {
         const connectionId = JSON.parse(packet.decode(event.data))["data"];
         const secret = JSON.parse(packet.decode(event.data))["secret"];
+        const publicKey = JSON.parse(packet.decode(event.data))["publicKey"];
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
         const sessionToken = getCookie("token");
         if (!sessionToken) {
@@ -582,6 +583,9 @@ socket.onmessage = async (event) => {
 
         // Store session secret
         sessionStorage.setItem("secret", secret);
+
+        // Store public key
+        sessionStorage.setItem("publicKey", publicKey);
 
         const language = navigator.language.split("-")[0] || navigator.language || "en";
         socket.send(
@@ -983,13 +987,14 @@ window.addEventListener("keydown", async (e) => {
     }
     const secret = sessionStorage.getItem("secret");
     if (!secret) return;
-    const encryptedMessage = await encrypt(secret, chatInput.value.trim().toString() || " ");
-    const emptyMessage = new Uint8Array(32);
+    const publicKey = sessionStorage.getItem("publicKey");
+    if (!publicKey) return;
+    const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
     socket.send(
       packet.encode(
         JSON.stringify({
           type: "CHAT",
-          data: Array.from(encryptedMessage),
+          data: encryptedMessage,
         })
       )
     );
@@ -1006,7 +1011,7 @@ window.addEventListener("keydown", async (e) => {
           packet.encode(
           JSON.stringify({
             type: "CHAT",
-            data: emptyMessage,
+            data: null,
           })
           )
         );
@@ -1809,51 +1814,30 @@ document.addEventListener("click", (event) => {
 //   console.log("Gamepad disconnected");
 // });
 
-// async function decrypt(secret: string, data: Uint8Array) {
-//   const keyBytes = new Uint8Array(
-//     secret.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-//   ).subarray(0, 32);
-//   const iv = data.subarray(0, 16); // First 16 bytes is the IV
-//   const encryptedData = data.subarray(16); // Remaining bytes are the encrypted payload
-
-//   const cryptoKey = await window.crypto.subtle.importKey(
-//     "raw",
-//     keyBytes,
-//     { name: "AES-CBC" },
-//     false,
-//     ["decrypt"]
-//   );
-
-//   const decryptedBuffer = await window.crypto.subtle.decrypt(
-//     { name: "AES-CBC", iv: iv },
-//     cryptoKey,
-//     encryptedData
-//   );
-
-//   return new TextDecoder().decode(decryptedBuffer);
-// }
-
-async function encrypt(secret: string, data: string) {
-  const keyBytes = new Uint8Array(
-    secret.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-  ).subarray(0, 32);
-  const iv = window.crypto.getRandomValues(new Uint8Array(16));
-
-  const cryptoKey = await window.crypto.subtle.importKey(
-    "raw",
-    keyBytes,
-    { name: "AES-CBC" },
+async function encryptRsa(publicKey: string, data: string) {
+  const cleanedKey = cleanBase64Key(publicKey);
+  const importedKey = await window.crypto.subtle.importKey(
+    "spki",
+    new Uint8Array(atob(cleanedKey).split('').map(c => c.charCodeAt(0))),
+    {
+      name: "RSA-OAEP",
+      hash: "SHA-256"
+    },
     false,
     ["encrypt"]
   );
 
-  const encodedData = new TextEncoder().encode(data);
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    { name: "AES-CBC", iv: iv },
-    cryptoKey,
-    encodedData
+  const encoded = new TextEncoder().encode(data);
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    importedKey,
+    encoded
   );
 
-  // Combine key, IV and encrypted data
-  return new Uint8Array([...keyBytes, ...iv, ...new Uint8Array(encryptedBuffer)]);
+  return new Uint8Array(encrypted);
 }
+
+function cleanBase64Key(base64Key: string): string {
+  return base64Key.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s+/g, '');
+}
+

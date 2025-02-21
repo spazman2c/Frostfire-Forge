@@ -148,6 +148,16 @@ export default (async () => {
     );
   }
 
+  // RSA Passphrase
+  if (process.env.RSA_PASSPHRASE) {
+    startUpWarnings.push(
+      "RSA passphrase is set. Do not set this manually. It will be overwritten with a random value. Please remove the RSA_PASSPHRASE environment variable to suppress this message."
+    );
+  }
+
+  // Generate a random RSA passphrase
+  process.env.RSA_PASSPHRASE = crypto.randomBytes(32).toString("hex");
+
   // Check if there are any warnings
   if (startUpWarnings.length > 0) {
     for (const warning of startUpWarnings) {

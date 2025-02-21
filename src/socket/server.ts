@@ -12,6 +12,7 @@ import packet from "../modules/packet";
 import path from "node:path";
 import fs from "node:fs";
 import { WebSocket } from "ws";
+import { generateKeyPair } from "../modules/cipher";
 
 // Load settings
 import * as settings from "../../config/settings.json";
@@ -59,6 +60,8 @@ const connections = new Set<Identity>();
 // Set to track the amount of requests
 const ClientRateLimit = [] as ClientRateLimit[];
 
+const keyPair = generateKeyPair(process.env.RSA_PASSPHRASE);
+
 const Server = Bun.serve<Packet>({
   fetch(req, Server) {
     // Upgrade the request to a WebSocket connection
@@ -66,9 +69,11 @@ const Server = Bun.serve<Packet>({
     const id = crypto.randomBytes(32).toString("hex");
     const secret = crypto.randomBytes(32).toString("hex");
     const useragent = req.headers.get("user-agent");
+    // Base64 encode the public key
+    const publicKey = keyPair.publicKey;
     if (!useragent)
       return new Response("User-Agent header is missing", { status: 400 });
-    const success = Server.upgrade(req, { data: { id, useragent, secret } });
+    const success = Server.upgrade(req, { data: { id, useragent, secret, publicKey } });
     return success
       ? undefined
       : new Response("WebSocket upgrade error", { status: 400 });
@@ -82,8 +87,8 @@ const Server = Bun.serve<Packet>({
     async open(ws) {
       ws.binaryType = "arraybuffer";
       // Add the client to the set of connected clients
-      if (!ws.data?.id || !ws.data?.useragent || !ws.data?.secret) return;
-      connections.add({ id: ws.data.id, useragent: ws.data.useragent, secret: ws.data.secret });
+      if (!ws.data?.id || !ws.data?.useragent || !ws.data?.publicKey) return;
+      connections.add({ id: ws.data.id, useragent: ws.data.useragent, publicKey: ws.data.publicKey });
       packetQueue.set(ws.data.id, []);
       // Emit the onConnection event
       listener.emit("onConnection", ws.data.id);

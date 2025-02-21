@@ -10,8 +10,7 @@ import generate from "../modules/sprites";
 import swears from "../../config/swears.json";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
-import { decrypt } from "../modules/cipher";
-
+import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
 // Load settings
 import * as settings from "../../config/settings.json";
 
@@ -87,7 +86,7 @@ export default async function packetReceiver(
       case "LOGIN": {
         ws.send(
           packet.encode(
-            JSON.stringify({ type: "LOGIN_SUCCESS", data: ws.data.id, secret: ws.data.secret })
+            JSON.stringify({ type: "LOGIN_SUCCESS", data: ws.data.id, secret: ws.data.secret, publicKey: ws.data.publicKey })
           )
         );
         break;
@@ -554,6 +553,11 @@ export default async function packetReceiver(
       }
       case "CHAT": {
         if (!currentPlayer) return;
+        
+        if (!data && data != null) {
+          console.log("No data received");
+          return;
+        }
 
         // Send message to the sender
         const sendMessageToPlayer = (playerWs: any, message: string) => {
@@ -570,11 +574,7 @@ export default async function packetReceiver(
           );
         };
 
-        const encryptedMessage = Buffer.from(Object.values(data));
-        // Check if the message is empty
-        const emptyMessage = new Uint8Array(32);
-        if (encryptedMessage.equals(emptyMessage)) {
-          // Send an empty message to all players in the map
+        if (data == null) {
           const playersInMap = filterPlayersByMap(currentPlayer.location.map);
           playersInMap.forEach((player) => {
             sendMessageToPlayer(player.ws, "");
@@ -582,8 +582,11 @@ export default async function packetReceiver(
           return;
         }
 
-        const encryptedData = encryptedMessage.subarray(32);
-        const decryptedMessage = decrypt(ws.data.secret, encryptedData);
+        const encryptedMessage = Buffer.from(Object.values(data));
+        const privateKey = _privateKey;
+        if (!privateKey) return;
+        const decryptedPrivateKey = decryptPrivateKey(privateKey, process.env.RSA_PASSPHRASE || "").toString();
+        const decryptedMessage = decryptRsa(encryptedMessage, decryptedPrivateKey) || "";
 
         // Send the message to the sender
         sendMessageToPlayer(ws, decryptedMessage);
