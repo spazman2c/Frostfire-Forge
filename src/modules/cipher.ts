@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import log from "../modules/logger";
 
-export let _privateKey = ''
+export let _privateKey: string | null = null;
 
 export function decryptPrivateKey(encryptedKey: string, passphrase: string) {
   return crypto
