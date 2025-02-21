@@ -64,10 +64,11 @@ const Server = Bun.serve<Packet>({
     // Upgrade the request to a WebSocket connection
     // and generate a random id for the client
     const id = crypto.randomBytes(32).toString("hex");
+    const secret = crypto.randomBytes(32).toString("hex");
     const useragent = req.headers.get("user-agent");
     if (!useragent)
       return new Response("User-Agent header is missing", { status: 400 });
-    const success = Server.upgrade(req, { data: { id, useragent } });
+    const success = Server.upgrade(req, { data: { id, useragent, secret } });
     return success
       ? undefined
       : new Response("WebSocket upgrade error", { status: 400 });
@@ -81,8 +82,8 @@ const Server = Bun.serve<Packet>({
     async open(ws) {
       ws.binaryType = "arraybuffer";
       // Add the client to the set of connected clients
-      if (!ws.data?.id || !ws.data?.useragent) return;
-      connections.add({ id: ws.data.id, useragent: ws.data.useragent });
+      if (!ws.data?.id || !ws.data?.useragent || !ws.data?.secret) return;
+      connections.add({ id: ws.data.id, useragent: ws.data.useragent, secret: ws.data.secret });
       packetQueue.set(ws.data.id, []);
       // Emit the onConnection event
       listener.emit("onConnection", ws.data.id);

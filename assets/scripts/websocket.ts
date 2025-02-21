@@ -253,8 +253,7 @@ socket.onerror = (error) => {
   console.error("WebSocket error: " + error);
 };
 
-socket.addEventListener("message", async (event) => {
-  // Blob to ArrayBuffer
+socket.onmessage = async (event) => {
   if (!(event.data instanceof ArrayBuffer)) return;
   const data = JSON.parse(packet.decode(event.data))["data"];
   const type = JSON.parse(packet.decode(event.data))["type"];
@@ -574,11 +573,16 @@ socket.addEventListener("message", async (event) => {
     case "LOGIN_SUCCESS":
       {
         const connectionId = JSON.parse(packet.decode(event.data))["data"];
+        const secret = JSON.parse(packet.decode(event.data))["secret"];
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
         const sessionToken = getCookie("token");
         if (!sessionToken) {
           throw new Error("No session token found");
         }
+
+        // Store session secret
+        sessionStorage.setItem("secret", secret);
+
         const language = navigator.language.split("-")[0] || navigator.language || "en";
         socket.send(
           packet.encode(JSON.stringify({ type: "AUTH", data: sessionToken, language }))
@@ -780,9 +784,9 @@ socket.addEventListener("message", async (event) => {
     default:
       break;
   }
-});
+}
 
-function playMusic(name: string, data: Buffer, timestamp: number): void {
+function playMusic(name: string, data: Uint8Array, timestamp: number): void {
 // Check if the audio is already cached, if not, inflate the data
     // @ts-expect-error - pako is not defined because it is loaded in the index.html
     const cachedAudio = timestamp < performance.now() - 3.6e+6 ? pako.inflate(new Uint8Array(data),{ to: 'string' }) : audioCache.get(name)|| pako.inflate(new Uint8Array(data), { to: 'string' });
@@ -811,7 +815,7 @@ function startMusicInterval(music: any) {
   }, 100);
 }
 
-function playAudio(name: string, data: Buffer, pitch: number, timestamp: number): void {
+function playAudio(name: string, data: Uint8Array, pitch: number, timestamp: number): void {
   // Get mute status
   if (mutedCheckbox.checked) return;
   // Get effects volume
@@ -859,7 +863,7 @@ let isMoving = false;
 const pressedKeys = new Set();
 const movementKeys = new Set(["KeyW", "KeyA", "KeyS", "KeyD"]);
 
-window.addEventListener("keydown", (e) => {
+window.addEventListener("keydown", async (e) => {
   if (!loaded) return;
   if (movementKeys.has(e.code) && chatInput !== document.activeElement) {
     if (pauseMenu.style.display == "block") return;
@@ -977,14 +981,19 @@ window.addEventListener("keydown", (e) => {
       chatInput.blur();
       return;
     }
+    const secret = sessionStorage.getItem("secret");
+    if (!secret) return;
+    const encryptedMessage = await encrypt(secret, chatInput.value.trim().toString() || " ");
+    const emptyMessage = new Uint8Array(32);
     socket.send(
       packet.encode(
         JSON.stringify({
           type: "CHAT",
-          data: chatInput.value.trim().toString() || " ",
+          data: Array.from(encryptedMessage),
         })
       )
     );
+
     const previousMessage = chatInput.value.trim();
     if (previousMessage === "") return;
 
@@ -997,7 +1006,7 @@ window.addEventListener("keydown", (e) => {
           packet.encode(
           JSON.stringify({
             type: "CHAT",
-            data: " ",
+            data: emptyMessage,
           })
           )
         );
@@ -1799,3 +1808,52 @@ document.addEventListener("click", (event) => {
 //   controllerConnected = false;
 //   console.log("Gamepad disconnected");
 // });
+
+// async function decrypt(secret: string, data: Uint8Array) {
+//   const keyBytes = new Uint8Array(
+//     secret.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+//   ).subarray(0, 32);
+//   const iv = data.subarray(0, 16); // First 16 bytes is the IV
+//   const encryptedData = data.subarray(16); // Remaining bytes are the encrypted payload
+
+//   const cryptoKey = await window.crypto.subtle.importKey(
+//     "raw",
+//     keyBytes,
+//     { name: "AES-CBC" },
+//     false,
+//     ["decrypt"]
+//   );
+
+//   const decryptedBuffer = await window.crypto.subtle.decrypt(
+//     { name: "AES-CBC", iv: iv },
+//     cryptoKey,
+//     encryptedData
+//   );
+
+//   return new TextDecoder().decode(decryptedBuffer);
+// }
+
+async function encrypt(secret: string, data: string) {
+  const keyBytes = new Uint8Array(
+    secret.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+  ).subarray(0, 32);
+  const iv = window.crypto.getRandomValues(new Uint8Array(16));
+
+  const cryptoKey = await window.crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "AES-CBC" },
+    false,
+    ["encrypt"]
+  );
+
+  const encodedData = new TextEncoder().encode(data);
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: "AES-CBC", iv: iv },
+    cryptoKey,
+    encodedData
+  );
+
+  // Combine key, IV and encrypted data
+  return new Uint8Array([...keyBytes, ...iv, ...new Uint8Array(encryptedBuffer)]);
+}

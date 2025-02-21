@@ -10,6 +10,7 @@ import generate from "../modules/sprites";
 import swears from "../../config/swears.json";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
+import { decrypt } from "../modules/cipher";
 
 // Load settings
 import * as settings from "../../config/settings.json";
@@ -86,7 +87,7 @@ export default async function packetReceiver(
       case "LOGIN": {
         ws.send(
           packet.encode(
-            JSON.stringify({ type: "LOGIN_SUCCESS", data: ws.data.id })
+            JSON.stringify({ type: "LOGIN_SUCCESS", data: ws.data.id, secret: ws.data.secret })
           )
         );
         break;
@@ -552,7 +553,6 @@ export default async function packetReceiver(
         break;
       }
       case "CHAT": {
-        if (data.toString().length > 255) return;
         if (!currentPlayer) return;
 
         // Send message to the sender
@@ -570,7 +570,23 @@ export default async function packetReceiver(
           );
         };
 
-        sendMessageToPlayer(ws, data.toString());
+        const encryptedMessage = Buffer.from(Object.values(data));
+        // Check if the message is empty
+        const emptyMessage = new Uint8Array(32);
+        if (encryptedMessage.equals(emptyMessage)) {
+          // Send an empty message to all players in the map
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          playersInMap.forEach((player) => {
+            sendMessageToPlayer(player.ws, "");
+          });
+          return;
+        }
+
+        const encryptedData = encryptedMessage.subarray(32);
+        const decryptedMessage = decrypt(ws.data.secret, encryptedData);
+
+        // Send the message to the sender
+        sendMessageToPlayer(ws, decryptedMessage);
 
         const playerCache = cache.list();
         let playersInMap = Object.values(playerCache).filter(
@@ -587,7 +603,7 @@ export default async function packetReceiver(
         if (playersInMap.length === 0) return;
 
         // Translate the original message to English so that we can filter it against an English swear word list
-        const englishMessage = await language.translate(data.toString(), "en");
+        const englishMessage = await language.translate(decryptedMessage, "en");
         let filteredMessage = englishMessage;
 
         // Check for swear words
