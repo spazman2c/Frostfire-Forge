@@ -67,13 +67,12 @@ const Server = Bun.serve<Packet>({
     // Upgrade the request to a WebSocket connection
     // and generate a random id for the client
     const id = crypto.randomBytes(32).toString("hex");
-    const secret = crypto.randomBytes(32).toString("hex");
     const useragent = req.headers.get("user-agent");
     // Base64 encode the public key
     const publicKey = keyPair.publicKey;
     if (!useragent)
       return new Response("User-Agent header is missing", { status: 400 });
-    const success = Server.upgrade(req, { data: { id, useragent, secret, publicKey } });
+    const success = Server.upgrade(req, { data: { id, useragent, publicKey } });
     return success
       ? undefined
       : new Response("WebSocket upgrade error", { status: 400 });

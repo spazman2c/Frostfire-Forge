@@ -573,16 +573,12 @@ socket.onmessage = async (event) => {
     case "LOGIN_SUCCESS":
       {
         const connectionId = JSON.parse(packet.decode(event.data))["data"];
-        const secret = JSON.parse(packet.decode(event.data))["secret"];
         const publicKey = JSON.parse(packet.decode(event.data))["publicKey"];
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
         const sessionToken = getCookie("token");
         if (!sessionToken) {
           throw new Error("No session token found");
         }
-
-        // Store session secret
-        sessionStorage.setItem("secret", secret);
 
         // Store public key
         sessionStorage.setItem("publicKey", publicKey);
@@ -985,8 +981,6 @@ window.addEventListener("keydown", async (e) => {
       chatInput.blur();
       return;
     }
-    const secret = sessionStorage.getItem("secret");
-    if (!secret) return;
     const publicKey = sessionStorage.getItem("publicKey");
     if (!publicKey) return;
     const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
