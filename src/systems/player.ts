@@ -68,6 +68,12 @@ const player = {
         const response = await query("SELECT username FROM accounts WHERE username = ?", [username]);
         return response || [];
     },
+    findPlayerInDatabase: async (username?: string, id?: string) => {
+        if (!username && !id) return;
+        if (username) username = username.toLowerCase();
+        const response = await query("SELECT username, banned FROM accounts WHERE username = ? OR session_id = ?", [username, id]);
+        return response || [];
+    },
     findByEmail: async (email: string) => {
         if (!email) return;
         const response = await query("SELECT email FROM accounts WHERE email = ?", [email]);
@@ -131,16 +137,14 @@ const player = {
         if (!username || !password) return;
         username = username.toLowerCase();
         // Validate credentials
-        const response = await query("SELECT username FROM accounts WHERE username = ? AND password_hash = ?", [username, hash(password)]) as string[];
-        if (response.length === 0) {
+        const response = await query("SELECT username, banned, token FROM accounts WHERE username = ? AND password_hash = ?", [username, hash(password)]) as { username: string, banned: number, token: string }[];
+        if (response.length === 0 || response[0].banned === 1) {
             log.debug(`User ${username} failed to login`);
             return;
         }
 
-        // Check if a token exists and use it
-        const _token = await query("SELECT token FROM accounts WHERE username = ?", [username]) as any;
-        // Assign a token to the user
-        const token = _token[0]?.token || await player.setToken(username);
+        // Use existing token or generate new one
+        const token = response[0].token || await player.setToken(username);
 
         log.debug(`User ${username} logged in`);
         // Update last_login
@@ -203,6 +207,18 @@ const player = {
         const response = await query("SELECT role FROM accounts WHERE username = ?", [username]) as any;
         return response[0]?.role === 1;
     },
+    toggleAdmin: async (username: string, ws?: WebSocket) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("UPDATE accounts SET role = !role WHERE username = ?", [username]) as any;
+        if (!response) return;
+        const admin = await player.isAdmin(username);
+        // Remove stealth status if the player is not an admin and is stealth
+        if (!admin) await query("UPDATE accounts SET stealth = 0 WHERE username = ? AND stealth = 1", [username]) as any;
+        log.debug(`${username} admin status has been updated to ${admin}`);
+        if (ws) ws.close();
+        return admin;
+    },
     isStealth: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
@@ -212,7 +228,7 @@ const player = {
     toggleStealth: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
-        await query("UPDATE accounts SET stealth = !stealth WHERE username = ?", [username]) as any;
+        await query("UPDATE accounts SET stealth = !stealth WHERE username = ? AND role = 1", [username]) as any;
         return await player.isStealth(username);
     },
     getSession: async (username: string) => {
@@ -300,16 +316,27 @@ const player = {
         }
     },
     kick: async (username: string, ws: WebSocket) => {
-        if (!username) return;
-        username = username.toLowerCase();
-        player.logout(username);
-        ws.close();
+        const response = await query("SELECT session_id FROM accounts WHERE username = ?", [username]) as any;
+        if (response[0]?.session_id) {
+            player.logout(response[0]?.session_id);
+        }
+        if (ws) ws.close();
     },
     ban: async (username: string, ws: WebSocket) => {
         if (!username) return;
         username = username.toLowerCase();
-        player.kick(username, ws);
         const response = await query("UPDATE accounts SET banned = 1 WHERE username = ?", [username]);
+        const session_id = await player.getSession(username) as any;
+        if (session_id[0]?.session_id) {
+            player.logout(session_id[0]?.session_id);
+        }
+        if (ws) ws.close();
+        return response;
+    },
+    unban: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("UPDATE accounts SET banned = 0 WHERE username = ?", [username]);
         return response;
     },
     canAttack: (self: Player, target: Player): boolean => {

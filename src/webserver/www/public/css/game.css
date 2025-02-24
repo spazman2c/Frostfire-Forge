@@ -273,7 +273,7 @@ input::placeholder {
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
-  z-index: 100000;
+  z-index: 1005;
 }
 
 #loading-screen #progress-bar-container {
@@ -665,4 +665,74 @@ input::placeholder {
   height: 10px;
   border-radius: 50%;
   z-index: 1001;
+}
+
+#game-notification-container {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 1.8vh;
+  z-index: 1006;
+  background: linear-gradient(
+    to right,
+    rgba(0, 20, 40, 0) 0%,
+    rgba(0, 20, 40, 0.4) 25%,
+    rgba(0, 20, 40, 0.4) 75%,
+    rgba(0, 20, 40, 0) 100%
+  ),
+  linear-gradient(
+    to bottom,
+    rgba(0, 20, 40, 0.4) 0%,
+    rgba(0, 20, 40, 0.4) 25%,
+    rgba(0, 20, 40, 0) 100%
+  );
+  display: none;
+  align-items: center;
+  justify-content: center;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 25%,
+    black 75%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 25%,
+    black 75%,
+    transparent 100%
+  );
+  box-shadow: 0 2px 4px rgba(0, 20, 40, 0.2);
+  backdrop-filter: blur(2px);
+}
+
+#game-notification-message {
+  position: absolute;
+  width: 100%;
+  font-size: 1.2vh;
+  font-weight: 600;
+  text-align: center;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: visible;
+  color: #FFFFFF;
+}
+
+.alert {
+  color: #ff0000;
+}
+
+.warning {
+  color: #ffff00;
+}
+
+.info {
+  color: #0000ff;
+}
+
+.debug {
+  color: #000000;
 }

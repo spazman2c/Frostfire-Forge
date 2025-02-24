@@ -14,6 +14,9 @@ import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
 // Load settings
 import * as settings from "../../config/settings.json";
 
+let restartScheduled: boolean;
+let restartTimers: NodeJS.Timer[];
+
 // Create sprites from the spritesheets
 const spritePromises = spritesheets.map(async (spritesheet: any) => {
   const sprite = await generate(spritesheet);
@@ -656,7 +659,7 @@ export default async function packetReceiver(
             Math.abs(p.location.position.x - Math.floor(Number(location.x))) <
               25 &&
             Math.abs(p.location.position.y - Math.floor(Number(location.y))) <
-              25
+             25
         );
 
         if (!selectedPlayer) {
@@ -900,6 +903,412 @@ export default async function packetReceiver(
             })
           )
         );
+        break;
+      }
+      case "COMMAND": {
+        if (!currentPlayer) return;
+        const _data = data as any;
+        const command = _data.command.toUpperCase();
+        const args = _data.args;
+        switch (command) {
+          case "KICK":
+          case "DISCONNECT": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            } 
+            const identifier = args[0] || null;
+            if (!identifier) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              break;
+            }
+
+            // Find player by ID or username
+            let targetPlayer;
+            if (isNaN(Number(identifier))) {
+              // Search by username
+              const players = Object.values(cache.list());
+              targetPlayer = players.find(p => p.username.toLowerCase() === identifier.toLowerCase());
+            } else {
+              // Search by ID
+              targetPlayer = cache.get(identifier);
+            }
+
+            // Prevent disconnecting yourself
+            if (targetPlayer?.id === currentPlayer.id) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot disconnect yourself" } })));
+              break;
+            }
+
+            if (!targetPlayer) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found or is not online" } })));
+              break;
+            }
+
+            // Prevent disconnecting admins
+            if (targetPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot disconnect other admins" } })));
+              break;
+            }
+
+            player.kick(targetPlayer.username, targetPlayer.ws);
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Disconnected ${targetPlayer.username} from the server` } })));
+            break;
+          }
+          // Send a message to all players in the current map
+          case "NOTIFY":
+          case "BROADCAST": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;  
+            }
+            let message;
+            let audience = "ALL";
+            
+            // If no audience provided, treat first arg as the message
+            if (!args[0]) return;
+            if (!["ALL", "ADMINS", "MAP"].includes(args[0].toUpperCase())) {
+              message = args.join(" ");
+            } else {
+              audience = args[0].toUpperCase();
+              message = args.slice(1).join(" ");
+            }
+
+            if (!message) return;
+            const players = Object.values(cache.list());
+            
+            switch (audience) {
+              case "ALL": {
+                players.forEach((player) => {
+                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                });
+                break;
+              }
+              case "ADMINS": {
+                const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+                const playersInMapAdmins = playersInMap.filter((p) => p.isAdmin);
+                playersInMapAdmins.forEach((player) => {
+                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                });
+                break;
+              }
+              case "MAP": {
+                const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+                playersInMap.forEach((player) => {
+                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                });
+                break;
+              }
+            }
+            break;
+          }
+          case "BAN": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+            const identifier = args[0] || null;
+            if (!identifier) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              break;
+            }
+
+            // Find player by ID or username in cache first
+            let targetPlayer;
+            if (isNaN(Number(identifier))) {
+              // Search by username
+              const players = Object.values(cache.list());
+              targetPlayer = players.find(p => p.username.toLowerCase() === identifier.toLowerCase());
+            } else {
+              // Search by ID
+              targetPlayer = cache.get(identifier);
+            }
+
+            // If not found in cache, check database
+            if (!targetPlayer) {
+              const dbPlayer = await player.findPlayerInDatabase(identifier) as { username: string, banned: number }[];
+              targetPlayer = dbPlayer.length > 0 ? dbPlayer[0] : null;
+            }
+
+            if (!targetPlayer) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+              break;
+            }
+
+            // Prevent banning yourself
+            if (targetPlayer.id === currentPlayer.id) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot ban yourself" } })));
+              break;
+            }
+
+            // Prevent banning admins
+            if (targetPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot ban other admins" } })));
+              break;
+            }
+
+            // Check if the player is already banned
+            if (targetPlayer.banned) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `${targetPlayer.username} is already banned` } })));
+              break;
+            }
+            
+            // Ban the player
+            await player.ban(targetPlayer.username, targetPlayer.ws);
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Banned ${targetPlayer.username} from the server` } })));
+            break;
+          }
+          case "UNBAN": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+            const identifier = args[0] || null;
+            if (!identifier) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              break;
+            }
+
+            const targetPlayer = await player.findPlayerInDatabase(identifier) as { username: string, banned: number }[] as any[];
+            if (!targetPlayer) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found or is not online" } })));
+              break;
+            }
+
+            // Prevent unbanning yourself
+            if (targetPlayer[0].id === currentPlayer.id) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot unban yourself" } })));
+              break;
+            }
+
+            // Unban the player
+            await player.unban(targetPlayer[0].username);
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Unbanned ${targetPlayer[0].username} from the server` } })));
+            break;           
+          }
+          // Toggle admin status
+          case "ADMIN":
+          case "SETADMIN": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+            const identifier = args[0] || null;
+            if (!identifier) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              break;
+            }
+
+            // Find player by ID or username in cache first
+            let targetPlayer;
+            if (isNaN(Number(identifier))) {
+              // Search by username
+              const players = Object.values(cache.list());
+              targetPlayer = players.find(p => p.username.toLowerCase() === identifier.toLowerCase());
+            } else {
+              // Search by ID
+              targetPlayer = cache.get(identifier);
+            }
+
+            // If not found in cache, check database
+            if (!targetPlayer) {
+              const dbPlayer = await player.findPlayerInDatabase(identifier) as { username: string, banned: number }[];
+              targetPlayer = dbPlayer.length > 0 ? dbPlayer[0] : null;
+            }
+
+            // Prevent toggling your own admin status
+            if (targetPlayer?.id === currentPlayer.id) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot toggle your own admin status" } })));
+              break;
+            }
+            
+            // Toggle admin status
+            const admin = await player.toggleAdmin(targetPlayer.username, targetPlayer.ws);
+            // Update player cache if the player is in the cache
+            if (targetPlayer) {
+              targetPlayer.isAdmin = admin;
+              cache.set(targetPlayer.id, targetPlayer);
+            }
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `${targetPlayer.username} admin status has been updated to ${admin}` } })));
+            break;
+          }
+          case "SHUTDOWN": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+            const players = Object.values(cache.list());
+            players.forEach((player) => {
+              player.ws.send(packet.encode(JSON.stringify({ 
+                type: "NOTIFY", 
+                data: { message: "⚠️ Server shutting down - please reconnect in a few minutes ⚠️" } 
+              })));
+            });
+
+            // Wait for 5 seconds
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            players.forEach((player) => {
+              player.ws.close(1000, "Server is restarting");
+            });
+            // Keep checking until all players are disconnected
+            const checkInterval = setInterval(() => {
+              const remainingPlayers = Object.values(cache.list());
+              remainingPlayers.forEach((player) => {
+                player.ws.close(1000, "Server is restarting");
+              });
+              
+              if (remainingPlayers.length === 0) {
+                clearInterval(checkInterval);
+                process.exit(0);
+              }
+            }, 100);
+            break;
+          }
+          // Restart the server
+          case "RESTART": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+
+            // Check if restart is already scheduled
+            if (restartScheduled) {
+              restartTimers.forEach(timer => clearTimeout(timer));
+              restartTimers = [];
+              restartScheduled = false;
+              
+              const players = Object.values(cache.list());
+              players.forEach((player) => {
+                player.ws.send(packet.encode(JSON.stringify({ 
+                  type: "NOTIFY", 
+                  data: { message: "⚠️ Server restart has been aborted ⚠️" } 
+                })));
+              });
+              break;
+            }
+
+            // Set restart flag
+            restartScheduled = true;
+            restartTimers = [];
+
+            const minutes = 15;
+            const RESTART_DELAY = minutes * 60000;
+            const totalMinutes = Math.floor(RESTART_DELAY / 60000);
+            
+            const minuteIntervals = Array.from({length: totalMinutes}, (_, i) => totalMinutes - i);
+            const secondIntervals = Array.from({length: 30}, (_, i) => 30 - i);
+
+            // Minute notifications
+            minuteIntervals.forEach(minutes => {
+              restartTimers.push(setTimeout(() => {
+                const players = Object.values(cache.list());
+                players.forEach((player) => {
+                  player.ws.send(packet.encode(JSON.stringify({ 
+                    type: "NOTIFY", 
+                    data: { message: `⚠️ Server restarting in ${minutes} minute${minutes === 1 ? '' : 's'} ⚠️` } 
+                  })));
+                });
+              }, RESTART_DELAY - (minutes * 60 * 1000)));
+            });
+
+            // Second notifications
+            secondIntervals.forEach(seconds => {
+              restartTimers.push(setTimeout(() => {
+                const players = Object.values(cache.list());
+                players.forEach((player) => {
+                  player.ws.send(packet.encode(JSON.stringify({ 
+                    type: "NOTIFY", 
+                    data: { message: `⚠️ Server restarting in ${seconds} second${seconds === 1 ? '' : 's'} ⚠️` } 
+                  })));
+                });
+              }, RESTART_DELAY - (seconds * 1000)));
+            });
+
+            // Final exit timeout
+            restartTimers.push(setTimeout(() => {
+              const players = Object.values(cache.list());
+              players.forEach((player) => {
+                player.ws.close(1000, "Server is restarting");
+              });
+              // Keep checking until all players are disconnected
+              const checkInterval = setInterval(() => {
+                const remainingPlayers = Object.values(cache.list());
+                remainingPlayers.forEach((player) => {
+                  player.ws.close(1000, "Server is restarting");
+                });
+                
+                if (remainingPlayers.length === 0) {
+                  clearInterval(checkInterval);
+                  process.exit(0);
+                }
+              }, 100);
+            }, RESTART_DELAY));
+            break;
+          }
+          // Respawn player by username or ID
+          case "RESPAWN": {
+            // Admin command
+            if (!currentPlayer.isAdmin) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+              break;
+            }
+
+            let targetPlayer;
+            const identifier = args[0];
+
+            if (!identifier) {
+              targetPlayer = currentPlayer;
+            } else {
+              // Find player by ID or username in cache first
+              const players = Object.values(cache.list());
+              if (isNaN(Number(identifier))) {
+                // Search by username
+                targetPlayer = players.find(p => p.username.toLowerCase() === identifier.toLowerCase());
+              } else {
+                // Search by ID
+                targetPlayer = cache.get(identifier);
+              }
+
+              // If not found in cache, check database
+              if (!targetPlayer) {
+                const dbPlayer = await player.findPlayerInDatabase(identifier) as { username: string }[];
+                targetPlayer = dbPlayer.length > 0 ? dbPlayer[0] : null;
+              }
+
+              if (!targetPlayer) {
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+                break;
+              }
+            }
+
+            // Respawn the player
+            await player.setLocation(targetPlayer.username, "main", { x: 0, y: 0, direction: "down" });
+            
+            // Update cache if player is online
+            if (cache.get(targetPlayer.id)) {
+              targetPlayer.location.position = { x: 0, y: 0, direction: "down" };
+              cache.set(targetPlayer.id, targetPlayer);
+              const playersInMap = filterPlayersByMap(targetPlayer.location.map);
+              playersInMap.forEach((player) => {
+                player.ws.send(packet.encode(JSON.stringify({ type: "MOVEXY", data: { id: targetPlayer.id, _data: targetPlayer.location.position } })));
+              });
+            }
+            
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Respawned ${targetPlayer.username}` } })));
+            break;
+          }
+          default: {
+            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            break;
+          }
+        }
         break;
       }
       // Unknown packet type

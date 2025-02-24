@@ -244,13 +244,12 @@ socket.onopen = () => {
   socket.send(packet.encode(JSON.stringify(_packet)));
 };
 
-socket.onclose = (e) => {
-  alert(`WebSocket closed: ${e.code} ${e.reason}`);
-  window.location.href = "/";
+socket.onclose = () => {
+  showNotification("You have been disconnected from the server", false, true);
 };
 
-socket.onerror = (error) => {
-  console.error("WebSocket error: " + error);
+socket.onerror = () => {
+  showNotification("An error occurred while connecting to the server", false, true);
 };
 
 socket.onmessage = async (event) => {
@@ -772,13 +771,17 @@ socket.onmessage = async (event) => {
     }
     case "INSPECTPLAYER": {
       const data = JSON.parse(packet.decode(event.data))["data"];
-      console.log(data);
       // Add the player ID as an attribute to the target stats container
       statUI.setAttribute("data-id", data.id);
       healthLabel!.innerText = `Health: (${data.stats.health})`;
       manaLabel!.innerText = `Mana: (${data.stats.stamina})`;
       statUI.style.transition = "1s";
       statUI.style.left = "10";
+      break;
+    }
+    case "NOTIFY": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      showNotification(data.message, true, false);
       break;
     }
     default:
@@ -981,6 +984,34 @@ window.addEventListener("keydown", async (e) => {
       chatInput.blur();
       return;
     }
+
+    // Check if we are sending a command
+    if (chatInput.value.trim().startsWith("/")) {
+      const command = chatInput.value.trim().substring(1);
+      // Match either quoted strings or non-space sequences
+      const commandParts = command.match(/[^\s"]+|"([^"]*)"/g) || [];
+      // Remove quotes and get command name and args
+      const commandName = commandParts[0];
+      const commandArgs = commandParts.slice(1).map(arg => 
+        arg.startsWith('"') ? arg.slice(1, -1) : arg
+      );
+
+      socket.send(
+        packet.encode(
+          JSON.stringify({
+            type: "COMMAND",
+            data: {
+              command: commandName,
+              args: commandArgs,
+            },
+          })
+        )
+      );
+      chatInput.value = "";
+      chatInput.blur();
+      return;
+    } 
+
     const publicKey = sessionStorage.getItem("publicKey");
     if (!publicKey) return;
     const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
@@ -1835,3 +1866,38 @@ function cleanBase64Key(base64Key: string): string {
   return base64Key.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s+/g, '');
 }
 
+/* Notifications */
+const notificationContainer = document.getElementById("game-notification-container");
+const notificationMessage = document.getElementById("game-notification-message");
+let clearNotificationTimeout: any = null;
+
+function showNotification(message: string, autoClose: boolean = true, reconnect: boolean = false) {
+
+  if (!notificationContainer || !notificationMessage) return;
+  
+  notificationMessage.innerText = message;
+  notificationContainer.style.display = "flex";
+  
+  const baseTimeout = 5000; // Base timeout of 5 seconds
+  const timePerChar = 100; // Additional time per character in milliseconds
+  const timeout = baseTimeout + (message.length * timePerChar);
+
+  if (autoClose) {
+    // Clear any existing timeout
+    if (clearNotificationTimeout) {
+      clearTimeout(clearNotificationTimeout);
+    }
+    clearNotificationTimeout = setTimeout(() => {
+      notificationContainer.style.display = "none";
+      // If reconnect is true, redirect after hiding notification
+      if (reconnect) {
+        window.location.href = "/";
+      }
+    }, timeout);
+  } else if (reconnect) {
+    // If not auto-closing but need to reconnect
+    setTimeout(() => {
+      window.location.href = "/";
+    }, timeout);
+  }
+}

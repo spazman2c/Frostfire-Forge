@@ -19,6 +19,7 @@
 > **Requirements**:
 > - [Bun](https://bun.sh/)
 > - [MySQL](https://www.mysql.com/downloads/)
+> - [Node.js](https://nodejs.org/en/download/)
 > <br>
 > Database Creation:
 >
@@ -36,6 +37,12 @@ bun production
 
 ```
 bun development
+```
+
+<h5>Running the server as a daemon (PM2)</h5>
+
+```
+pm2 start ./src/utility/daemon.js --name "Game Server"
 ```
 
 <h5>Database Setup</h5>
@@ -62,18 +69,6 @@ bun test
 
 ```
 bun create-config
-```
-
-<h5>Run Docker</h5>
-
-```
-bun docker
-```
-
-<h5>Stop Docker</h5>
-
-```
-bun stop-docker
 ```
 
 <h3>Production Environment Variables</h3>
@@ -106,6 +101,69 @@ DOMAIN
 GAME_NAME
 DATABASE_PORT
 ```
+
+<hr>
+
+<h3>Admin Commands</h3>
+
+<h4>Disconnect Player</h4>
+
+```
+/kick [username | id]
+Aliases: disconnect
+```
+
+<h4>Ban Player</h4>
+
+```
+/ban [username | id]
+Aliases: ban
+``` 
+
+<h4>Unban Player</h4>
+
+```
+/unban [username | id]
+Aliases: unban
+```
+
+<h4>Send Message to Players</h4>
+
+```
+/notify [audience?] [message]
+Audience: all (default) | map | admins
+Aliases: notify
+```
+
+<h4>Toggle Admin Status</h4>
+
+```
+/admin [username | id]
+Aliases: setadmin
+```
+
+<h4>Server Shutdown</h4>
+
+```
+/shutdown
+Aliases: shutdown
+```
+
+<h4>Server Restart (Scheduled: 15 minutes)</h4>
+
+```
+/restart
+Aliases: restart
+```
+
+<h4>Respawn Player</h4>
+
+```
+/respawn [username | id]
+Aliases: respawn
+```
+
+<hr>
 
 <h3>Client Identity</h3>
 

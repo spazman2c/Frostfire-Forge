@@ -1,14 +1,19 @@
+import UglyifyJS from 'uglify-js';
 import path from "path";
 import fs from "fs";
 import log from "../modules/logger";
 import assetConfig from "../services/assetConfig";
-const assetPath = assetConfig.getAssetConfig();
+if (!assetConfig.getAssetConfig()) {
+  throw new Error("Asset path not found");
+}
 
-if (!assetPath || !fs.existsSync(path.join(import.meta.dir, assetPath))) {
+const assetPath = path.join(import.meta.dir, assetConfig.getAssetConfig() as string);
+
+if (!assetPath || !fs.existsSync(assetPath)) {
   throw new Error(`Asset path not found at ${assetPath}`);
 }
 
-const asset = fs.readFileSync(path.join(import.meta.dir, assetPath), "utf-8");
+const asset = fs.readFileSync(assetPath, "utf-8");
 if (!asset) {
   throw new Error("Failed to load asset config");
 }
@@ -38,7 +43,9 @@ function transpileDirectory(sourceDir: string) {
             let replacedResult = result; // copy result to new variable to edit it
             envVars.forEach((env) => replacedResult = replacedResult.replaceAll(env.key, env.value || env.defaultvalue) );
 
-            fs.writeFileSync(outputFile, replacedResult);
+            const minifiedResult = UglyifyJS.minify(replacedResult);
+
+            fs.writeFileSync(outputFile, minifiedResult.code);
         } else {
             console.error(`Failed to transpile ${script}`);
         }
