@@ -1,6 +1,7 @@
 import { packetTypes } from "./types";
 import log from "../modules/logger";
 import player from "../systems/player";
+import permissions from "../systems/permissions";
 import inventory from "../systems/inventory";
 import cache from "../services/cache";
 import assetCache from "../services/assetCache";
@@ -128,6 +129,9 @@ export default async function packetReceiver(
           ws.data.id
         )) as any[];
         const username = getUsername[0]?.username as string;
+        // Get permissions for the player
+        const access = await permissions.get(username) as string;
+        
         // Retrieve the player's inventory
         const items = (await inventory.get(username)) || [];
         if (items.length > 30) {
@@ -221,6 +225,7 @@ export default async function packetReceiver(
           stats,
           attackDelay: 0,
           lastMovementPacket: null,
+          permissions: access.split(",") || [],
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -911,14 +916,15 @@ export default async function packetReceiver(
         const command = _data.command.toUpperCase();
         const args = _data.args;
         switch (command) {
+          // Kick a player
           case "KICK":
           case "DISCONNECT": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // admin.kick or admin.*
+            if (!currentPlayer.permissions.some((p: string) => p === "admin.kick" || p === "admin.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             } 
-            const identifier = args[0] || null;
+            const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
               ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
               break;
@@ -959,9 +965,9 @@ export default async function packetReceiver(
           // Send a message to all players in the current map
           case "NOTIFY":
           case "BROADCAST": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // server.notify or server.*
+            if (!currentPlayer.permissions.some((p: string) => p === "server.notify" || p === "server.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;  
             }
             let message;
@@ -1004,13 +1010,14 @@ export default async function packetReceiver(
             }
             break;
           }
+          // Ban a player
           case "BAN": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // admin.ban or admin.*
+            if (!currentPlayer.permissions.some((p: string) => p === "admin.ban" || p === "admin.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
-            const identifier = args[0] || null;
+            const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
               ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
               break;
@@ -1062,9 +1069,9 @@ export default async function packetReceiver(
             break;
           }
           case "UNBAN": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // admin.unban or admin.*
+            if (!currentPlayer.permissions.some((p: string) => p === "admin.unban" || p === "admin.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
             const identifier = args[0] || null;
@@ -1093,12 +1100,12 @@ export default async function packetReceiver(
           // Toggle admin status
           case "ADMIN":
           case "SETADMIN": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // server.admin or server.*
+            if (!currentPlayer.permissions.some((p: string) => p === "server.admin" || p === "server.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
-            const identifier = args[0] || null;
+            const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
               ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
               break;
@@ -1137,10 +1144,11 @@ export default async function packetReceiver(
             ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `${targetPlayer.username} admin status has been updated to ${admin}` } })));
             break;
           }
+          // Shutdown the server
           case "SHUTDOWN": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // server.shutdown or server.*
+            if (!currentPlayer.permissions.some((p: string) => p === "server.shutdown" || p === "server.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
             const players = Object.values(cache.list());
@@ -1172,9 +1180,9 @@ export default async function packetReceiver(
           }
           // Restart the server
           case "RESTART": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // server.restart or server.*
+            if (!currentPlayer.permissions.some((p: string) => p === "server.restart" || p === "server.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
 
@@ -1254,14 +1262,14 @@ export default async function packetReceiver(
           }
           // Respawn player by username or ID
           case "RESPAWN": {
-            // Admin command
-            if (!currentPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            // admin.respawn or admin.*
+            if (!currentPlayer.permissions.some((p: string) => p === "admin.respawn" || p === "admin.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
               break;
             }
 
             let targetPlayer;
-            const identifier = args[0];
+            const identifier = args[0].toLowerCase() || null;
 
             if (!identifier) {
               targetPlayer = currentPlayer;
@@ -1302,6 +1310,147 @@ export default async function packetReceiver(
             }
             
             ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Respawned ${targetPlayer.username}` } })));
+            break;
+          }
+          // Update permissions for a player
+          case "PERMISSION":
+          case "PERMISSIONS": {
+            // admin.permission or admin.*
+            if (!currentPlayer.permissions.some((p: string) => p === "admin.permission" || p === "admin.*")) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              break;
+            }
+            const mode = args[0]?.toUpperCase() || null;
+            if (!mode) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a mode" } })));
+              break;
+            }
+
+            if (mode !== "ADD" && mode !== "REMOVE" && mode !== "SET" && mode !== "CLEAR" && mode !== "LIST") {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid mode" } })));
+              break;
+            }
+
+            let targetPlayer;
+            const identifier = args[1]?.toLowerCase() || null;
+            
+            // Find player by ID or username in cache first
+            const players = Object.values(cache.list());
+            if (isNaN(Number(identifier))) {
+              // Search by username
+              targetPlayer = players.find(p => p.username.toLowerCase() === identifier.toLowerCase());
+            } else {
+              // Search by ID
+              targetPlayer = cache.get(identifier);
+            }
+
+            // If not found in cache, check database
+            if (!targetPlayer) {
+              const dbPlayer = await player.findPlayerInDatabase(identifier) as { username: string }[];
+              targetPlayer = dbPlayer.length > 0 ? dbPlayer[0] : null;
+            }
+            
+            if (!targetPlayer) {
+              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+              break;
+            }
+
+            // Permissions is what ever is after the mode unless it's clear or list
+            let access;
+            let permissionsArray;
+            if (mode !== "CLEAR" && mode !== "LIST") {
+              access = args.slice(2).join(" ");
+              // Check if each permission is valid 
+              const validPermissions = await permissions.list();
+              // Ensure permissions is split by commas
+              permissionsArray = access.split(",");
+              permissionsArray.forEach((permission: string) => {
+                if (!validPermissions.includes(permission)) {
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Invalid permission: ${permission}` } })));
+                  return;
+                }
+              });
+            }
+
+            switch (mode) {
+              case "ADD": {
+                if (!currentPlayer.permissions.some((p: string) => p === "permission.add" || p === "permission.*")) {
+                  // Prevent setting permissions for yourself
+                  if (targetPlayer?.id === currentPlayer.id) {
+                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    break;
+                  }
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  break;
+                }
+                await permissions.add(targetPlayer.username, permissionsArray);
+                // Update the player cache
+                targetPlayer.permissions = permissionsArray;
+                cache.set(targetPlayer.id, targetPlayer);
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions added to ${targetPlayer.username}` } })));
+                break;
+              }
+              case "REMOVE": {
+                if (!currentPlayer.permissions.some((p: string) => p === "permission.remove" || p === "permission.*")) {
+                  // Prevent setting permissions for yourself
+                  if (targetPlayer?.id === currentPlayer.id) {
+                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    break;
+                  }
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  break;
+                }
+                await permissions.remove(targetPlayer.username, permissionsArray);
+                // Update the player cache
+                targetPlayer.permissions = permissionsArray;
+                cache.set(targetPlayer.id, targetPlayer);
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions removed from ${targetPlayer.username}` } })));
+                break;
+              }
+              case "SET": {
+                if (!currentPlayer.permissions.some((p: string) => p === "permission.add" || p === "permission.*")) {
+                  // Prevent setting permissions for yourself
+                  if (targetPlayer?.id === currentPlayer.id) {
+                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    break;
+                  }
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  break;
+                }
+                await permissions.set(targetPlayer.username, permissionsArray);
+                // Update the player cache
+                targetPlayer.permissions = permissionsArray;
+                cache.set(targetPlayer.id, targetPlayer);
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions set for ${targetPlayer.username}` } })));
+                break;
+              }
+              case "CLEAR": {
+                if (!currentPlayer.permissions.some((p: string) => p === "permission.remove" || p === "permission.*")) {
+                  // Prevent setting permissions for yourself
+                  if (targetPlayer?.id === currentPlayer.id) {
+                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    break;
+                  }
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  break;
+                }
+                await permissions.clear(targetPlayer.username);
+                // Update the player cache
+                targetPlayer.permissions = [];
+                cache.set(targetPlayer.id, targetPlayer);
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions cleared for ${targetPlayer.username}` } })));
+                break;
+              }
+              case "LIST": {
+                if (!currentPlayer.permissions.some((p: string) => p === "permission.list" || p === "permission.*")) {
+                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  break;
+                }
+                const response = await permissions.get(targetPlayer.username) as string || "No permissions found";
+                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions for ${targetPlayer.username}: ${response.replaceAll(",", ", ")}` } })));
+                break;
+              }
+            }
             break;
           }
           default: {

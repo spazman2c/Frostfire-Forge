@@ -181,7 +181,47 @@ const createSpellsTable = async () => {
     )
   `;
   await query(sql);
-}
+};
+
+const createPermissionsTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+
+  const sql = `
+    CREATE TABLE IF NOT EXISTS permissions (
+      username VARCHAR(255) NOT NULL UNIQUE PRIMARY KEY,
+      permissions VARCHAR(255) NOT NULL
+    )
+  `;
+  await query(sql);
+};
+
+const createPermissionTypesTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+
+
+  const sql = `
+    CREATE TABLE IF NOT EXISTS permission_types (
+      name VARCHAR(255) NOT NULL UNIQUE PRIMARY KEY
+    )
+
+    INSERT IGNORE INTO permission_types (name) VALUES
+      ('admin.ban'),
+      ('admin.disconnect'),
+      ('admin.permission'),
+      ('admin.respawn'),
+      ('admin.unban'),
+      ('permission.add'),
+      ('permission.list'),
+      ('permission.remove'),
+      ('server.admin'),
+      ('server.notify'),
+      ('server.restart'),
+      ('server.shutdown');
+  `;
+  await query(sql);
+};
 
 // Run the database setup
 const setupDatabase = async () => {
@@ -196,6 +236,8 @@ const setupDatabase = async () => {
   await createClientConfig();
   await createWeaponsTable();
   await createSpellsTable();
+  await createPermissionsTable();
+  await createPermissionTypesTable();
 };
 
 try {

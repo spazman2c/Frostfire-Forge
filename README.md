@@ -111,6 +111,7 @@ DATABASE_PORT
 ```
 /kick [username | id]
 Aliases: disconnect
+Permission: admin.kick | admin.*
 ```
 
 <h4>Ban Player</h4>
@@ -118,6 +119,7 @@ Aliases: disconnect
 ```
 /ban [username | id]
 Aliases: ban
+Permission: admin.ban | admin.*
 ``` 
 
 <h4>Unban Player</h4>
@@ -125,6 +127,7 @@ Aliases: ban
 ```
 /unban [username | id]
 Aliases: unban
+Permission: admin.unban | admin.*
 ```
 
 <h4>Send Message to Players</h4>
@@ -133,6 +136,7 @@ Aliases: unban
 /notify [audience?] [message]
 Audience: all (default) | map | admins
 Aliases: notify
+Permission: server.notify | server.*
 ```
 
 <h4>Toggle Admin Status</h4>
@@ -140,6 +144,7 @@ Aliases: notify
 ```
 /admin [username | id]
 Aliases: setadmin
+Permission: server.admin | server.*
 ```
 
 <h4>Server Shutdown</h4>
@@ -147,6 +152,7 @@ Aliases: setadmin
 ```
 /shutdown
 Aliases: shutdown
+Permission: server.shutdown | server.*
 ```
 
 <h4>Server Restart (Scheduled: 15 minutes)</h4>
@@ -154,6 +160,7 @@ Aliases: shutdown
 ```
 /restart
 Aliases: restart
+Permission: server.restart
 ```
 
 <h4>Respawn Player</h4>
@@ -161,6 +168,22 @@ Aliases: restart
 ```
 /respawn [username | id]
 Aliases: respawn
+Permission: admin.respawn | admin.*
+```
+
+<h4>Update Player Permissions</h4>
+
+```
+/permission [username | id] [mode] [permissions?]
+Aliases: permissions
+Permission: admin.permission | admin.*
+
+Modes:
+- add
+- remove
+- set
+- clear
+- list
 ```
 
 <hr>
@@ -882,4 +905,53 @@ await npc.list();
 
 ```ts
 await npc.move(npc);
+```
+
+<hr>
+<h3>Permissions Management</h3>
+
+```ts
+import permissions from "../systems/permissions";
+```
+
+<h5>permissions.clear();</h5>
+<p style="font-size:0.75em;">Clears a player's permissions</p>
+
+```ts
+await permissions.clear(username);
+```
+
+<h5>permissions.get();</h5>
+<p style="font-size:0.75em;">Fetches a player's permissions</p>
+
+```ts
+await permissions.get(username);
+``` 
+
+<h5>permissions.add();</h5>
+<p style="font-size:0.75em;">Adds a permission to a player</p>
+
+```ts
+await permissions.add(username, permission);
+```
+
+<h5>permissions.remove();</h5>
+<p style="font-size:0.75em;">Removes a permission from a player</p>
+
+```ts
+await permissions.remove(username, permission);
+``` 
+
+<h5>permissions.set();</h5>
+<p style="font-size:0.75em;">Sets a player's permissions</p>
+
+```ts
+await permissions.set(username, permissions);
+``` 
+
+<h5>permissions.list();</h5>
+<p style="font-size:0.75em;">Lists all permissions</p>
+
+```ts
+await permissions.list();
 ```
