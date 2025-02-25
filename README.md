@@ -180,10 +180,15 @@ Permission: admin.permission | admin.*
 
 Modes:
 - add
+Permission: permission.add | permission.*
 - remove
+Permission: permission.remove | permission.*
 - set
+Permission: permission.add | permission.*
 - clear
+Permission: permission.remove | permission.*
 - list
+Permission: permission.list | permission.*
 ```
 
 <hr>
