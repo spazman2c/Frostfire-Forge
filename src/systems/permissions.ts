@@ -10,7 +10,7 @@ const permissions = {
     set: async (username: string, permissions: string[]) => {
         // Set permissions for a player
         await query("INSERT INTO permissions (username, permissions) VALUES (?, ?)", [username, permissions.join(",")]);
-        log.info(`Permissions set for ${username}`);
+        log.info(`Permissions ${permissions.join(",")} set for ${username}`);
     },
     get: async (username: string) => {
         // Get permissions for a player
@@ -24,6 +24,7 @@ const permissions = {
         const access = response.split(",");
         access.push(permission);
         await permissions.set(username, access);
+        log.info(`Permission ${permission} added to ${username}`);
     },
     remove: async (username: string, permission: string) => {
         // Get permissions for a player
@@ -31,6 +32,7 @@ const permissions = {
         const access = response.split(",");
         access.splice(access.indexOf(permission), 1);
         await permissions.set(username, access);
+        log.info(`Permission ${permission} removed from ${username}`);
     },
     list: async() => {
         // Get all permission types 
