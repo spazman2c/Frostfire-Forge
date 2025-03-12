@@ -225,7 +225,7 @@ export default async function packetReceiver(
           stats,
           attackDelay: 0,
           lastMovementPacket: null,
-          permissions: access.split(",") || [],
+          permissions: (typeof access === 'string' ? access.split(",") : []),
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
