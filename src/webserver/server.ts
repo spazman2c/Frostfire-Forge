@@ -24,132 +24,157 @@ const _cert = path.join(import.meta.dir, "../certs/cert.crt");
 const _key = path.join(import.meta.dir, "../certs/cert.key");
 const _https = process.env.WEBSRV_USESSL === "true" && fs.existsSync(_cert) && fs.existsSync(_key);
 
+const routes = {
+  "/docs": docs_html,
+  "/benchmark": benchmark_html,
+  "/": login_html,
+  "/registration": register_html,
+  "/game": game_html,
+  "/login": login,
+  "/verify": authenticate,
+  "/register": register,
+  "/map/hash": {
+    GET: async (req: Request) => {
+      const url = new URL(req.url);
+      const mapName = url.searchParams.get("name");
+      if (!mapName) {
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+      }
+
+      for (const key of Object.keys(maps)) {
+        if (maps[key].name === mapName) {
+          return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
+        }
+      }
+
+      return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
+    },
+    POST: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    PUT: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    DELETE: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    PATCH: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    OPTIONS: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+  },
+  "/tileset/hash" : {
+    GET: async (req: Request) => {
+      if (req.method !== "GET") {
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+    const url = new URL(req.url);
+    const tilesetName = url.searchParams.get("name");
+    if (!tilesetName) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+
+    for (const key of Object.keys(tilesets)) {
+      if (tilesets[key].name === tilesetName) {
+        return new Response(JSON.stringify({ hash: tilesets[key].hash }), { status: 200 });
+      }
+    }
+    return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
+    },
+    POST: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    PUT: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    DELETE: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    PATCH: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    OPTIONS: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+  },
+  "/tileset" : {
+    GET: async (req: Request) => {
+      if (req.method !== "GET") {
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+      }
+    const url = new URL(req.url);
+    const tilesetName = url.searchParams.get("name");
+    if (!tilesetName) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+
+    for (const key of Object.keys(tilesets)) {
+      if (tilesets[key].name === tilesetName) {
+        return new Response(JSON.stringify({ tileset: tilesets[key] }), { status: 200 });
+      }
+    }
+    return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
+    },
+    POST: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    PUT: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    DELETE: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },  
+    PATCH: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+    OPTIONS: async () => {
+      // Return a 405
+      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+    },
+  },
+}
+
 Bun.serve({
   port: _https ? 443 : 80,
   routes: {
-    "/docs": docs_html,
-    "/benchmark": benchmark_html,
-    "/": login_html,
-    "/registration": register_html,
-    "/register": register,
-    "/game": game_html,
-    "/login": login,
-    "/verify": authenticate,
-    "/map/hash": {
-      GET: async (req: Request) => {
-        const url = new URL(req.url);
-        const mapName = url.searchParams.get("name");
-        if (!mapName) {
-          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-        }
-
-        for (const key of Object.keys(maps)) {
-          if (maps[key].name === mapName) {
-            return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
-          }
-        }
-
-        return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
-      },
-      POST: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      PUT: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      DELETE: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      PATCH: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      OPTIONS: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-    },
-    "/tileset/hash" : {
-      GET: async (req: Request) => {
-        if (req.method !== "GET") {
-          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-      }
-      const url = new URL(req.url);
-      const tilesetName = url.searchParams.get("name");
-      if (!tilesetName) {
-        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-      }
-
-      for (const key of Object.keys(tilesets)) {
-        if (tilesets[key].name === tilesetName) {
-          return new Response(JSON.stringify({ hash: tilesets[key].hash }), { status: 200 });
-        }
-      }
-      return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
-      },
-      POST: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      PUT: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      DELETE: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      PATCH: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      OPTIONS: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-    },
-    "/tileset" : {
-      GET: async (req: Request) => {
-        if (req.method !== "GET") {
-          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-        }
-      const url = new URL(req.url);
-      const tilesetName = url.searchParams.get("name");
-      if (!tilesetName) {
-        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-      }
-
-      for (const key of Object.keys(tilesets)) {
-        if (tilesets[key].name === tilesetName) {
-          return new Response(JSON.stringify({ tileset: tilesets[key] }), { status: 200 });
-        }
-      }
-      return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
-      },
-      POST: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      PUT: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      DELETE: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },  
-      PATCH: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-      OPTIONS: async () => {
-        // Return a 405
-        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-      },
-    },
+    "/docs": routes["/docs"],
+    "/benchmark": routes["/benchmark"],
+    "/": routes["/"],
+    "/registration": routes["/registration"],
+    "/register": routes["/register"],
+    "/game": routes["/game"],
+    "/login": routes["/login"],
+    "/verify": routes["/verify"],
+    "/map/hash": routes["/map/hash"],
+    "/tileset/hash": routes["/tileset/hash"],
+    "/tileset": routes["/tileset"],
+  },
+  fetch(req) {
+    const url = new URL(req.url);
+    if (_https && url.protocol === "http:") {
+      return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
+    }
+    const route = routes[url.pathname as keyof typeof routes];
+    if (!route) {
+      return new Response("Not found", { status: 404 });
+    }
+    return route[req.method as keyof typeof route]?.(req);
   },
   ...(_https ? {
       cert: fs.readFileSync(_cert),
