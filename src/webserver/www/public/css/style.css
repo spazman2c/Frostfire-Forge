@@ -59,14 +59,14 @@ body {
   width: 100%;
   height: 100vh;
   background-color: #f1f1f1;
-  background: url("/img/background.png");
+  background: url("../img/background.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-origin: border-box;
 }
 
 #logo {
-  content: url("/img/logo.gif");
+  content: url("../img/logo.gif");
   width: auto;
   height: auto;
   /* Position at top center */
@@ -92,7 +92,7 @@ body {
 }
 
 #login {
-  content: url("/img/login.png");
+  content: url("../img/login.png");
 }
 
 #register {

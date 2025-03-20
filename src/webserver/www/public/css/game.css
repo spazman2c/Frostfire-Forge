@@ -16,7 +16,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url("/img/background.png");
+  background: url("../img/background.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
@@ -55,7 +55,7 @@ body {
   bottom: 10;
   right: -350;
   z-index: 100;
-  background: url("/img/ui/ui-inventory-container.png");
+  background: url("../img/ui/ui-inventory-container.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   transition: right ease-in-out 1s;
@@ -85,7 +85,7 @@ body {
   word-wrap: break-word;
   overflow: hidden;
   color: #bdbdbd;
-  background: url("/img/ui/ui-inventory-slot.png");
+  background: url("../img/ui/ui-inventory-slot.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   user-select: none;
@@ -112,7 +112,7 @@ body {
   word-wrap: break-word;
   overflow: hidden;
   color: #bdbdbd;
-  background: url("/img/ui/ui-inventory-slot.png");
+  background: url("../img/ui/ui-inventory-slot.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   user-select: none;
@@ -210,7 +210,7 @@ body {
   bottom: -162;
   left: 10;
   z-index: 100;
-  background: url("/img/ui/ui-chat-container.png");
+  background: url("../img/ui/ui-chat-container.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   width: 500px;
@@ -256,7 +256,7 @@ input::placeholder {
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  background: url("/img/ui/ui-hotbar-container.png");
+  background: url("../img/ui/ui-hotbar-container.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   width: 469px;
@@ -269,7 +269,7 @@ input::placeholder {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url("/img/background.png");
+  background: url("../img/background.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
@@ -301,7 +301,7 @@ input::placeholder {
 #stats-container, #target-stats-container {
   position: fixed;
   z-index: 100;
-  background: url("/img/ui/ui-stats-container.png");
+  background: url("../img/ui/ui-stats-container.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
   width: 330px;
@@ -326,7 +326,7 @@ input::placeholder {
   left: 10;
   width: 97px;
   height: 102px;
-  background: url("/img/ui/ui-player-image.png");
+  background: url("../img/ui/ui-player-image.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
@@ -347,20 +347,20 @@ input::placeholder {
 
 /* Max Health */
 .green {
-  background: url("/img/ui/ui-health-green.png");
+  background: url("../img/ui/ui-health-green.png");
 }
 
 /* 70% Health */
 .yellow {
-  background: url("/img/ui/ui-health-yellow.png");  
+  background: url("../img/ui/ui-health-yellow.png");  
 }
 /* */
 .orange {
-  background: url("/img/ui/ui-health-orange.png");
+  background: url("../img/ui/ui-health-orange.png");
 }
 
 .red {
-  background: url("/img/ui/ui-health-red.png");
+  background: url("../img/ui/ui-health-red.png");
 }
 
 #stamina-bar-container, #target-stamina-bar-container {
@@ -375,7 +375,7 @@ input::placeholder {
 #stamina-progress-bar, #target-stamina-progress-bar {
   height: 100%;
   width: 100%;
-  background: url("/img/ui/ui-stamina.png");
+  background: url("../img/ui/ui-stamina.png");
 }
 
 #map-container {

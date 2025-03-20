@@ -16,8 +16,12 @@ login.addEventListener('click', async () => {
             username: username.value,
             password: password.value
         }),
-    });
-
+    });    
+    if (response.status === 200 || response.status === 301) {
+        const res = await response.json();
+        // Set cookie
+        document.cookie = `token=${res.data.token}; path=/`;
+    }
     if (response.status === 200) {
         // @ts-expect-error Notify is not defined
         window.Notify('success', 'Email sent successfully');

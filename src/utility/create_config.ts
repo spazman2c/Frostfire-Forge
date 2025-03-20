@@ -16,9 +16,6 @@ const assetConfig = {
   sfx: {
     path: "../../assets/sfx/",
   },
-  scripts: {
-    path: "../../assets/scripts/",
-  },
   spritesheets: {
     path: "../../assets/spritesheets/",
   },

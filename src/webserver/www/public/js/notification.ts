@@ -1,4 +1,4 @@
-export default function Notify(type: string, message: string) {
+function Notify(type: string, message: string) {
 	const notification = document.createElement("div") as HTMLDivElement;
 	notification.classList.add("notification");
 	notification.classList.add(`notification-${type}`);
@@ -20,3 +20,6 @@ export default function Notify(type: string, message: string) {
 		notification.remove();
 	}, 5000);
 }
+
+// Assign the Notify function to the global window object
+window.Notify = Notify;

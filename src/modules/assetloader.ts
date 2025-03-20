@@ -213,30 +213,6 @@ function loadTilesets() {
 }
 loadTilesets();
 
-// Load scripts
-function loadScripts() {
-  const now = performance.now();
-  const scripts = [] as ScriptData[];
-  const scriptDir = path.join(import.meta.dir, assetData.scripts.path);
-  if (!fs.existsSync(scriptDir)) return scripts;
-
-  const scriptFiles = fs
-    .readdirSync(scriptDir)
-    .filter((file) => file.endsWith(".js"));
-  scriptFiles.forEach((file) => {
-    const scriptData = fs.readFileSync(path.join(scriptDir, file), "utf-8");
-    log.debug(`Loaded script: ${file}`);
-    const scriptHash = crypto
-      .createHash("sha256")
-      .update(scriptData)
-      .digest("hex");
-    scripts.push({ name: file, data: scriptData, hash: scriptHash });
-  });
-  assetCache.add("scripts", scripts);
-  log.success(`Loaded ${scripts.length} script(s) in ${(performance.now() - now).toFixed(2)}ms`);
-}
-loadScripts();
-
 function tryParse(data: string): any {
   try {
     return JSON.parse(data);

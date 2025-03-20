@@ -18,8 +18,6 @@ if (!asset) {
   throw new Error("Failed to load asset config");
 }
 
-const assetData = JSON.parse(asset);
-
 const transpiler = new Bun.Transpiler({
     loader: "tsx",
 });
@@ -54,8 +52,6 @@ function transpileDirectory(sourceDir: string) {
 
 // Define directories to transpile
 const directories = [
-    path.join(import.meta.dir, assetData.scripts.path),
-    path.join(import.meta.dir, "..", "webserver", "www", "game", "js"),
     path.join(import.meta.dir, "..", "webserver", "www", "public", "js"),
 ];
 

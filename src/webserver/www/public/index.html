@@ -3,12 +3,9 @@
         <meta charset="utf-8">
         <title>Mystika - Login</title>
         <script src="./js/browsers.js"></script>
-        <script type="module">
-            import Notify from "/js/notification.js";
-            window.Notify = Notify;
-        </script>
-        <script defer src="js/login.js"></script>
-        <link rel="stylesheet" href="css/style.css">
+        <script src="./js/notification.js"></script>
+        <script defer src="./js/login.js"></script>
+        <link rel="stylesheet" href="./css/style.css">
     </head>
     <body>
         <div id="container"> <!-- Displays the background of the webpage -->
@@ -18,7 +15,7 @@
                     <input type="password" id="password" name="password" placeholder="Password" spellcheck="false" autocomplete="current-password" required>
                     <input type="button" id="login-button" value="Login">
                 </form>
-                <p id="register-text">No account? </p><a href="/register" id="register-link">Register</a>
+                <p id="register-text">No account? </p><a href="/registration" id="register-link">Register</a>
             </div>
             <div id="login"></div> <!-- Displays the login UI-->
             <div id="logo"></div>

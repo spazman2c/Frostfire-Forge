@@ -1,11 +1,12 @@
 const socket = new WebSocket(`__VAR.WEBSOCKETURL__`);
+import * as pako from "../libs/pako.js";
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
 const npcs = [] as any[];
 const mapScale = 0.1;
 const audioCache = new Map<string, string>();
 const npcImage = new Image();
-npcImage.src = "/img/npc.png";
+npcImage.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAmCAYAAABOFCLqAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TxQ8qDq0g4pChioNdVMSxVLEIFkpboVUHk0u/oElDkuLiKLgWHPxYrDq4OOvq4CoIgh8g7oKToouU+L+k0CLGg+N+vLv3uHsHCI0KU82uKKBqlpGKx8RsblXseYWAPgQxgSGJmXoivZiB5/i6h4+vdxGe5X3uzzGg5E0G+ETiKNMNi3iDeHbT0jnvE4dYSVKIz4knDbog8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4hDiuqRvlC1mWF8xZntVJjrXvyFwby2kqa6zRHEccSEkhChIwayqjAQoRWjRQTKdqPefhHHH+SXDK5ymDkWEAVKiTHD/4Hv7s1C9NTblIgBnS/2PbHGNCzCzTrtv19bNvNE8D/DFxpbX+1Acx9kl5va+EjYHAbuLhua/IecLkDDD/pkiE5kp+mUCgA72f0TTkgeAv0r7m9tfZx+gBkqKvlG+DgEBgvUva6x7t7O3v790yrvx+jlHK64ZQ6gAAAAAZiS0dEAAAAAAAA+UO7fwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+kCCRMwEsjIppIAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAB50lEQVRYw+2YvWvCYBDGn7xk0yRUKtqIiBBaUAoOznXv6B9b6GhnN3GRDErQRG2U1w9cStNB35hEjV/5sOBNuYRcft7de88h95LPW7gR4wHg/fURkrCMDYLOE/hofYMAgCQsQeeJ2EBYIgi7OS5UMS3VI4Oi8wSmpTrGhaq7TACgTBpQUYOyyZIkLJESg2+nyYyz46uGCWXS2IVhQKxsfSqhT7fPkuTHvl788mf7TstJ1PU9ZsTvVyTJjyvoNXZKLN7vZfuEOZrsat+nJwluyO4w/wKGPzaY9l0H4Z8MQ72nIUQJ2FsmNVWz5SBs0WRaOC3VoaZquzDpXhOmYUam3pKwhGmYSPea7jKxbEie8Ry2KZMGILB+Wq1hirlFrKcoJS6A1iYzn+0HyGJ8C99gxgHQ1z0ji9bmRjwgLBF2A8uihVWxgg6XiQSiw2WwKlZcFXFNYK2rI0lHkcAk6QhaVz889J6tISC6Uxdqaazh8Qksixa+2sb2COafrgZQtW0W3srZ87UpCAhvLCfUWTCsVN6yXeOrl6wQQWbl1Lj35eoOE9jaqWo64Gg2r3Zd6quaDvmcOTOYcZvBFPwUlsvZgxOe+KloWHZoSyB+Kho2kHdLIH4qGrZ5twTeT0XDNueWAADcLf3B+AfAy/vU2Mt7LwAAAABJRU5ErkJggg==';
 const onlinecount = document.getElementById("onlinecount") as HTMLDivElement;
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");

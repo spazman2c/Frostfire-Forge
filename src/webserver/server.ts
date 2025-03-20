@@ -1,220 +1,279 @@
 import '../utility/validate_config';
 const now = performance.now();
-import express from "express";
-import compression from "compression";
-import { rateLimit } from "express-rate-limit";
-import cookieParser from "cookie-parser";
-import cookieSession from "cookie-session";
-import crypto from "crypto";
-import http from "http";
-import https from "https";
+import log from "../modules/logger";
+import player from "../systems/player";
+import verify from "../services/verification";
+import query from "../controllers/sqldatabase";
+import * as settings from "../../config/settings.json";
 import path from "path";
 import fs from "fs";
-const app = express();
-
-import log from "../../src/modules/logger";
-import "../../src/services/security";
-
-// Load settings
-import * as settings from "../../config/settings.json";
+import docs_html from "./www/public/docs.html";
+import benchmark_html from "./www/public/benchmark.html";
+import login_html from "./www/public/index.html";
+import register_html from "./www/public/register.html";
+import game_html from "./www/public/game.html";
 
 // Load assets
-import "../../src/modules/assetloader";
+import "../modules/assetloader";
 
-/* SSL Certificate Setup */
+import assetCache from "../services/assetCache";
+const maps = assetCache.get("maps");
+const tilesets = assetCache.get("tilesets");
+
 const _cert = path.join(import.meta.dir, "../certs/cert.crt");
 const _key = path.join(import.meta.dir, "../certs/cert.key");
 const _https = process.env.WEBSRV_USESSL === "true" && fs.existsSync(_cert) && fs.existsSync(_key);
 
-// Compression
-app.use(compression());
+Bun.serve({
+  port: _https ? 443 : 80,
+  routes: {
+    "/docs": docs_html,
+    "/benchmark": benchmark_html,
+    "/": login_html,
+    "/registration": register_html,
+    "/register": register,
+    "/game": game_html,
+    "/login": login,
+    "/verify": authenticate,
+    "/map/hash": {
+      GET: async (req: Request) => {
+        const url = new URL(req.url);
+        const mapName = url.searchParams.get("name");
+        if (!mapName) {
+          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+        }
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(
-  cookieSession({
-    name: "session",
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    path: "/",
-    domain: "*.*",
-    keys: [process.env.SESSION_KEY || crypto.randomBytes(20).toString("hex")],
-  })
-);
+        for (const key of Object.keys(maps)) {
+          if (maps[key].name === mapName) {
+            return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
+          }
+        }
 
-// Disable x-powered-by header
-app.disable("x-powered-by");
-
-// Disable proxy trust
-app.set('trust proxy', false);
-
-// Rate limiting
-if (settings?.webserverRatelimit?.enabled) {
-  const limiter = rateLimit({
-    windowMs: settings?.webserverRatelimit?.windowMs * 60 * 1000 || 15 * 60 * 1000,
-    max: settings?.webserverRatelimit?.max || 500,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-      status: 429,
-      message: "Too many requests, please try again later.",
+        return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
+      },
+      POST: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      PUT: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      DELETE: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      PATCH: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      OPTIONS: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
     },
-    validate: false,
-  });
-  log.success(`Rate limiting enabled for the webserver`);
-  app.use(limiter);
-} else {
-  log.warn("Rate limiting is disabled for the webserver");
-}
+    "/tileset/hash" : {
+      GET: async (req: Request) => {
+        if (req.method !== "GET") {
+          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+      }
+      const url = new URL(req.url);
+      const tilesetName = url.searchParams.get("name");
+      if (!tilesetName) {
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+      }
 
-// Redirect to HTTPS
-if (_https) {
-  app.enable('trust proxy'); // Trust X-Forwarded-* headers
-  app.use((req, res, next) => {
-    if (req.secure) {
-      // Request was via https, so do no special handling
-      next();
-    } else {
-      // Redirect to https
-      res.redirect('https://' + req.headers.host + req.url);
+      for (const key of Object.keys(tilesets)) {
+        if (tilesets[key].name === tilesetName) {
+          return new Response(JSON.stringify({ hash: tilesets[key].hash }), { status: 200 });
+        }
+      }
+      return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
+      },
+      POST: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      PUT: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      DELETE: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      PATCH: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      OPTIONS: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+    },
+    "/tileset" : {
+      GET: async (req: Request) => {
+        if (req.method !== "GET") {
+          return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+        }
+      const url = new URL(req.url);
+      const tilesetName = url.searchParams.get("name");
+      if (!tilesetName) {
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+      }
+
+      for (const key of Object.keys(tilesets)) {
+        if (tilesets[key].name === tilesetName) {
+          return new Response(JSON.stringify({ tileset: tilesets[key] }), { status: 200 });
+        }
+      }
+      return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
+      },
+      POST: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      PUT: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      DELETE: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },  
+      PATCH: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+      OPTIONS: async () => {
+        // Return a 405
+        return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
+      },
+    },
+  },
+  ...(_https ? {
+      cert: fs.readFileSync(_cert),
+      key: fs.readFileSync(_key),
     }
-  });
-}
-
-// Filter
-import filter from "../../src/systems/security";
-app.use(function (req: any, res: any, next: any) {
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, x-access-token"
-  );
-  res.setHeader("Cache-Control", "public, max-age=2.88e+7");
-  const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-  filter(req, res, next, ip);
+  : {}),
 });
 
-// Sanitize the URL
-app.use(function (req: any, res: any, next: any) {
-  let url = req.url;
-  if (url.match(/\/{2,}$/)) {
-    // Remove repeating slashes at the end of the domain
-    url = url.replace(/\/{2,}$/g, "/");
-    // Redirect to the new url
-    res.redirect(
-      `${req.headers["x-forwarded-proto"] || req.protocol}://${
-        req.headers.host
-      }${url}`
-    );
-  } else {
-    next();
+async function authenticate(req: Request) {
+  const url = new URL(req.url);
+  const email = url.searchParams.get("email");
+  const token = url.searchParams.get("token");
+  const code = url.searchParams.get("code");
+
+  if (!token || !code || !email) {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
   }
-});
 
-app.use(function (req: any, res: any, next: any) {
-  if (!process.env.DOMAIN) {
-    next();
-    return;
+  const result = await query("SELECT * FROM accounts WHERE token = ? AND email = ? AND verification_code = ? LIMIT 1", [token, email.toLowerCase(), code]) as any;
+  if (result.length === 0) {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
   }
-  const allowedHost = process.env.DOMAIN?.replace("https://", "");
-  if (req.hostname === allowedHost || req.hostname === 'localhost') {
-    next();
-  } else {
-    res.status(403).redirect(`https://${allowedHost}`);
-  }
-});
 
-// Static files
-app.use("/", express.static(path.join(import.meta.dirname, "www/public")));
-
-// Unauthenticated Routes
-import { router as ReigisterRouter } from "../../src/routes/register";
-app.use(ReigisterRouter);
-
-// Verify Routes
-import { router as VerifyRouter } from "../../src/routes/verify";
-app.use(VerifyRouter);
-
-// Benchmark Routes
-import { router as BenchmarkRouter } from "../../src/routes/benchmark";
-app.use(BenchmarkRouter);
-
-// Documentation Routes
-import { router as DocumentationRouter } from "../../src/routes/documentation";
-app.use(DocumentationRouter);
-
-import { router as LoginRouter } from "../../src/routes/login";
-app.use(LoginRouter);
-
-// Authorization Middleware
-import { router as AuthorizationRouter } from "../../src/routes/authorization";
-app.use(AuthorizationRouter);
-
-// Static files
-app.use("/game", express.static(path.join(import.meta.dirname, "www/game")));
-import { router as mapRouter } from "../../src/routes/map";
-app.use(mapRouter);
-import { router as tilesetRouter } from "../../src/routes/tileset";
-app.use(tilesetRouter);
-import { router as functionRouter } from "../../src/routes/functions";
-app.use(functionRouter);
-
-
-// 404 redirect to /
-app.use(function (req: any, res: any) {
-  res.redirect("/");
-});
-
-const server = http.createServer(app);
-let httpsServer: any;
-
-if (_https) {
-  try {
-    const cert = _https ? fs.readFileSync(_cert, "utf8") : "";
-    const key = _https ? fs.readFileSync(_key, "utf8") : "";
-    
-    const tlsOptions = {
-      cert: cert,
-      key: key,
-      requestCert: true,
-      rejectUnauthorized: false
-    }
-
-    // Create HTTPS server with Express app
-    httpsServer = https.createServer(tlsOptions, app);
-
-    httpsServer.on('error', (err: any) => {
-      console.error('HTTPS Server Error:', err);
-    });
-
-    // Make sure to listen on the SSL port
-    httpsServer.listen(process.env.WEBSRV_PORTSSL, async () => {
-      log.success(`HTTPS server is listening on localhost:${process.env.WEBSRV_PORTSSL} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
-    });
+  await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
+  await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
   
-    httpsServer.on("stop", () => {
-      log.info("HTTPS server is stopping...");
-      httpsServer.close(() => {
-        log.info("HTTPS server stopped.");
-      });
-    });
+  // Send to /game
+  return Response.redirect(`${process.env.DOMAIN}/game`, 301);
+}
 
-  } catch (e: any) {
-    log.error(`Error starting HTTPS server: ${e.message}`);
+async function register(req: Request) {
+  try {
+    const body = await req.json();
+    const { username, email, password, password2 } = body;
+    if (!username || !password || !email || !password2) {
+      return new Response(JSON.stringify({ message: "All fields are required" }), { status: 400 });
+    }
+
+    if (password !== password2) {
+      return new Response(JSON.stringify({ message: "Passwords do not match" }), { status: 400 });
+    }
+
+    if (username.length < 3 || username.length > 15 || password.length < 8 || password.length > 20) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
+
+    if (email.length < 5 || email.length > 50 || !email.includes("@") || !email.includes(".")) {
+      return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
+    }
+
+    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!regex.test(email)) {
+      return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 }); 
+    }
+
+    const user = await player.register(username.toLowerCase(), password, email.toLowerCase(), req) as any;
+    if (!user) {
+      return new Response(JSON.stringify({ message: "Failed to register" }), { status: 400 });
+    }
+
+    if (user.error) {
+      return new Response(JSON.stringify({ message: user.error }), { status: 400 });
+    }
+
+    const token = await player.login(username.toLowerCase(), password);
+    if (!token) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
+
+    const result = await verify(token, email.toLowerCase(), username.toLowerCase()) as any;
+    if (result instanceof Error) {
+      return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ message: "Verification email sent" }), { status: 200 });
+
+  } catch (error) {
+    return new Response(JSON.stringify({ message: "Failed to register", error: error instanceof Error ? error.message : "Unknown error" }), { status: 500 });
   }
 }
 
-server.listen(process.env.WEBSRV_PORT, async () => {
-  log.success(`HTTP server is listening on localhost:${process.env.WEBSRV_PORT} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
-  await import("../../src/socket/server");
-});
+async function login(req: Request) {
+  try {
+    const body = await req.json();
+    const { username, password } = body;
+    if (!username || !password) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
+    if (username.length < 3 || username.length > 15 || password.length < 8 || password.length > 20) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
 
-// Wait for connections to close gracefully
-server.on("stop", () => {
-  log.info("Server is stopping...");
-  server.close(() => {
-    log.info("Server stopped.");
-  });
-});
+    const token = await player.login(username.toLowerCase(), password);
+    if (!token) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
 
-export default app;
+    const useremail = await player.getEmail(username.toLowerCase()) as string;
+    if (!useremail) {
+      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    }
+
+    if (!settings["2fa"].enabled || !process.env.EMAIL_SERVICE || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      // Update the account to verified
+      await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
+
+      // Remove any verification code that may exist
+      await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
+      // 2FA is not enabled, so we can just return the token
+      return new Response(JSON.stringify({ message: "Logged in successfully", data: { token } }), { status: 301 });
+    } else {
+      // 2FA is enabled, so we need to send a verification email
+      const result = await verify(token, useremail.toLowerCase(), username.toLowerCase()) as any;
+      if (result instanceof Error) {
+        return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
+      }
+      // Return a 200
+      return new Response(JSON.stringify({ message: "Verification email sent", data: { token } }), { status: 200 });
+    }
+  } catch (error) {
+    log.error(`Failed to authenticate: ${error}`);
+    return new Response(JSON.stringify({ message: "Failed to authenticate" }), { status: 500 });
+  }
+}
+
+log.success(`Webserver started in ${(performance.now() - now).toFixed(2)}ms`);
+await import("../socket/server");

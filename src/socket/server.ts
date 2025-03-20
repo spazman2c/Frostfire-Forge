@@ -62,7 +62,7 @@ const ClientRateLimit = [] as ClientRateLimit[];
 
 const keyPair = generateKeyPair(process.env.RSA_PASSPHRASE);
 
-const Server = Bun.serve<Packet>({
+const Server = Bun.serve<Packet, any>({
   fetch(req, Server) {
     // Upgrade the request to a WebSocket connection
     // and generate a random id for the client
@@ -83,7 +83,7 @@ const Server = Bun.serve<Packet>({
     maxPayloadLength: 1024 * 1024 * settings?.websocket?.maxPayloadMB || 1024 * 1024, // 1MB
     // Seconds to wait for the connection to close
     idleTimeout: settings?.websocket?.idleTimeout || 1,
-    async open(ws) {
+    async open(ws: any) {
       ws.binaryType = "arraybuffer";
       // Add the client to the set of connected clients
       if (!ws.data?.id || !ws.data?.useragent || !ws.data?.publicKey) return;
@@ -135,7 +135,7 @@ const Server = Bun.serve<Packet>({
         packet.encode(JSON.stringify(_packet))
       );
     },
-    async close(ws) {
+    async close(ws: any) {
       // Remove the client from the set of connected clients
       if (!ws.data.id) return;
       // Find the client object in the set
@@ -186,7 +186,7 @@ const Server = Bun.serve<Packet>({
       }
     },
     // Use any because we aren't allowed to use ArrayBuffer
-    async message(ws, message: any) {
+    async message(ws: any, message: any) {
       try {
         // Check if the request has an identity and a message and if the message is an ArrayBuffer
         if (!ws.data?.id || !message) return;
