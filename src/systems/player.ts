@@ -102,14 +102,15 @@ const player = {
     },
     setSessionId: async (token: string, sessionId: string) => {
         if (!token || !sessionId) return;
-        // Check if the user already has a session id
+        // Check if the user already has a session id       
         const sessionExists = await player.getSessionId(token) as any[];
         if (sessionExists[0]?.session_id) {
             if (sessionExists[0]?.session_id != sessionId) return;
         }
         const getUsername = await player.getUsernameByToken(token) as any[];
         const username = await getUsername[0]?.username as string;
-        const isBanned = await player.isBanned(username) as any[];
+        const isBanned = await player.isBanned(username) as any[] | undefined;
+        if (!isBanned) return;
         const response = await query("UPDATE accounts SET session_id = ?, online = ? WHERE token = ?", [sessionId, 1, token]);
         if (isBanned[0]?.banned === 1) {
             log.debug(`User ${username} is banned`);
@@ -266,7 +267,7 @@ const player = {
     },
     setConfig: async (session_id: string, data: any) => {
         if (!session_id) return;
-        if (!data.fps || !data.music_volume || !data.effects_volume || typeof data.muted != 'boolean' || !data.language) return [];
+        if (!data.fps || !data.music_volume || !data.effects_volume || typeof data.muted != 'boolean') return [];
         const result = await query("SELECT username FROM accounts WHERE session_id = ?", [session_id]) as any;
         if (!result[0].username) return [];
         const response = await query("UPDATE clientconfig SET fps = ?, music_volume = ?, effects_volume = ?, muted = ? WHERE username = ?", [data.fps, data.music_volume, data.effects_volume, data.muted, result[0].username]);
