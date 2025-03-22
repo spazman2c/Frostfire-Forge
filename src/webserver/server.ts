@@ -284,7 +284,7 @@ async function login(req: Request) {
       // Remove any verification code that may exist
       await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
       // 2FA is not enabled, so we can just return the token
-      return new Response(JSON.stringify({ message: "Logged in successfully", data: { token } }), { status: 301 });
+      return new Response(JSON.stringify({ message: "Logged in successfully"}), { status: 301, headers: { "Set-Cookie": `token=${token}; Path=/;` } });
     } else {
       // 2FA is enabled, so we need to send a verification email
       const result = await verify(token, useremail.toLowerCase(), username.toLowerCase()) as any;
@@ -292,7 +292,7 @@ async function login(req: Request) {
         return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
       }
       // Return a 200
-      return new Response(JSON.stringify({ message: "Verification email sent", data: { token } }), { status: 200 });
+      return new Response(JSON.stringify({ message: "Verification email sent"}), { status: 200, headers: { "Set-Cookie": `token=${token}; Path=/;` } });
     }
   } catch (error) {
     log.error(`Failed to authenticate: ${error}`);
