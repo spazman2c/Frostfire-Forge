@@ -269,7 +269,7 @@ input::placeholder {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url("../img/background.png");
+  background: url("../img/background-blur.png");
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
@@ -278,24 +278,58 @@ input::placeholder {
 
 #loading-screen #progress-bar-container {
   position: absolute;
-  bottom: 0;
+  transform: translateY(-50%);
+  top: 50%;
+  left: 5px;
+  right: 5px;
+  height: 53px;
+}
+
+#loading-bar-left {
+  position: absolute;
   left: 0;
+  bottom: 0;
+  width: 47px;
+  height: 100%;
+  background: url("../img/ui/loading-bar-left.png");
+}
+
+#loading-bar-right {
+  position: absolute;
   right: 0;
-  height: 50px;
-  background: #653B1D;
-  border-top: solid 2px #815E44;
+  bottom: 0;
+  width: 47px;
+  height: 100%;
+  background: url("../img/ui/loading-bar-right.png");
+}
+
+#loading-bar-center {
+  position: absolute;
+  bottom: 0;
+  height: 100%;
+  left: 44px;
+  right: 44px;
+  background: url("../img/ui/loading-bar-center.png");
+  background-repeat: repeat-x;
 }
 
 /* Center it such as that it has a top and bottom padding of 10px*/
 #loading-screen #progress-bar {
-  background: #469CD9;
+  background: linear-gradient(to right, rgb(76, 201, 114), rgb(156, 255, 184));
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 70%;
+  position: absolute;
+  top: 15px;
+  bottom: 15px;
+  left: 20px;
   width: 0%;
-  transform: translateY(23.333%);
-  transition: width 0.1s;
+  max-width: calc(100% - 40px);
+  border-radius: 2px;
+  /* Make it smooth */
+  transition: width 0.1s ease-in-out;
+  /* Black shadow */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
 #stats-container, #target-stats-container {

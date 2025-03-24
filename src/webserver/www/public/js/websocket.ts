@@ -246,10 +246,13 @@ socket.onopen = () => {
 };
 
 socket.onclose = () => {
+  // Remove the loading bar if it exists
+  progressBarContainer.style.display = 'none';
   showNotification("You have been disconnected from the server", false, true);
 };
 
 socket.onerror = () => {
+  progressBarContainer.style.display = 'none';
   showNotification("An error occurred while connecting to the server", false, true);
 };
 
@@ -577,7 +580,8 @@ socket.onmessage = async (event) => {
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
         const sessionToken = getCookie("token");
         if (!sessionToken) {
-          throw new Error("No session token found");
+          window.location.href = "/";
+          return;
         }
 
         // Store public key

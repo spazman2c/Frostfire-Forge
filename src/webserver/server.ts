@@ -172,7 +172,7 @@ Bun.serve({
     }
     const route = routes[url.pathname as keyof typeof routes];
     if (!route) {
-      return new Response("Not found", { status: 404 });
+      return Response.redirect("/", 301);
     }
     return route[req.method as keyof typeof route]?.(req);
   },
@@ -198,7 +198,7 @@ async function authenticate(req: Request) {
     return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
   }
 
-  await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
+  await query("UPDATE accounts SET verified = 1, onelogin = 0 WHERE token = ?", [token]);
   await query("UPDATE accounts SET verification_code = NULL WHERE token = ?", [token]);
   
   // Send to /game
