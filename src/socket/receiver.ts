@@ -226,6 +226,7 @@ export default async function packetReceiver(
           attackDelay: 0,
           lastMovementPacket: null,
           permissions: (typeof access === 'string' ? access.split(",") : []),
+          movementInterval: null,
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -352,49 +353,8 @@ export default async function packetReceiver(
       }
       case "MOVEXY": {
         if (!currentPlayer) return;
-        const direction = data
-          .toString()
-          .toLowerCase() as keyof typeof directionAdjustments;
-        // Only allow the player to move in these directions
-        const directions = [
-          "up",
-          "down",
-          "left",
-          "right",
-          "upleft",
-          "upright",
-          "downleft",
-          "downright",
-        ];
-        if (!directions.includes(direction)) return;
-
-        const speed = 2;
-        const time = performance.now();
-        if (!currentPlayer.lastMovementPacket) {
-          currentPlayer.lastMovementPacket = time;
-        }
-        /*
-          Check if the player is moving too fast and ignore the packet.
-          
-          Due to the packet being dropped, the player will move at the normally
-          enforced speed without the need to kick them.
-        */
-        if (
-          time - currentPlayer.lastMovementPacket < 10 &&
-          time - currentPlayer.lastMovementPacket !== 0
-        )
-          return;
-
-        currentPlayer.lastMovementPacket = time;
-
-        const tempPosition = { ...currentPlayer.location.position };
-        const collisionPosition = { ...currentPlayer.location.position };
         const tileSize = 16;
-        // Center of the player
-        const playerHeight = 48;
-        const playerWidth = 32;
-        collisionPosition.x += playerWidth / 2;
-        collisionPosition.y += playerHeight / 2;
+        const speed = 2;
 
         const directionAdjustments = {
           up: {
@@ -465,54 +425,89 @@ export default async function packetReceiver(
           },
         };
 
-        if (!directionAdjustments[direction]) return;
-
-        const adjustment = directionAdjustments[direction];
-        tempPosition.x += adjustment.tempX;
-        tempPosition.y += adjustment.tempY;
-        tempPosition.direction = adjustment.direction;
-        collisionPosition.x = adjustment.collisionX(tempPosition);
-        collisionPosition.y = adjustment.collisionY(tempPosition);
-
-        const collision = player.checkIfWouldCollide(
-          currentPlayer.location.map,
-          collisionPosition
-        );
-        if (collision) return;
-
-        currentPlayer.location.position = tempPosition;
-        if (currentPlayer.isStealth) {
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
-          const playersInMapAdmin = playersInMap.filter((p) => p.isAdmin);
-          playersInMapAdmin.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
-          });
-        } else {
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
-          playersInMap.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
-          });
+        const direction = data.toString().toLowerCase();
+        
+        // Handle movement abort
+        if (direction === "abort") {
+          if (currentPlayer.movementInterval) {
+            clearInterval(currentPlayer.movementInterval);
+            currentPlayer.movementInterval = null;
+          }
+          return;
         }
+
+        // Now cast to the movement-only types
+        const moveDirection = direction as keyof typeof directionAdjustments;
+
+        // Only allow the player to move in these directions
+        const directions = [
+          "up",
+          "down",
+          "left",
+          "right",
+          "upleft",
+          "upright",
+          "downleft",
+          "downright",
+        ];
+        if (!directions.includes(moveDirection)) return;
+
+        // Clear any existing movement
+        if (currentPlayer.movementInterval) {
+          clearInterval(currentPlayer.movementInterval);
+        }
+
+        const movePlayer = () => {
+          const tempPosition = { ...currentPlayer.location.position };
+          const collisionPosition = { ...currentPlayer.location.position };
+          const playerHeight = 48;
+          const playerWidth = 32;
+          collisionPosition.x += playerWidth / 2;
+          collisionPosition.y += playerHeight / 2;
+
+          const adjustment = directionAdjustments[moveDirection];
+          tempPosition.x += adjustment.tempX;
+          tempPosition.y += adjustment.tempY;
+          tempPosition.direction = adjustment.direction;
+          collisionPosition.x = adjustment.collisionX(tempPosition);
+          collisionPosition.y = adjustment.collisionY(tempPosition);
+
+          const collision = player.checkIfWouldCollide(
+            currentPlayer.location.map,
+            collisionPosition
+          );
+          if (collision) {
+            clearInterval(currentPlayer.movementInterval);
+            currentPlayer.movementInterval = null;
+            return;
+          }
+
+          currentPlayer.location.position = tempPosition;
+          
+          // Broadcast movement to other players
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          const targetPlayers = currentPlayer.isStealth 
+            ? playersInMap.filter(p => p.isAdmin)
+            : playersInMap;
+
+          targetPlayers.forEach((player) => {
+            player.ws.send(
+              packet.encode(
+                JSON.stringify({
+                  type: "MOVEXY",
+                  data: {
+                    id: ws.data.id,
+                    _data: currentPlayer.location.position,
+                  },
+                })
+              )
+            );
+          });
+        };
+
+        // Start continuous movement
+        movePlayer(); // Execute first movement immediately
+        currentPlayer.movementInterval = setInterval(movePlayer, 10); // Continue movement every 10ms
         break;
       }
       case "TELEPORTXY": {

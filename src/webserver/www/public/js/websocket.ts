@@ -327,6 +327,13 @@ socket.onmessage = async (event) => {
     case "MOVEXY": {
       const player = players.find((player) => player.id === data.id);
       if (!player) return;
+
+      // Handle movement abort
+      if (data._data === "abort") {
+        // Stop any ongoing movement animations/updates for this player
+        break;
+      }
+
       player.position.x = playerCanvas.width / 2 + data._data.x;
       player.position.y = playerCanvas.height / 2 + data._data.y;
       // If the player is the client, scroll to the player's position
@@ -1088,107 +1095,74 @@ window.addEventListener("keyup", (e) => {
 
 function handleKeyPress() {
   if (!loaded || controllerConnected) return;
-  // Check if paused
   if (pauseMenu.style.display == "block") return;
-  // Check if the chat input is focused
   if (isMoving) return;
 
   isMoving = true;
+  let lastDirection = ""; // Track last sent direction
 
   function runMovement() {
-
     if (!isKeyPressed) {
+      // Send abort packet when movement stops
+      if (lastDirection !== "") {
+        socket.send(
+          packet.encode(
+            JSON.stringify({
+              type: "MOVEXY",
+              data: "ABORT",
+            })
+          )
+        );
+      }
       isMoving = false;
+      lastDirection = "";
       return;
     }
 
     if (pauseMenu.style.display == "block") return;
 
-    // Only send directional instructions to the server for calculations
+    let currentDirection = "";
+
+    // Calculate current direction based on pressed keys
     if (pressedKeys.size > 1) {
       if (pressedKeys.has("KeyW") && pressedKeys.has("KeyA")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "UPLEFT",
-            })
-          )
-        );
+        currentDirection = "UPLEFT";
       } else if (pressedKeys.has("KeyW") && pressedKeys.has("KeyD")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "UPRIGHT",
-            })
-          )
-        );
+        currentDirection = "UPRIGHT";
       } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyA")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "DOWNLEFT",
-            })
-          )
-        );
+        currentDirection = "DOWNLEFT";
       } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyD")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "DOWNRIGHT",
-            })
-          )
-        );
+        currentDirection = "DOWNRIGHT";
       }
     } else {
-      // Ensure that individual key presses are only checked if no combination is pressed
       if (pressedKeys.has("KeyW")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "UP",
-            })
-          )
-        );
+        currentDirection = "UP";
       } else if (pressedKeys.has("KeyS")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "DOWN",
-            })
-          )
-        );
+        currentDirection = "DOWN";
       } else if (pressedKeys.has("KeyA")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "LEFT",
-            })
-          )
-        );
+        currentDirection = "LEFT";
       } else if (pressedKeys.has("KeyD")) {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
-              data: "RIGHT",
-            })
-          )
-        );
+        currentDirection = "RIGHT";
       }
     }
 
-    // Recursively call the function with adjusted timeout
+    // Only send if direction changed
+    if (currentDirection !== "" && currentDirection !== lastDirection) {
+      socket.send(
+        packet.encode(
+          JSON.stringify({
+            type: "MOVEXY",
+            data: currentDirection,
+          })
+        )
+      );
+      lastDirection = currentDirection;
+    }
+
     setTimeout(runMovement, 0);
   }
 
-  runMovement();  // Start the movement loop
+  runMovement();
 }
 
 async function isLoaded() {
