@@ -245,6 +245,7 @@ const PacketTypes: PacketType = {
   32: "MUSIC",
   33: "STARTGAME",
   34: "CREATE_NPC",
+  35: "NOCLIP",
 };
 ```
 

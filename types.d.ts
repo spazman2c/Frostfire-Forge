@@ -80,6 +80,7 @@ declare interface Player {
   stats?: StatsData;
   isStealth?: boolean;
   isAdmin?: boolean;
+  isNoclip?: boolean;
 }
 
 type NullablePlayer = Player | null;

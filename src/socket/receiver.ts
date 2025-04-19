@@ -172,10 +172,15 @@ export default async function packetReceiver(
         })) as LocationData | null;
         const isAdmin = await player.isAdmin(username);
         let isStealth = await player.isStealth(username);
+        let isNoclip = await player.isNoclip(username);
         // Turn off stealth mode if the player is not an admin and is in stealth mode
         if (!isAdmin && isStealth) {
           await player.toggleStealth(username);
           isStealth = false;
+        }
+        if (!isAdmin && isNoclip) {
+          await player.toggleNoclip(username);
+          isNoclip = false;
         }
 
         const position = location?.position as unknown as PositionData;
@@ -212,6 +217,7 @@ export default async function packetReceiver(
           username,
           isAdmin,
           isStealth,
+          isNoclip,
           id: ws.data.id,
           location: {
             map: spawnLocation.map.replace(".json", ""),
@@ -477,9 +483,9 @@ export default async function packetReceiver(
 
           const collision = player.checkIfWouldCollide(
             currentPlayer.location.map,
-            collisionPosition
+            collisionPosition,
           );
-          if (collision) {
+          if (collision && !currentPlayer.isNoclip) {
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
             return;
@@ -742,6 +748,12 @@ export default async function packetReceiver(
             )
           );
         }
+        break;
+      }
+      case "NOCLIP": {
+        if (!currentPlayer?.isAdmin) return;
+        const isNoclip = await player.toggleNoclip(currentPlayer.username);
+        currentPlayer.isNoclip = isNoclip;
         break;
       }
       case "STEALTH": {

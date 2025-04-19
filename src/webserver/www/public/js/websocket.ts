@@ -989,6 +989,13 @@ window.addEventListener("keydown", async (e) => {
     socket.send(packet.encode(JSON.stringify({ type: "STEALTH", data: null })));
   }
 
+  if (e.code === "KeyZ") {
+    if (!loaded) return;
+    if (chatInput === document.activeElement) return;
+    if (pauseMenu.style.display == "block") return;
+    socket.send(packet.encode(JSON.stringify({ type: "NOCLIP", data: null })));
+  }
+
   if (e.code === "Enter" && chatInput !== document.activeElement) {
     if (pauseMenu.style.display == "block") return;
     chatInput.focus();

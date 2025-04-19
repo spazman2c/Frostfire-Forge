@@ -215,7 +215,7 @@ const player = {
         if (!response) return;
         const admin = await player.isAdmin(username);
         // Remove stealth status if the player is not an admin and is stealth
-        if (!admin) await query("UPDATE accounts SET stealth = 0 WHERE username = ? AND stealth = 1", [username]) as any;
+        if (!admin) await query("UPDATE accounts SET stealth = 0, noclip = 0 WHERE username = ?", [username]) as any;
         log.debug(`${username} admin status has been updated to ${admin}`);
         if (ws) ws.close();
         return admin;
@@ -231,6 +231,18 @@ const player = {
         username = username.toLowerCase();
         await query("UPDATE accounts SET stealth = !stealth WHERE username = ? AND role = 1", [username]) as any;
         return await player.isStealth(username);
+    },
+    isNoclip: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("SELECT noclip FROM accounts WHERE username = ?", [username]) as any;
+        return response[0]?.noclip === 1;
+    },
+    toggleNoclip: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        await query("UPDATE accounts SET noclip = !noclip WHERE username = ?", [username]) as any;
+        return await player.isNoclip(username);
     },
     getSession: async (username: string) => {
         if (!username) return;

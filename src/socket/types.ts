@@ -36,4 +36,5 @@ export const packetTypes: PacketType = {
   34: "CREATE_NPC",
   35: "COMMAND",
   36: "NOTIFY",
+  37: "NOCLIP",
 };
