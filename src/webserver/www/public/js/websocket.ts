@@ -1104,16 +1104,48 @@ window.addEventListener("keyup", (e) => {
 });
 
 function handleKeyPress() {
-  if (!loaded || controllerConnected) return;
+  if (!loaded || !controllerConnected) return;
   if (pauseMenu.style.display == "block") return;
   if (isMoving) return;
 
   isMoving = true;
   let lastDirection = ""; // Track last sent direction
+  let joystickMovement = { x: 0, y: 0 }; // Track joystick position
+
+  // Add joystick event listener
+  window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
+    if (e.detail.type === "left") {
+      joystickMovement.x = e.detail.x;
+      joystickMovement.y = e.detail.y;
+    }
+  });
 
   function runMovement() {
-    if (!isKeyPressed) {
-      // Send abort packet when movement stops
+    if (pauseMenu.style.display == "block") {
+      isMoving = false;
+      return;
+    }
+
+    let currentDirection = "";
+
+    // Handle joystick input
+    if (Math.abs(joystickMovement.x) > 0.1 || Math.abs(joystickMovement.y) > 0.1) {
+      // Convert joystick coordinates to direction
+      if (Math.abs(joystickMovement.x) > Math.abs(joystickMovement.y)) {
+        currentDirection = joystickMovement.x > 0 ? "RIGHT" : "LEFT";
+      } else {
+        currentDirection = joystickMovement.y > 0 ? "DOWN" : "UP";
+      }
+
+      // Handle diagonal movement
+      if (Math.abs(joystickMovement.x) > 0.5 && Math.abs(joystickMovement.y) > 0.5) {
+        if (joystickMovement.x > 0 && joystickMovement.y < 0) currentDirection = "UPRIGHT";
+        if (joystickMovement.x < 0 && joystickMovement.y < 0) currentDirection = "UPLEFT";
+        if (joystickMovement.x > 0 && joystickMovement.y > 0) currentDirection = "DOWNRIGHT";
+        if (joystickMovement.x < 0 && joystickMovement.y > 0) currentDirection = "DOWNLEFT";
+      }
+    } else {
+      // No joystick input - send ABORT if we were moving
       if (lastDirection !== "") {
         socket.send(
           packet.encode(
@@ -1123,36 +1155,7 @@ function handleKeyPress() {
             })
           )
         );
-      }
-      isMoving = false;
-      lastDirection = "";
-      return;
-    }
-
-    if (pauseMenu.style.display == "block") return;
-
-    let currentDirection = "";
-
-    // Calculate current direction based on pressed keys
-    if (pressedKeys.size > 1) {
-      if (pressedKeys.has("KeyW") && pressedKeys.has("KeyA")) {
-        currentDirection = "UPLEFT";
-      } else if (pressedKeys.has("KeyW") && pressedKeys.has("KeyD")) {
-        currentDirection = "UPRIGHT";
-      } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyA")) {
-        currentDirection = "DOWNLEFT";
-      } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyD")) {
-        currentDirection = "DOWNRIGHT";
-      }
-    } else {
-      if (pressedKeys.has("KeyW")) {
-        currentDirection = "UP";
-      } else if (pressedKeys.has("KeyS")) {
-        currentDirection = "DOWN";
-      } else if (pressedKeys.has("KeyA")) {
-        currentDirection = "LEFT";
-      } else if (pressedKeys.has("KeyD")) {
-        currentDirection = "RIGHT";
+        lastDirection = "";
       }
     }
 
@@ -1169,7 +1172,8 @@ function handleKeyPress() {
       lastDirection = currentDirection;
     }
 
-    setTimeout(runMovement, 0);
+    // Use requestAnimationFrame instead of setTimeout for smoother animation
+    requestAnimationFrame(runMovement);
   }
 
   runMovement();
