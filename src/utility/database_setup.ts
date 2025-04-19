@@ -223,6 +223,50 @@ const createPermissionTypesTable = async () => {
   await query(sql);
 };
 
+const createNpcTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+
+  const sql = `
+    CREATE TABLE IF NOT EXISTS npcs (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY UNIQUE,
+      last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      map VARCHAR(255) NOT NULL,
+      position VARCHAR(255) NOT NULL,
+      direction VARCHAR(10) NOT NULL,
+      dialog VARCHAR(500) NOT NULL,
+      hidden INT NOT NULL DEFAULT 0,
+      script VARCHAR(5000) NOT NULL,
+      particles VARCHAR(500) NOT NULL
+    )
+  `;
+  await query(sql);
+};
+
+const createParticleTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+
+  const sql = `
+    CREATE TABLE IF NOT EXISTS particles (
+      name VARCHAR(255) NOT NULL UNIQUE PRIMARY KEY,
+      size INT NOT NULL DEFAULT '1',
+      color VARCHAR(45) NOT NULL DEFAULT 'transparent',
+      velocity VARCHAR(45) NOT NULL DEFAULT '0,0',
+      lifetime INT NOT NULL DEFAULT '100',
+      opacity FLOAT NOT NULL DEFAULT '1',
+      visible INT NOT NULL DEFAULT '1',
+      gravity VARCHAR(45) NOT NULL DEFAULT '0,0',
+      localposition VARCHAR(45) NOT NULL DEFAULT '0,0',
+      amount INT NOT NULL DEFAULT '1',
+      interval INT NOT NULL DEFAULT '1',
+      staggertime FLOAT NOT NULL DEFAULT '0',
+      spread VARCHAR(45) NOT NULL DEFAULT '0,0'
+    )
+  `;
+  await query(sql);
+};
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -238,6 +282,8 @@ const setupDatabase = async () => {
   await createSpellsTable();
   await createPermissionsTable();
   await createPermissionTypesTable();
+  await createNpcTable();
+  await createParticleTable();
 };
 
 try {

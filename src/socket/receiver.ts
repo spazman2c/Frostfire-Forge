@@ -29,6 +29,7 @@ Promise.all(spritePromises).then((sprites) => {
 });
 
 const npcs = assetCache.get("npcs");
+const particles = assetCache.get("particles");
 
 export default async function packetReceiver(
   server: any,
@@ -256,6 +257,7 @@ export default async function packetReceiver(
         );
 
         npcsInMap.forEach((npc: Npc) => {
+          const particleArray = typeof npc.particles === 'string' ? (npc.particles as string).split(",").map(name => particles.find((p: Particle) => p.name === name.trim())).filter(Boolean) : [];
           ws.send(
             packet.encode(
               JSON.stringify({
@@ -271,6 +273,7 @@ export default async function packetReceiver(
                   script: npc.script,
                   hidden: npc.hidden,
                   dialog: npc.dialog,
+                  particles: particleArray,
                 },
               })
             )

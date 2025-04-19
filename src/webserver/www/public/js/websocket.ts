@@ -118,6 +118,9 @@ function npcAnimationLoop() {
   npcContext.clearRect(0, 0, npcCanvas.width, npcCanvas.height);
   npcs.forEach((npc) => {
     npc.show(npcContext);
+    npc.particles.forEach((particle: Particle) => {
+      npc.updateParticle(particle, npc, npcContext);
+    });
   });
   window.requestAnimationFrame(npcAnimationLoop);
 }
@@ -1183,7 +1186,9 @@ function createNPC(data: any) {
     id: string;
     position: { x: number; y: number };
     dialog: string;
+    particles: Particle[];
     show: (context: CanvasRenderingContext2D) => void;
+    updateParticle: (particle: Particle, npc: any, context: CanvasRenderingContext2D) => void;
   } = {
     id: data.id,
     dialog: data.dialog || "",
@@ -1191,6 +1196,7 @@ function createNPC(data: any) {
       x: npcCanvas.width / 2 + data.location.x,
       y: npcCanvas.height / 2 + data.location.y,
     },
+    particles: data.particles || [],
     show: function (this: typeof npc, context: CanvasRenderingContext2D) {
       if (!npcImage || !context) return;
       // Get current players admin status
@@ -1215,6 +1221,126 @@ function createNPC(data: any) {
           }
         }
       }
+    },
+    updateParticle: async (particle: Particle, npc: any, context: CanvasRenderingContext2D) => {
+      // Initialize particle arrays and timing for each type if they don't exist
+      if (!npc.particleArrays) {
+        npc.particleArrays = {};
+        npc.lastEmitTime = {};
+      }
+      
+      const currentTime = performance.now();
+      const emitInterval = (particle.interval || 1) * 16.67; // Convert to milliseconds (60fps = 16.67ms)
+      
+      // Initialize or get the last emit time for this particle type
+      if (!npc.lastEmitTime[particle.name || '']) {
+        npc.lastEmitTime[particle.name || ''] = currentTime;
+      }
+      
+      // Initialize particle array if it doesn't exist
+      if (!npc.particleArrays[particle.name || '']) {
+        npc.particleArrays[particle.name || ''] = [];
+      }
+
+      // Check if it's time to emit a new particle
+      if (currentTime - npc.lastEmitTime[particle.name || ''] >= emitInterval) {
+        const randomLifetimeExtension = Math.random() * (particle.staggertime || 0);
+        const baseLifetime = particle.lifetime || 1000;
+        
+        const newParticle: Particle = {
+          ...particle,
+          localposition: { 
+            x: (particle.localposition?.x || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * particle.spread.x,
+            y: (particle.localposition?.y || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * particle.spread.y
+          },
+          velocity: { 
+            x: particle.velocity.x,
+            y: particle.velocity.y
+          },
+          lifetime: baseLifetime + randomLifetimeExtension,
+          currentLife: baseLifetime + randomLifetimeExtension,
+          opacity: particle.opacity || 1,
+          visible: true,
+          size: particle.size || 5,
+          color: particle.color || 'white',
+          gravity: { ...particle.gravity }
+        };
+
+        // Remove oldest particle if we exceed the maximum amount
+        if (npc.particleArrays[particle.name || ''].length >= particle.amount) {
+          npc.particleArrays[particle.name || ''].shift();
+        }
+        
+        npc.particleArrays[particle.name || ''].push(newParticle);
+        npc.lastEmitTime[particle.name || ''] = currentTime;
+      }
+
+      // Update and render existing particles for this type
+      const particles = npc.particleArrays[particle.name || ''];
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        
+        // Decrease lifetime
+        p.currentLife--;
+
+        // Remove dead particles
+        if (p.currentLife <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        if (!p.localposition) {
+          p.localposition = { x: 0, y: 0 };
+        }
+
+        // Apply gravity
+        if (p.velocity && p.gravity) {
+          // Update velocity with gravity
+          p.velocity.x += p.gravity.x * 0.01;
+          p.velocity.y += p.gravity.y * 0.01;
+          
+          // Cap velocity at original defined values
+          p.velocity.x = Math.min(Math.max(p.velocity.x, -particle.velocity.x), particle.velocity.x);
+          p.velocity.y = Math.min(Math.max(p.velocity.y, -particle.velocity.y), particle.velocity.y);
+          
+          // Update position
+          p.localposition.x += p.velocity.x * 0.01;
+          p.localposition.y += p.velocity.y * 0.01;
+        }
+
+        // Calculate render position
+        const centerX = npc.position.x + 16 - (p.size / 2);
+        const centerY = npc.position.y + 24 - (p.size / 2);
+        const renderX = centerX + p.localposition.x;
+        const renderY = centerY + p.localposition.y;
+
+        // Calculate fade in/out alpha
+        const fadeInDuration = p.lifetime * 0.4;  // Use 40% of lifetime for fade in
+        const fadeOutDuration = p.lifetime * 0.4; // Use 40% of lifetime for fade out
+        let alpha;
+
+        if (p.lifetime - p.currentLife < fadeInDuration) {
+          // Fade in
+          alpha = ((p.lifetime - p.currentLife) / fadeInDuration) * p.opacity;
+        } else if (p.currentLife < fadeOutDuration) {
+          // Fade out
+          alpha = (p.currentLife / fadeOutDuration) * p.opacity;
+        } else {
+          // Fully visible
+          alpha = p.opacity;
+        }
+        
+        context.globalAlpha = alpha;
+
+        // Draw particle as a circle
+        context.beginPath();
+        context.arc(renderX + p.size/2, renderY + p.size/2, p.size/2, 0, Math.PI * 2);
+        context.fillStyle = p.color || "white";
+        context.fill();
+      }
+
+      // Reset global alpha for other rendering
+      context.globalAlpha = 1;
     }
   };
 

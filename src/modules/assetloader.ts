@@ -6,6 +6,7 @@ import weapon from "../systems/weapons";
 import item from "../systems/items";
 import spell from "../systems/spells";
 import npc from "../systems/npcs";
+import particle from "../systems/particles";
 // import NPC from "../systems/npc_scripting";
 import assetCache from "../services/assetCache";
 import generate from "../modules/sprites";
@@ -50,6 +51,12 @@ const npcnow = performance.now();
 assetCache.add("npcs", await npc.list());
 const npcs = assetCache.get("npcs") as Npc[];
 log.success(`Loaded ${npcs.length} npc(s) from the database in ${(performance.now() - npcnow).toFixed(2)}ms`);
+
+// Load particle data
+const particleNow = performance.now();
+assetCache.add("particles", await particle.list());
+const particles = assetCache.get("particles") as Particle[];
+log.success(`Loaded ${particles.length} particle(s) from the database in ${(performance.now() - particleNow).toFixed(2)}ms`);
 
 // Load maps
 function loadMaps() {

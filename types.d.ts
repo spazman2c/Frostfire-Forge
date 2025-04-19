@@ -106,6 +106,7 @@ declare interface Npc {
   hidden: boolean;
   script: Nullable<string>;
   dialog: Nullable<string>;
+  particles: Nullable<Particle[]>;
 }
 
 // Define location data
@@ -117,7 +118,7 @@ declare interface LocationData {
 declare interface PositionData {
   x: number;
   y: number;
-  direction: string;
+  direction: string | null;
 }
 
 // Define stats data
@@ -182,3 +183,37 @@ type NPCScript = {
   onCreated: (this: Npc) => void;
   say: (this: Npc, message: string) => void;
 };
+
+declare interface Particle {
+  name: string | null; // Name of the particle
+  size: number; // Size of the particle
+  color: string | null; // Color of the particle (optional)
+  velocity: {
+      x: number; // Velocity of the particle in the x direction
+      y: number; // Velocity of the particle in the y direction
+  };
+  lifetime: number; // Lifetime of the particle in seconds
+  scale: number; // Scale of the particle
+  opacity: number; // Opacity of the particle
+  visible: boolean; // Whether the particle is visible
+  gravity: {
+      x: number; // Gravity of the particle in the x direction
+      y: number; // Gravity of the particle in the y direction
+  }; // Whether the particle has gravity
+  localposition: {
+    x: number | 0;
+    y: number | 0;
+  } | null;
+  interval: number;
+  amount: number;
+  staggertime: number;
+  currentLife: number | null;
+  initialVelocity: {
+    x: number;
+    y: number;
+  } | null;
+  spread: {
+    x: number;
+    y: number;
+  };
+}

@@ -9,9 +9,10 @@ const npcs = {
     const x = npc.position.x || 0;
     const y = npc.position.y || 0;
     const direction = npc.position.direction || "down";
+    const particles = npc.particles || [];
 
     const response = await query(
-      "INSERT INTO npcs (last_updated, map, position, direction, hidden, script, dialog) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO npcs (last_updated, map, position, direction, hidden, script, dialog, particles) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         last_updated,
         npc.map,
@@ -20,6 +21,7 @@ const npcs = {
         hidden,
         npc.script || null,
         npc.dialog || null,
+        JSON.stringify(particles),
       ]
     );
 
@@ -41,26 +43,27 @@ const npcs = {
 
   async list() {
     const response = (await query("SELECT * FROM npcs")) as any[];
-    const map = response[0]?.map as string;
-    const position: PositionData = {
-      x: Number(response[0]?.position?.split(",")[0]),
-      y: Number(response[0]?.position?.split(",")[1]),
-      direction: response[0]?.direction || "down",
-    };
-    const hidden = response[0]?.hidden as number;
-    const script = response[0]?.script as string;
+    const npcs: Npc[] = [];
+    
+    for (const npc of response) {
+      const map = npc?.map as string;
+      const position: PositionData = {
+        x: Number(npc?.position?.split(",")[0]),
+        y: Number(npc?.position?.split(",")[1]),
+        direction: npc?.direction || "down",
+      };
 
-    const npcs: Npc[] = [
-      {
-        id: response[0]?.id as number,
-        last_updated: (response[0]?.last_updated as number) || null,
+      npcs.push({
+        id: npc?.id as number,
+        last_updated: (npc?.last_updated as number) || null,
         map,
         position,
-        hidden: hidden === 1 ? true : false,
-        script,
-        dialog: response[0]?.dialog as string,
-      },
-    ];
+        hidden: npc?.hidden === 1,
+        script: npc?.script as string,
+        dialog: npc?.dialog as string,
+        particles: npc?.particles as Particle[],
+      });
+    }
 
     return npcs;
   },
@@ -82,9 +85,10 @@ const npcs = {
     const x = npc.position.x || 0;
     const y = npc.position.y || 0;
     const direction = npc.position.direction;
+    const particles = npc.particles || [];
 
     const response = await query(
-      "UPDATE npcs SET last_updated = ?, map = ?, position = ?, direction = ?, hidden = ?, script = ?, dialog = ? WHERE id = ?",
+      "UPDATE npcs SET last_updated = ?, map = ?, position = ?, direction = ?, hidden = ?, script = ?, dialog = ?, particles = ? WHERE id = ?",
       [
         last_updated,
         npc.map,
@@ -93,6 +97,7 @@ const npcs = {
         hidden,
         npc.script,
         npc.dialog,
+        JSON.stringify(particles),
         npc.id,
       ]
     );
