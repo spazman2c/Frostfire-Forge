@@ -216,4 +216,15 @@ declare interface Particle {
     x: number;
     y: number;
   };
+  weather: WeatherData | 'none';
+}
+
+declare interface WeatherData {
+  name: string;
+  temperature: number;
+  humidity: number;
+  wind_speed: number;
+  wind_direction: string;
+  precipitation: number;
+  ambience: number;
 }

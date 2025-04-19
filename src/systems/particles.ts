@@ -1,27 +1,32 @@
 import query from "../controllers/sqldatabase";
 import assetCache from "../services/assetCache";
+const weathers = await query("SELECT * FROM weather") as WeatherData[];
 
 const particles = {
   async add(particle: Particle) {
-    const response = await query("INSERT INTO particles (size, color, velocity, lifetime, scale, opacity, visible, gravity, name, localposition, interval, amount, staggertime, spread) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [particle.size, particle.color, particle.velocity, particle.lifetime, particle.scale, particle.opacity, particle.visible, particle.gravity, particle.name, particle.localposition, particle.interval, particle.amount, particle.staggertime, particle.spread]);
+    const response = await query("INSERT INTO particles (size, color, velocity, lifetime, scale, opacity, visible, gravity, name, localposition, interval, amount, staggertime, spread, weather) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [particle.size, particle.color, particle.velocity, particle.lifetime, particle.scale, particle.opacity, particle.visible, particle.gravity, particle.name, particle.localposition, particle.interval, particle.amount, particle.staggertime, particle.spread, particle.weather]);
     assetCache.set("particles", response);
+    return response;
   },
 
   async remove(particle: Particle) {
     const response = await query("DELETE FROM particles WHERE name = ?", [particle.name]);
     assetCache.set("particles", response);
+    return response;
   },
   
   async update(particle: Particle) {
-    const response = await query("UPDATE particles SET size = ?, color = ?, velocity = ?, lifetime = ?, scale = ?, opacity = ?, visible = ?, gravity = ?, name = ?, localposition = ?, interval = ?, amount = ?, staggertime = ?, spread = ? WHERE name = ?", [particle.size, particle.color, particle.velocity, particle.lifetime, particle.scale, particle.opacity, particle.visible, particle.gravity, particle.name, particle.localposition, particle.interval, particle.amount, particle.staggertime, particle.spread, particle.name]);
+    const response = await query("UPDATE particles SET size = ?, color = ?, velocity = ?, lifetime = ?, scale = ?, opacity = ?, visible = ?, gravity = ?, name = ?, localposition = ?, interval = ?, amount = ?, staggertime = ?, spread = ?, weather = ? WHERE name = ?", [particle.size, particle.color, particle.velocity, particle.lifetime, particle.scale, particle.opacity, particle.visible, particle.gravity, particle.name, particle.localposition, particle.interval, particle.amount, particle.staggertime, particle.spread, particle.weather, particle.name]);
     assetCache.set("particles", response);
+    return response;
   },
 
   async list() {
     const response = await query("SELECT * FROM particles") as any[];
     const particles: Particle[] = [];
-    
+
     for (const particle of response) {
+      const weather = weathers.find((w) => w.name === particle.weather) || 'none';
       const p: Particle = {
         name: particle.name,
         size: particle.size,
@@ -51,6 +56,7 @@ const particles = {
         },
         currentLife: null,
         initialVelocity: null,
+        weather: weather
       };
       particles.push(p);
     }
@@ -60,6 +66,7 @@ const particles = {
   
   async find(particle: Particle) {
     const response = await query("SELECT * FROM particles WHERE name = ?", [particle.name]) as any[];
+    const weather = weathers.find((w) => w.name === response[0]?.weather) || 'none';
     const p: Particle = {
       name: response[0]?.name,
       size: response[0]?.size,
@@ -77,8 +84,10 @@ const particles = {
       spread: response[0]?.spread,
       currentLife: null,
       initialVelocity: null,
+      weather: weather,
     };
     assetCache.set("particles", p);
+    return p;
   },
 }
 

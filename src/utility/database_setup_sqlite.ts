@@ -251,6 +251,44 @@ const createPermissionTypesTable = async () => {
   await query(sql);
 }
 
+const createNpcTable = async () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS npc (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
+        name TEXT NOT NULL UNIQUE,
+        position TEXT NOT NULL,
+        hidden INTEGER NOT NULL DEFAULT 0,
+        script TEXT DEFAULT NULL,
+        dialog TEXT DEFAULT NULL,
+        particles TEXT DEFAULT NULL
+    );
+  `;
+  await query(sql);
+}
+
+const createParticleTable = async () => {
+  const sql = `
+    CREATE TABLE IF NOT EXISTS particles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
+        name TEXT NOT NULL UNIQUE,
+        size INTEGER NOT NULL DEFAULT 1,
+        color TEXT NOT NULL DEFAULT 'transparent',
+        velocity TEXT NOT NULL DEFAULT '0,0',
+        lifetime INTEGER NOT NULL DEFAULT 100,
+        opacity FLOAT NOT NULL DEFAULT 1,
+        visible INTEGER NOT NULL DEFAULT 1,
+        gravity TEXT NOT NULL DEFAULT '0,0',
+        localposition TEXT NOT NULL DEFAULT '0,0',
+        amount INTEGER NOT NULL DEFAULT 1,
+        interval INTEGER NOT NULL DEFAULT 1,
+        staggertime FLOAT NOT NULL DEFAULT 0,
+        spread TEXT NOT NULL DEFAULT '0,0',
+        weather TEXT NOT NULL DEFAULT 'none'
+    );
+  `;
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createAccountsTable();
@@ -265,6 +303,8 @@ const setupDatabase = async () => {
   await createSpellsTable();
   await createPermissionsTable();
   await createPermissionTypesTable();
+  await createNpcTable();
+  await createParticleTable();
 };
 
 try {

@@ -1003,6 +1003,7 @@ declare interface Particle {
     x: number;
     y: number;
   };
+  weather: WeatherData | 'none';
 }
 ```
 
@@ -1039,4 +1040,60 @@ await particle.update(particle);
 
 ```ts
 await particle.list();
+```
+
+<hr>
+<h3>Weather Management</h3>
+
+```ts
+import weather from "../systems/weather";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface WeatherData {
+  name: string;
+  temperature: number;
+  humidity: number;
+  wind_speed: number;
+  wind_direction: string;
+  precipitation: number;
+  ambience: number;
+}
+```
+
+<h5>weather.add();</h5>
+<p style="font-size:0.75em;">Adds a weather to the weather database</p>
+
+```ts 
+await weather.add(weather);
+```
+
+<h5>weather.remove();</h5>
+<p style="font-size:0.75em;">Removes a weather from the weather database</p>
+
+```ts
+await weather.remove(weather);
+```
+
+<h5>weather.find();</h5>
+<p style="font-size:0.75em;">Fetches a weather from the weather database</p>
+
+```ts
+await weather.find(weather);
+```
+
+<h5>weather.update();</h5>
+<p style="font-size:0.75em;">Updates a weather in the weather database</p>  
+
+```ts
+await weather.update(weather);
+``` 
+
+<h5>weather.list();</h5>
+<p style="font-size:0.75em;">Lists all weathers in the weather database</p>
+
+```ts
+await weather.list();
 ```

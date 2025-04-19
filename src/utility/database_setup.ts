@@ -261,7 +261,8 @@ const createParticleTable = async () => {
       amount INT NOT NULL DEFAULT '1',
       interval INT NOT NULL DEFAULT '1',
       staggertime FLOAT NOT NULL DEFAULT '0',
-      spread VARCHAR(45) NOT NULL DEFAULT '0,0'
+      spread VARCHAR(45) NOT NULL DEFAULT '0,0',
+      weather VARCHAR(45) NOT NULL DEFAULT 'none'
     )
   `;
   await query(sql);

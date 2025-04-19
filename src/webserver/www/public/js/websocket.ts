@@ -1247,15 +1247,27 @@ function createNPC(data: any) {
         const randomLifetimeExtension = Math.random() * (particle.staggertime || 0);
         const baseLifetime = particle.lifetime || 1000;
         
+        // Apply wind direction bias to initial position
+        const windDirectionRad = Number(typeof particle.weather === 'object' ? 
+          particle.weather.wind_direction === 'left' ? 180 :
+          particle.weather.wind_direction === 'right' ? 0 :
+          Math.abs(Number(particle.weather.wind_direction || 0))
+        : 0) * Math.PI / 180;
+        const windSpeed = Number(typeof particle.weather === 'object' ? particle.weather.wind_speed || 0 : 0);
+        const windBias = {
+          x: Math.cos(windDirectionRad) * windSpeed * 0.5,
+          y: Math.sin(windDirectionRad) * windSpeed * 0.5
+        };
+
         const newParticle: Particle = {
           ...particle,
           localposition: { 
-            x: (particle.localposition?.x || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * particle.spread.x,
-            y: (particle.localposition?.y || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * particle.spread.y
+            x: Number(particle.localposition?.x || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.x) + windBias.x,
+            y: Number(particle.localposition?.y || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.y) + windBias.y
           },
           velocity: { 
-            x: particle.velocity.x,
-            y: particle.velocity.y
+            x: Number(particle.velocity.x) + (windBias.x * 0.2),
+            y: Number(particle.velocity.y) + (windBias.y * 0.2)
           },
           lifetime: baseLifetime + randomLifetimeExtension,
           currentLife: baseLifetime + randomLifetimeExtension,
@@ -1263,7 +1275,8 @@ function createNPC(data: any) {
           visible: true,
           size: particle.size || 5,
           color: particle.color || 'white',
-          gravity: { ...particle.gravity }
+          gravity: { ...particle.gravity },
+          weather: typeof particle.weather === 'object' ? { ...particle.weather } : 'none'
         };
 
         // Remove oldest particle if we exceed the maximum amount
@@ -1293,15 +1306,31 @@ function createNPC(data: any) {
           p.localposition = { x: 0, y: 0 };
         }
 
-        // Apply gravity
+        // Apply gravity and wind effects
         if (p.velocity && p.gravity) {
-          // Update velocity with gravity
-          p.velocity.x += p.gravity.x * 0.01;
-          p.velocity.y += p.gravity.y * 0.01;
+          const windDirectionRad = Number(typeof p.weather === 'object' ? 
+            p.weather.wind_direction === 'left' ? 180 :
+            p.weather.wind_direction === 'right' ? 0 :
+            Math.abs(p.weather.wind_direction || 0)
+          : 0) * Math.PI / 180;
+          const windSpeed = Number(typeof p.weather === 'object' ? p.weather.wind_speed || 0 : 0);
+          const windForce = {
+            x: Math.cos(windDirectionRad) * windSpeed * 0.01,
+            y: Math.sin(windDirectionRad) * windSpeed * 0.01
+          };
+
+          // Update velocity with gravity and wind
+          p.velocity.x += p.gravity.x * 0.01 + windForce.x;
+          p.velocity.y += p.gravity.y * 0.01 + windForce.y;
           
-          // Cap velocity at original defined values
-          p.velocity.x = Math.min(Math.max(p.velocity.x, -particle.velocity.x), particle.velocity.x);
-          p.velocity.y = Math.min(Math.max(p.velocity.y, -particle.velocity.y), particle.velocity.y);
+          // Cap velocity considering wind influence
+          const maxVelocity = {
+            x: particle.velocity.x + (windSpeed * 0.2),
+            y: particle.velocity.y + (windSpeed * 0.2)
+          };
+          
+          p.velocity.x = Math.min(Math.max(p.velocity.x, -maxVelocity.x), maxVelocity.x);
+          p.velocity.y = Math.min(Math.max(p.velocity.y, -maxVelocity.y), maxVelocity.y);
           
           // Update position
           p.localposition.x += p.velocity.x * 0.01;
@@ -1315,8 +1344,8 @@ function createNPC(data: any) {
         const renderY = centerY + p.localposition.y;
 
         // Calculate fade in/out alpha
-        const fadeInDuration = p.lifetime * 0.4;  // Use 40% of lifetime for fade in
-        const fadeOutDuration = p.lifetime * 0.4; // Use 40% of lifetime for fade out
+        const fadeInDuration = p.lifetime * 0.4;
+        const fadeOutDuration = p.lifetime * 0.4;
         let alpha;
 
         if (p.lifetime - p.currentLife < fadeInDuration) {
