@@ -7,7 +7,6 @@ import item from "../systems/items";
 import spell from "../systems/spells";
 import npc from "../systems/npcs";
 import particle from "../systems/particles";
-import weather from "../systems/weather";
 // import NPC from "../systems/npc_scripting";
 import assetCache from "../services/assetCache";
 import generate from "../modules/sprites";
@@ -58,12 +57,6 @@ const particleNow = performance.now();
 assetCache.add("particles", await particle.list());
 const particles = assetCache.get("particles") as Particle[];
 log.success(`Loaded ${particles.length} particle(s) from the database in ${(performance.now() - particleNow).toFixed(2)}ms`);
-
-// Load weather data
-const weatherNow = performance.now();
-assetCache.add("weather", await weather.list());
-const weathers = assetCache.get("weather") as WeatherData[];
-log.success(`Loaded ${weathers.length} weather(s) from the database in ${(performance.now() - weatherNow).toFixed(2)}ms`);
 
 // Load maps
 function loadMaps() {

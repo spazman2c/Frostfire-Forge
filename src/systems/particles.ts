@@ -1,6 +1,12 @@
 import query from "../controllers/sqldatabase";
 import assetCache from "../services/assetCache";
-const weathers = await query("SELECT * FROM weather") as WeatherData[];
+import log from "../modules/logger";
+import weather from "./weather";
+// Load weather data
+const weatherNow = performance.now();
+assetCache.add("weather", await weather.list());
+const weathers = assetCache.get("weather") as WeatherData[];
+log.success(`Loaded ${weathers.length} weather(s) from the database in ${(performance.now() - weatherNow).toFixed(2)}ms`);
 
 const particles = {
   async add(particle: Particle) {
