@@ -960,3 +960,83 @@ await permissions.set(username, permissions);
 ```ts
 await permissions.list();
 ```
+
+<hr>
+<h3>Particle Management</h3>
+
+```ts
+import particle from "../systems/particles";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface Particle {
+  name: string | null;
+  size: number;
+  color: string | null;
+  velocity: {
+      x: number;
+      y: number;
+  };
+  lifetime: number;
+  scale: number;
+  opacity: number;
+  visible: boolean;
+  gravity: {
+      x: number;
+      y: number;
+  };
+  localposition: {
+    x: number | 0;
+    y: number | 0;
+  } | null;
+  interval: number;
+  amount: number;
+  staggertime: number;
+  currentLife: number | null;
+  initialVelocity: {
+    x: number;
+    y: number;
+  } | null;
+  spread: {
+    x: number;
+    y: number;
+  };
+}
+```
+
+<h5>particle.add();</h5>
+<p style="font-size:0.75em;">Adds a particle to the particle database</p>
+
+```ts
+await particle.add(particle);
+```
+
+<h5>particle.remove();</h5>
+<p style="font-size:0.75em;">Removes a particle from the particle database</p>
+
+```ts
+await particle.remove(particle);
+```
+
+<h5>particle.find();</h5>
+<p style="font-size:0.75em;">Fetches a particle from the particle database</p>
+
+```ts
+await particle.find(particle);
+```
+
+<h5>particle.update();</h5>
+<p style="font-size:0.75em;">Updates a particle in the particle database</p>
+
+```ts
+await particle.update(particle);
+```
+
+<h5>particle.list();</h5>
+<p style="font-size:0.75em;">Lists all particles in the particle database</p>
+
+```ts
+await particle.list();
+```
