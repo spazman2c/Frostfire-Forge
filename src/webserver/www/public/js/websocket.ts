@@ -1033,18 +1033,35 @@ window.addEventListener("keydown", async (e) => {
       chatInput.blur();
       return;
     } 
-
-    const publicKey = sessionStorage.getItem("publicKey");
-    if (!publicKey) return;
-    const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "CHAT",
-          data: encryptedMessage,
-        })
-      )
-    );
+    if (window?.crypto?.subtle) {
+      const publicKey = sessionStorage.getItem("publicKey");
+      if (!publicKey) return;
+      const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
+      socket.send(
+        packet.encode(
+          JSON.stringify({
+            type: "CHAT",
+            data: {
+              message: encryptedMessage,
+              mode: "decrypt"
+            }
+          })
+        )
+      );
+    } else {
+      // Fallback to non-encrypted chat if Web Crypto API is not available
+      socket.send(
+        packet.encode(
+          JSON.stringify({
+            type: "CHAT",
+            data: {
+              message: chatInput.value.trim().toString() || " ",
+              mode: null
+            }
+          })
+        )
+      );
+    }
 
     const previousMessage = chatInput.value.trim();
     if (previousMessage === "") return;

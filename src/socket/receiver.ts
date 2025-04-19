@@ -565,11 +565,9 @@ export default async function packetReceiver(
       }
       case "CHAT": {
         if (!currentPlayer) return;
-        
-        if (!data && data != null) {
-          console.log("No data received");
-          return;
-        }
+        const messageData = data as any;
+        const message = messageData?.message;
+        const mode = messageData?.mode;
 
         // Send message to the sender
         const sendMessageToPlayer = (playerWs: any, message: string) => {
@@ -586,7 +584,7 @@ export default async function packetReceiver(
           );
         };
 
-        if (data == null) {
+        if (message == null) {
           const playersInMap = filterPlayersByMap(currentPlayer.location.map);
           playersInMap.forEach((player) => {
             sendMessageToPlayer(player.ws, "");
@@ -594,14 +592,19 @@ export default async function packetReceiver(
           return;
         }
 
-        const encryptedMessage = Buffer.from(Object.values(data));
-        const privateKey = _privateKey;
-        if (!privateKey) return;
-        const decryptedPrivateKey = decryptPrivateKey(privateKey, process.env.RSA_PASSPHRASE || "").toString();
-        const decryptedMessage = decryptRsa(encryptedMessage, decryptedPrivateKey) || "";
+        let decryptedMessage;
+        if (mode && mode == "decrypt") {
+          const encryptedMessage = Buffer.from(Object.values(message) as number[]);
+          const privateKey = _privateKey;
+          if (!privateKey) return;
+          const decryptedPrivateKey = decryptPrivateKey(privateKey, process.env.RSA_PASSPHRASE || "").toString();
+          decryptedMessage = decryptRsa(encryptedMessage, decryptedPrivateKey) || "";
+        } else {
+          decryptedMessage = message;
+        }
 
         // Send the message to the sender
-        sendMessageToPlayer(ws, decryptedMessage);
+        sendMessageToPlayer(ws, decryptedMessage as string);
 
         const playerCache = cache.list();
         let playersInMap = Object.values(playerCache).filter(
@@ -618,17 +621,19 @@ export default async function packetReceiver(
         if (playersInMap.length === 0) return;
 
         // Translate the original message to English so that we can filter it against an English swear word list
-        const englishMessage = await language.translate(decryptedMessage, "en");
+        const englishMessage = currentPlayer.language === "en" ? 
+          decryptedMessage as string : 
+          await language.translate(decryptedMessage as string, "en");
         let filteredMessage = englishMessage;
 
         // Check for swear words
         for (const swear of swears) {
           const swearRegex = new RegExp(swear.id, "gi");
-          if (swearRegex.test(englishMessage)) {
-            // Replace it with an equal number of asterisks
-            filteredMessage = englishMessage.replace(
+          while (swearRegex.test(filteredMessage)) {
+            const randomLength = Math.floor(Math.random() * 5) + 1;
+            filteredMessage = filteredMessage.replace(
               swearRegex,
-              "*".repeat(swear.id.length)
+              "*".repeat(randomLength)
             );
           }
         }
@@ -637,10 +642,9 @@ export default async function packetReceiver(
 
         playersInMap.forEach(async (player) => {
           if (!translations[player.language]) {
-            translations[player.language] = await language.translate(
-              filteredMessage,
-              player.language
-            );
+            // Skip translation if target language matches source language
+            translations[player.language] = player.language === "en" ? filteredMessage : 
+              await language.translate(filteredMessage, player.language);
           }
 
           sendMessageToPlayer(player.ws, translations[player.language]);
