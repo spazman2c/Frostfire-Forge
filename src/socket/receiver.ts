@@ -14,6 +14,7 @@ const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
 // Load settings
 import * as settings from "../../config/settings.json";
+const defaultMap = settings.default_map?.replace(".json", "") || "main";
 
 let restartScheduled: boolean;
 let restartTimers: NodeJS.Timer[];
@@ -190,7 +191,7 @@ export default async function packetReceiver(
           (!position?.x && position.x.toString() != "0") ||
           (!position?.y && position.y.toString() != "0")
         ) {
-          spawnLocation = { map: "main.json", x: 0, y: 0 };
+          spawnLocation = { map: `${defaultMap}.json`, x: 0, y: 0 };
         } else {
           spawnLocation = {
             map: `${location.map}.json`,
@@ -202,7 +203,7 @@ export default async function packetReceiver(
         const map =
           (maps as any[]).find(
             (map: MapData) => map.name === spawnLocation?.map
-          ) || (maps as any[]).find((map: MapData) => map.name === "main.json");
+          ) || (maps as any[]).find((map: MapData) => map.name === `${defaultMap}.json`);
 
         if (!map) return;
 
@@ -364,6 +365,8 @@ export default async function packetReceiver(
         if (!currentPlayer) return;
         const tileSize = 16;
         const speed = 2;
+        const targetFPS = 60;
+        const frameTime = 1000 / targetFPS; // Time per frame in milliseconds
 
         const directionAdjustments = {
           up: {
@@ -450,14 +453,8 @@ export default async function packetReceiver(
 
         // Only allow the player to move in these directions
         const directions = [
-          "up",
-          "down",
-          "left",
-          "right",
-          "upleft",
-          "upright",
-          "downleft",
-          "downright",
+          "up", "down", "left", "right",
+          "upleft", "upright", "downleft", "downright",
         ];
         if (!directions.includes(moveDirection)) return;
 
@@ -466,7 +463,19 @@ export default async function packetReceiver(
           clearInterval(currentPlayer.movementInterval);
         }
 
+        let lastTime = performance.now();
         const movePlayer = () => {
+          const currentTime = performance.now();
+          const deltaTime = currentTime - lastTime;
+          
+          // Skip frame if too early
+          if (deltaTime < frameTime) {
+            return;
+          }
+          
+          // Update last frame time
+          lastTime = currentTime - (deltaTime % frameTime);
+
           const tempPosition = { ...currentPlayer.location.position };
           const collisionPosition = { ...currentPlayer.location.position };
           const playerHeight = 48;
@@ -514,9 +523,9 @@ export default async function packetReceiver(
           });
         };
 
-        // Start continuous movement
+        // Start continuous movement with requestAnimationFrame-like timing
         movePlayer(); // Execute first movement immediately
-        currentPlayer.movementInterval = setInterval(movePlayer, 10); // Continue movement every 10ms
+        currentPlayer.movementInterval = setInterval(movePlayer, 1); // Check frequently but only update at 60fps
         break;
       }
       case "TELEPORTXY": {
@@ -1311,7 +1320,7 @@ export default async function packetReceiver(
             }
 
             // Respawn the player
-            await player.setLocation(targetPlayer.username, "main", { x: 0, y: 0, direction: "down" });
+            await player.setLocation(targetPlayer.username, `${defaultMap}`, { x: 0, y: 0, direction: "down" });
             
             // Update cache if player is online
             if (cache.get(targetPlayer.id)) {

@@ -262,7 +262,7 @@ const createParticleTable = async () => {
       interval INT NOT NULL DEFAULT '1',
       staggertime FLOAT NOT NULL DEFAULT '0',
       spread VARCHAR(45) NOT NULL DEFAULT '0,0',
-      weather VARCHAR(45) NOT NULL DEFAULT 'none'
+      affected_by_weather INT NOT NULL DEFAULT 0
     )
   `;
   await query(sql);
@@ -286,6 +286,41 @@ const createWeatherTable = async () => {
   await query(sql);
 }
 
+const createDefaultWeather = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+  log.info("Creating default weather...");
+  const sql = `
+    INSERT IGNORE INTO weather (name, ambience, wind_direction, wind_speed, humidity, temperature, precipitation) VALUES ('clear', 0, 'none', 0, 30, 68, 0);
+  `;
+  await query(sql);
+}
+
+const createWorldTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+  log.info("Creating world table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS worlds (
+      name VARCHAR(100) NOT NULL UNIQUE PRIMARY KEY,
+      weather VARCHAR(45) NOT NULL DEFAULT 'none',
+      max_players INT NOT NULL DEFAULT 100,
+      default_map VARCHAR(255) NOT NULL DEFAULT 'main'
+    )
+  `;
+  await query(sql);
+};
+
+const createDefaultWorld = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+  log.info("Creating default world...");
+  const sql = `
+    INSERT IGNORE INTO worlds (name, weather, max_players, default_map) VALUES ('default', 'clear', 100, 'main');
+  `;
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -304,6 +339,9 @@ const setupDatabase = async () => {
   await createNpcTable();
   await createParticleTable();
   await createWeatherTable();
+  await createDefaultWeather();
+  await createWorldTable();
+  await createDefaultWorld();
 };
 
 try {

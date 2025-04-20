@@ -92,6 +92,45 @@ const times = [] as number[];
 let lastFrameTime = 0; // Track the time of the last frame
 let controllerConnected = false;
 
+// Add these variables near the top with other declarations
+let cameraX = 0;
+let cameraY = 0;
+const cameraSmoothing = 0.1; // Adjust between 0 and 1 (lower = smoother but slower)
+
+// Add this variable with other declarations at the top
+let lastSentDirection = "";
+
+function lerp(start: number, end: number, amount: number) {
+  return start + (end - start) * amount;
+}
+
+function updateCamera() {
+  if (!loaded) return;
+  
+  const currentPlayer = players.find(
+    (player) => player.id === sessionStorage.getItem("connectionId")
+  );
+  
+  if (currentPlayer) {
+    // Calculate target camera position
+    const targetX = currentPlayer.position.x - window.innerWidth / 2 + 8;
+    const targetY = currentPlayer.position.y - window.innerHeight / 2 + 48;
+    
+    // Smoothly interpolate camera position
+    cameraX = lerp(cameraX, targetX, cameraSmoothing);
+    cameraY = lerp(cameraY, targetY, cameraSmoothing);
+    
+    // Apply camera position
+    window.scrollTo(cameraX, cameraY);
+  }
+  
+  // Request next frame
+  requestAnimationFrame(updateCamera);
+}
+
+// Start camera updates
+updateCamera();
+
 // Event listener for gamepad connection
 window.addEventListener("gamepadconnected", () => {
   controllerConnected = true;
@@ -203,6 +242,23 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
   const x = e.detail.x;
   const y = e.detail.y;
 
+  // Check if joystick is in neutral position (increased deadzone)
+  const deadzone = 0.5;
+  if (Math.abs(x) < deadzone && Math.abs(y) < deadzone) {
+    if (lastSentDirection !== "ABORT") {
+      socket.send(
+        packet.encode(
+          JSON.stringify({
+            type: "MOVEXY",
+            data: "ABORT",
+          })
+        )
+      );
+      lastSentDirection = "ABORT";
+    }
+    return;
+  }
+
   // Determine the angle in degrees
   const angle = Math.atan2(y, x) * (180 / Math.PI);
 
@@ -226,8 +282,8 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
     direction = "UPRIGHT";
   }
 
-  // Send the direction if determined
-  if (direction) {
+  // Only send if direction changed
+  if (direction && direction !== lastSentDirection) {
     if (pauseMenu.style.display == "block") return;
     socket.send(
       packet.encode(
@@ -237,6 +293,7 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
         })
       )
     );
+    lastSentDirection = direction;
   }
 });
 
@@ -342,7 +399,7 @@ socket.onmessage = async (event) => {
       // If the player is the client, scroll to the player's position
       if (data.id == sessionStorage.getItem("connectionId")) {
         window.scrollTo(
-          player.position.x - window.innerWidth / 2 + 32,
+          player.position.x - window.innerWidth / 2 + 8,
           player.position.y - window.innerHeight / 2 + 48
         );
         if (fullmap.style.display === "block") {
@@ -1270,28 +1327,32 @@ function createNPC(data: any) {
       if (currentTime - npc.lastEmitTime[particle.name || ''] >= emitInterval) {
         const randomLifetimeExtension = Math.random() * (particle.staggertime || 0);
         const baseLifetime = particle.lifetime || 1000;
-        
-        // Apply wind direction bias to initial position
-        const windDirectionRad = Number(typeof particle.weather === 'object' ? 
-          particle.weather.wind_direction === 'left' ? 180 :
-          particle.weather.wind_direction === 'right' ? 0 :
-          Math.abs(Number(particle.weather.wind_direction || 0))
-        : 0) * Math.PI / 180;
-        const windSpeed = Number(typeof particle.weather === 'object' ? particle.weather.wind_speed || 0 : 0);
+        const windDirection = typeof particle.weather === 'object' ? particle.weather.wind_direction : null;
+        const windSpeed = typeof particle.weather === 'object' ? particle.weather.wind_speed || 0 : 0;
+
+        // Default wind bias to 0
         const windBias = {
-          x: Math.cos(windDirectionRad) * windSpeed * 0.5,
-          y: Math.sin(windDirectionRad) * windSpeed * 0.5
-        };
+          x: 0,
+          y: 0
+        }
+
+        if (windDirection !== null && (windDirection === 'left' || windDirection === 'right')) {
+          // Apply wind direction bias to initial position
+          const windDirectionRad = (windDirection === 'left' ? 180 : 
+                                  windDirection === 'right' ? 0 : 180) * Math.PI / 180;
+          windBias.x = Math.cos(windDirectionRad) * windSpeed * 0.5;
+          windBias.y = Math.sin(windDirectionRad) * windSpeed * 0.5;
+        }
 
         const newParticle: Particle = {
           ...particle,
           localposition: { 
-            x: Number(particle.localposition?.x || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.x) + windBias.x,
-            y: Number(particle.localposition?.y || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.y) + windBias.y
+            x: Number(particle.localposition?.x || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.x),
+            y: Number(particle.localposition?.y || 0) + (Math.random() < 0.5 ? -1 : 1) * Math.random() * Number(particle.spread.y)
           },
           velocity: { 
-            x: Number(particle.velocity.x) + (windBias.x * 0.2),
-            y: Number(particle.velocity.y) + (windBias.y * 0.2)
+            x: Number(particle.velocity.x || 0) + windBias.x,
+            y: Number(particle.velocity.y || 0) + windBias.y
           },
           lifetime: baseLifetime + randomLifetimeExtension,
           currentLife: baseLifetime + randomLifetimeExtension,
@@ -1332,16 +1393,18 @@ function createNPC(data: any) {
 
         // Apply gravity and wind effects
         if (p.velocity && p.gravity) {
-          const windDirectionRad = Number(typeof p.weather === 'object' ? 
-            p.weather.wind_direction === 'left' ? 180 :
-            p.weather.wind_direction === 'right' ? 0 :
-            Math.abs(p.weather.wind_direction || 0)
-          : 0) * Math.PI / 180;
-          const windSpeed = Number(typeof p.weather === 'object' ? p.weather.wind_speed || 0 : 0);
+          const windDirection = typeof p.weather === 'object' ? p.weather.wind_direction : null;
+          const windSpeed = typeof p.weather === 'object' ? p.weather.wind_speed || 0 : 0;
           const windForce = {
-            x: Math.cos(windDirectionRad) * windSpeed * 0.01,
-            y: Math.sin(windDirectionRad) * windSpeed * 0.01
+            x: 0,
+            y: 0
           };
+
+          if (windDirection !== 'none' && (windDirection === 'left' || windDirection === 'right')) {
+            const windDirectionRad = (windDirection === 'left' ? 180 : 0) * Math.PI / 180;
+            windForce.x = Math.cos(windDirectionRad) * windSpeed * 0.01;
+            windForce.y = Math.sin(windDirectionRad) * windSpeed * 0.01;
+          }
 
           // Update velocity with gravity and wind
           p.velocity.x += p.gravity.x * 0.01 + windForce.x;
@@ -1563,10 +1626,10 @@ function createPlayer(data: any) {
 
   // Current player
   if (data.id === sessionStorage.getItem("connectionId")) {
-    window.scrollTo(
-      player.position.x - window.innerWidth / 2 + 32,
-      player.position.y - window.innerHeight / 2 + 48
-    );
+    // Initialize camera position immediately for the current player
+    cameraX = player.position.x - window.innerWidth / 2 + 8;
+    cameraY = player.position.y - window.innerHeight / 2 + 48;
+    window.scrollTo(cameraX, cameraY);
   }
 
   players.push(player);
@@ -1599,14 +1662,12 @@ function getLines(ctx: any, text: string, maxWidth: number) {
 // Snap to player's position on resize
 window.addEventListener("resize", () => {
   const clientSocketId = sessionStorage.getItem("connectionId");
-  players.forEach((player) => {
-    if (player.id === clientSocketId) {
-      window.scrollTo(
-        player.position.x - window.innerWidth / 2 + 32,
-        player.position.y - window.innerHeight / 2 + 48
-      );
-    }
-  });
+  const currentPlayer = players.find((player) => player.id === clientSocketId);
+  if (currentPlayer) {
+    cameraX = currentPlayer.position.x - window.innerWidth / 2 + 8;
+    cameraY = currentPlayer.position.y - window.innerHeight / 2 + 48;
+    window.scrollTo(cameraX, cameraY);
+  }
 });
 
 // Prevent unfocusing the window
@@ -1737,98 +1798,6 @@ async function updateFullMap() {
   fullmap.style.width = canvas.width * mapScale + "px";
   fullmap.style.height = canvas.height * mapScale + "px";
 }
-
-// async function updateMiniMap() {
-//   if (!loaded) return;
-//   // Check if there is already a minimap image
-//   const image = map.querySelector("img");
-
-//   // Create a temporary canvas for the minimap
-//   const tempCanvas = document.createElement("canvas");
-//   const context = tempCanvas.getContext("2d");
-
-//   if (!context) return;
-
-//   // Set the minimap size
-//   const minimapWidth = 200; // Set to your desired minimap width
-//   const minimapHeight = 200; // Set to your desired minimap height
-//   tempCanvas.width = minimapWidth;
-//   tempCanvas.height = minimapHeight;
-
-//   // Get the current player's position
-//   const currentPlayer = players.find(
-//     (player) => player.id === sessionStorage.getItem("connectionId")
-//   );
-
-//   if (!currentPlayer) return;
-
-//   // Update position display
-//   const x = currentPlayer.position.x - playerCanvas.width / 2;
-//   const y = currentPlayer.position.y - playerCanvas.height / 2;
-//   const positionText = `X: ${x}, Y: ${y}`;
-//   if (mapPosition.innerHTML !== positionText) {
-//     mapPosition.innerHTML = positionText;
-//   }
-
-//   const canvasWidth = canvas.width;
-//   const canvasHeight = canvas.height;
-
-//   // Calculate the cropping region centered around the current player
-//   const scale = 20; // Scale factor for the minimap
-//   const cropWidth = minimapWidth * scale;
-//   const cropHeight = minimapHeight * scale;
-
-//   // Ensure the player stays centered in the minimap
-//   const cropX = Math.max(
-//     0,
-//     Math.min(currentPlayer.position.x - cropWidth / 2, canvasWidth - cropWidth)
-//   );
-//   const cropY = Math.max(
-//     0,
-//     Math.min(
-//       currentPlayer.position.y - cropHeight / 2,
-//       canvasHeight - cropHeight
-//     )
-//   );
-
-//   context.imageSmoothingEnabled = true;
-//   context.imageSmoothingQuality = "high";
-
-//   // Draw the cropped and scaled-down region of the canvas to the minimap
-//   context.drawImage(
-//     canvas, // Source canvas
-//     cropX, // Crop start X
-//     cropY, // Crop start Y
-//     cropWidth, // Crop width
-//     cropHeight, // Crop height
-//     0, // Destination X
-//     0, // Destination Y
-//     minimapWidth, // Destination width
-//     minimapHeight // Destination height
-//   );
-
-//   // Generate the data URL for the minimap
-//   const dataUrl = tempCanvas.toDataURL("image/png");
-
-//   if (image) {
-//     image.src = dataUrl;
-//   } else {
-//     const newImage = new Image();
-//     newImage.src = dataUrl;
-//     map.appendChild(newImage);
-//   }
-// }
-
-// Update minimap less frequently to avoid freezing
-// const updateInterval = 200; // Update every 150ms
-
-// setTimeout(async () => {
-//   const updateLoop = async () => {
-//     await updateMiniMap();
-//     setTimeout(async () => await updateLoop(), updateInterval);
-//   };
-//   await updateLoop();
-// }, 1000);
 
 document
   .getElementById("pause-menu-action-back")
@@ -1983,19 +1952,6 @@ document.addEventListener("click", (event) => {
     )
   );
 });
-
-
-// window.addEventListener("gamepadconnected", (e) => {
-//   const gamepad = navigator.getGamepads()[e.gamepad.index];
-//   if (!gamepad) return;
-//   controllerConnected = true;
-//   console.log(`Gamepad connected at index ${gamepad.index}: ${gamepad.id}`);
-// });
-
-// window.addEventListener("gamepaddisconnected", () => {
-//   controllerConnected = false;
-//   console.log("Gamepad disconnected");
-// });
 
 async function encryptRsa(publicKey: string, data: string) {
   const cleanedKey = cleanBase64Key(publicKey);

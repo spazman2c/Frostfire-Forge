@@ -218,6 +218,7 @@ declare interface Particle {
     y: number;
   };
   weather: WeatherData | 'none';
+  affected_by_weather?: boolean;
 }
 
 declare interface WeatherData {
@@ -228,4 +229,11 @@ declare interface WeatherData {
   wind_direction: string;
   precipitation: number;
   ambience: number;
+}
+
+declare interface WorldData {
+  name: string;
+  weather: string;
+  max_players: number;
+  default_map: string;
 }

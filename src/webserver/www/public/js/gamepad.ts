@@ -77,7 +77,7 @@ const controllerInputLoop = () => {
 
     // Check for joystick movement left or right
     const axes = gamepad.axes;
-    const deadzone = 0.1;
+    const deadzone = 0.01;
     const x = Math.abs(axes[0]) > deadzone ? axes[0] : 0;
     const y = Math.abs(axes[1]) > deadzone ? axes[1] : 0;
 

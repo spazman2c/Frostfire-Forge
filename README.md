@@ -1101,3 +1101,70 @@ await weather.update(weather);
 ```ts
 await weather.list();
 ```
+
+<hr>
+<h3>World Management</h3>
+
+```ts
+import world from "../systems/worlds";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface WorldData {
+  name: string;
+  weather: string;
+  max_players: number;
+  default_map: string;
+}
+```
+
+<h5>world.add();</h5>
+<p style="font-size:0.75em;">Adds a world to the world database</p>
+
+```ts
+await world.add(world);
+```
+
+<h5>world.remove();</h5>
+<p style="font-size:0.75em;">Removes a world from the world database</p>
+
+```ts
+await world.remove(world);
+```
+
+<h5>world.find();</h5>
+<p style="font-size:0.75em;">Fetches a world from the world database</p>
+
+```ts
+await world.find(world);
+```
+
+<h5>world.update();</h5>
+<p style="font-size:0.75em;">Updates a world in the world database</p>
+
+```ts
+await world.update(world);
+```
+
+<h5>world.list();</h5>
+<p style="font-size:0.75em;">Lists all worlds in the world database</p>
+
+```ts
+await world.list();
+```
+
+<h5>world.getCurrentWeather();</h5>
+<p style="font-size:0.75em;">Fetches the current weather for a world</p>
+
+```ts
+await world.getCurrentWeather(world);
+```
+
+<h5>world.getMaxPlayers();</h5>
+<p style="font-size:0.75em;">Fetches the max players for a world</p>
+
+```ts
+await world.getMaxPlayers(world);
+```

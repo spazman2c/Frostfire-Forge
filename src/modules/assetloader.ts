@@ -7,11 +7,13 @@ import item from "../systems/items";
 import spell from "../systems/spells";
 import npc from "../systems/npcs";
 import particle from "../systems/particles";
+import worlds from "../systems/worlds";
 // import NPC from "../systems/npc_scripting";
 import assetCache from "../services/assetCache";
 import generate from "../modules/sprites";
 import zlib from "zlib";
 import query from "../controllers/sqldatabase";
+import * as settings from "../../config/settings.json";
 // Warm up the database connection
 await query("SELECT 1 + 1 AS solution -- Warm up the database connection");
 
@@ -27,6 +29,20 @@ if (!asset) {
 }
 
 const assetData = JSON.parse(asset);
+
+// Load world data
+const worldNow = performance.now();
+assetCache.add("worlds", await worlds.list());
+const world = assetCache.get("worlds") as WorldData[];
+log.success(`Loaded ${world.length} world(s) from the database in ${(performance.now() - worldNow).toFixed(2)}ms`);
+
+// Check if the world name in the config is in the asset cache
+const worldName = settings.world;
+if (!world.find((w) => w.name === worldName)) {
+  throw new Error(`World name ${worldName} was not loaded correctly from the database\nFound the following worlds: ${world.map((w) => w.name).join(", ")}`);
+} else {
+  log.success(`World: ${worldName} was loaded correctly from the database`);
+}
 
 // Load item data
 const itemnow = performance.now();

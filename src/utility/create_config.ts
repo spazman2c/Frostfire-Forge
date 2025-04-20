@@ -46,7 +46,9 @@ const settings = {
     "maxPayloadMB": 1,
     "benchmarkenabled": false,
     "idleTimeout": 1
-  }
+  },
+  "world": "default",
+  "default_map": "main"
 };
 
 if (!fs.existsSync(path.join(configPath, "assets.json"))) {
