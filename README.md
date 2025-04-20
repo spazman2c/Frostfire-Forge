@@ -37,6 +37,9 @@ bun production
 
 ```
 bun development
+
+*: demo_user
+Password: 12345678
 ```
 
 <h5>Running the server as a daemon (PM2)</h5>

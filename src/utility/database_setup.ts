@@ -29,11 +29,11 @@ const createAccountsTable = async () => {
         geo_location VARCHAR(255) DEFAULT NULL,
         verification_code VARCHAR(100) DEFAULT NULL,
         needs_password_reset INT DEFAULT 0 NOT NULL,
-        map VARCHAR(255) DEFAULT NULL,
-        position VARCHAR(255) DEFAULT NULL,
+        map VARCHAR(255) DEFAULT 'main' NOT NULL,
+        position VARCHAR(255) DEFAULT '0,0' NOT NULL,
         session_id VARCHAR(255) UNIQUE DEFAULT NULL,
         stealth INT DEFAULT 0 NOT NULL,
-        direction VARCHAR(10) DEFAULT NULL,
+        direction VARCHAR(10) DEFAULT 'down' NOT NULL,
         verified INT DEFAULT 0 NOT NULL,
         noclip INT DEFAULT 0 NOT NULL
       );

@@ -20,11 +20,11 @@ const createAccountsTable = async () => {
         geo_location TEXT DEFAULT NULL,
         verification_code TEXT DEFAULT NULL,
         needs_password_reset INTEGER DEFAULT 0 NOT NULL,
-        map TEXT DEFAULT NULL,
-        position TEXT DEFAULT NULL,
+        map TEXT DEFAULT 'main' NOT NULL,
+        position TEXT DEFAULT '0,0' NOT NULL,
         session_id TEXT UNIQUE DEFAULT NULL,
         stealth INTEGER DEFAULT 0 NOT NULL,
-        direction TEXT DEFAULT NULL,
+        direction TEXT DEFAULT 'down' NOT NULL,
         verified INTEGER DEFAULT 0 NOT NULL,
         noclip INTEGER DEFAULT 0 NOT NULL
       );
@@ -77,18 +77,16 @@ const insertDemoAccount = async () => {
       role,
       banned,
       needs_password_reset,
-      stealth,
-      direction
+      stealth
     ) VALUES (
       'demo@example.com',
       'demo_user',
       'Lb2e9d35b2720ec87198b38fee811cc386fe909aa03786085960b269d7089cd02bc8f85f7bee2e3d565341dee70e9d9a9de2b971eef84c43f04d987414b4cf6c7Aed1d913ef3afd0f87b5127e14016aa50f6053e26527cf82b091b4d0a567151c0Pfa585d89c851dd338a70dcf535aa2a92fee7836dd6aff1226583e88e0996293f16bc009c652826e0fc5c706695a03cddce372f139eff4d13959da6f1f5d3eabeY63395358fb084a3ef48a0d5d153d6476fb5f9a0b57ad09252cbec05c9067d45bX',
       0,
-      0,
-      0,
       1,
       0,
-      'down'
+      0,
+      0
     );
     `;
   await query(sql);
@@ -266,6 +264,14 @@ const createPermissionTypesTable = async () => {
   await query(sql);
 }
 
+const addPermissionsToDemoAccount = async () => {
+  log.info("Adding permissions to demo account...");
+  const sql = `
+    INSERT OR IGNORE INTO permissions (username, permissions) VALUES ('demo_user', 'admin.*,server.*,permission.*');
+  `;
+  await query(sql);
+}
+
 const createNpcTable = async () => {
   log.info("Creating npcs table...");
   const sql = `
@@ -310,9 +316,9 @@ const createWeatherTable = async () => {
   log.info("Creating weather table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS weather (
-      name VARCHAR(100) NOT NULL UNIQUE PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE PRIMARY KEY,
       ambience FLOAT NOT NULL DEFAULT 0,
-      wind_direction VARCHAR(5) NOT NULL DEFAULT 'none',
+      wind_direction TEXT NOT NULL DEFAULT 'none',
       wind_speed FLOAT NOT NULL DEFAULT 0,
       humidity FLOAT NOT NULL DEFAULT 30,
       temperature FLOAT NOT NULL DEFAULT 68,
@@ -336,6 +342,7 @@ const setupDatabase = async () => {
   await createSpellsTable();
   await createPermissionsTable();
   await createPermissionTypesTable();
+  await addPermissionsToDemoAccount();
   await createNpcTable();
   await createParticleTable();
   await createWeatherTable();

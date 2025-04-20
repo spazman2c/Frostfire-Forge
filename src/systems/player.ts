@@ -229,7 +229,7 @@ const player = {
     toggleStealth: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
-        await query("UPDATE accounts SET stealth = !stealth WHERE username = ? AND role = 1", [username]) as any;
+        await query("UPDATE accounts SET stealth = CASE WHEN stealth = 1 THEN 0 ELSE 1 END WHERE username = ? AND role = 1", [username]) as any;
         return await player.isStealth(username);
     },
     isNoclip: async (username: string) => {
@@ -241,7 +241,7 @@ const player = {
     toggleNoclip: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
-        await query("UPDATE accounts SET noclip = !noclip WHERE username = ?", [username]) as any;
+        await query("UPDATE accounts SET noclip = CASE WHEN noclip = 1 THEN 0 ELSE 1 END WHERE username = ?", [username]) as any;
         return await player.isNoclip(username);
     },
     getSession: async (username: string) => {
