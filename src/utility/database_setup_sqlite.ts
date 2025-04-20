@@ -4,6 +4,7 @@ import log from "../modules/logger";
 
 // Create accounts table if it doesn't exist
 const createAccountsTable = async () => {
+  log.info("Creating accounts table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,6 +34,7 @@ const createAccountsTable = async () => {
 
 // Create allowed_ips table if it doesn't exist
 const createAllowedIpsTable = async () => {
+  log.info("Creating allowed_ips table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS allowed_ips (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,6 +46,7 @@ const createAllowedIpsTable = async () => {
 
 // Create blocked_ips table if it doesn't exist
 const createBlockedIpsTable = async () => {
+  log.info("Creating blocked_ips table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS blocked_ips (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,6 +58,7 @@ const createBlockedIpsTable = async () => {
 
 // Insert 127.0.0.1 and ::1 as allowed IPs if they doesn't exist
 const insertLocalhost = async () => {
+  log.info("Inserting localhost and ::1 as allowed IPs...");
   const sql = `
     INSERT OR IGNORE INTO allowed_ips (ip) VALUES ('127.0.0.1'), ('::1');
     `;
@@ -63,7 +67,7 @@ const insertLocalhost = async () => {
 
 // Insert demo account if doesn't exist
 const insertDemoAccount = async () => {
-  // demo_user:demo_user
+  log.info("Inserting demo account...");
   const sql = `
     INSERT OR IGNORE INTO accounts (
       email,
@@ -78,7 +82,7 @@ const insertDemoAccount = async () => {
     ) VALUES (
       'demo@example.com',
       'demo_user',
-      'L3add0fc9fb8bda0c566ca0b2088063861499a4471363a57120de1015cbb77f0fc1b31df7e34b8d9cdac1c06d1d2a5754f84a03ddcb68ce1ec95d4207dfb22054A9c46e8c72e11d543a5a683b6d7ce59e00678ab28fa4551ab41de73b6b2869461Pd0f61e6392f33d449cb26b6be93acface2156409cbd05af94b88e8179992b99fc775e5e71b02b5147981437f64c90cd68ecbd5a49efbac973487af8186d95d2eY48013846846c765d82ffdd7e0afc1c0240285a031c7ddfc451bdd1d807e1b0c4X',
+      'Lb2e9d35b2720ec87198b38fee811cc386fe909aa03786085960b269d7089cd02bc8f85f7bee2e3d565341dee70e9d9a9de2b971eef84c43f04d987414b4cf6c7Aed1d913ef3afd0f87b5127e14016aa50f6053e26527cf82b091b4d0a567151c0Pfa585d89c851dd338a70dcf535aa2a92fee7836dd6aff1226583e88e0996293f16bc009c652826e0fc5c706695a03cddce372f139eff4d13959da6f1f5d3eabeY63395358fb084a3ef48a0d5d153d6476fb5f9a0b57ad09252cbec05c9067d45bX',
       0,
       0,
       0,
@@ -91,6 +95,7 @@ const insertDemoAccount = async () => {
 };
 
 const insertDemoStats = async () => {
+  log.info("Inserting demo stats...");
   const sql = `
     INSERT OR IGNORE INTO stats (
       username,
@@ -110,6 +115,7 @@ const insertDemoStats = async () => {
 }
 
 const insertDemoClientConfig = async () => {
+  log.info("Inserting demo client config...");
   const sql = `
     INSERT OR IGNORE INTO clientconfig (
       username,
@@ -137,6 +143,7 @@ const getAllowedIPs = async () => {
 
 // Create inventory table if it doesn't exist
 const createInventoryTable = async () => {
+  log.info("Creating inventory table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS inventory (
         username TEXT NOT NULL,
@@ -149,6 +156,7 @@ const createInventoryTable = async () => {
 
 // Create items table if it doesn't exist
 const createItemsTable = async () => {
+  log.info("Creating items table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS items (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -161,6 +169,7 @@ const createItemsTable = async () => {
 };
 
 const createStatsTable = async () => {
+  log.info("Creating stats table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -175,6 +184,7 @@ const createStatsTable = async () => {
 }
 
 const createClientConfig = async () => {
+  log.info("Creating clientconfig table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS clientconfig (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -189,6 +199,7 @@ const createClientConfig = async () => {
 }
 
 const createWeaponsTable = async () => {
+  log.info("Creating weapons table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS weapons (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -205,6 +216,7 @@ const createWeaponsTable = async () => {
 }
 
 const createSpellsTable = async () => {
+  log.info("Creating spells table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS spells (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -221,6 +233,7 @@ const createSpellsTable = async () => {
 }
 
 const createPermissionsTable = async () => {
+  log.info("Creating permissions table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS permissions (
         username TEXT NOT NULL UNIQUE PRIMARY KEY,
@@ -231,6 +244,7 @@ const createPermissionsTable = async () => {
 }
 
 const createPermissionTypesTable = async () => {
+  log.info("Creating permission_types table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS permission_types (
         name TEXT NOT NULL UNIQUE PRIMARY KEY
@@ -253,8 +267,9 @@ const createPermissionTypesTable = async () => {
 }
 
 const createNpcTable = async () => {
+  log.info("Creating npcs table...");
   const sql = `
-    CREATE TABLE IF NOT EXISTS npc (
+    CREATE TABLE IF NOT EXISTS npcs (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
         name TEXT NOT NULL UNIQUE,
         position TEXT NOT NULL,
@@ -268,6 +283,7 @@ const createNpcTable = async () => {
 }
 
 const createParticleTable = async () => {
+  log.info("Creating particles table...");
   const sql = `
     CREATE TABLE IF NOT EXISTS particles (
         id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
@@ -290,6 +306,22 @@ const createParticleTable = async () => {
   await query(sql);
 }
 
+const createWeatherTable = async () => {
+  log.info("Creating weather table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS weather (
+      name VARCHAR(100) NOT NULL UNIQUE PRIMARY KEY,
+      ambience FLOAT NOT NULL DEFAULT 0,
+      wind_direction VARCHAR(5) NOT NULL DEFAULT 'none',
+      wind_speed FLOAT NOT NULL DEFAULT 0,
+      humidity FLOAT NOT NULL DEFAULT 30,
+      temperature FLOAT NOT NULL DEFAULT 68,
+      precipitation FLOAT NOT NULL DEFAULT 0
+    );
+  `;
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createAccountsTable();
@@ -306,6 +338,7 @@ const setupDatabase = async () => {
   await createPermissionTypesTable();
   await createNpcTable();
   await createParticleTable();
+  await createWeatherTable();
 };
 
 try {

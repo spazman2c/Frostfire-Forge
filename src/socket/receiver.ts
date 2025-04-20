@@ -249,9 +249,9 @@ export default async function packetReceiver(
                 map?.compressed,
                 map?.hash,
                 spawnLocation?.map,
-                position.x || 0,
-                position.y || 0,
-                position.direction,
+                position?.x || 0,
+                position?.y || 0,
+                position?.direction || "down",
               ],
             })
           )
