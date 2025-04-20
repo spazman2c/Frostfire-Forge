@@ -98,14 +98,14 @@ export default async function packetReceiver(
       }
       case "TIME_SYNC": {
         // Calculate latency
-        const latency = Date.now() - Number(data) - 5000;
+        const latency = performance.now() - Number(data) - 5000;
         if (latency >= 3000) {
           log.error(
             `Client with id: ${ws.data.id} has high latency: ${latency}ms and will be disconnected`
           );
           ws.close(1001, "High latency");
         }
-        const ServerTime = Date.now();
+        const ServerTime = performance.now();
         ws.send(
           packet.encode(
             JSON.stringify({
