@@ -1,3 +1,10 @@
+// Add type declaration at the top of the file
+declare global {
+	interface Window {
+		Notify: (type: string, message: string) => void;
+	}
+}
+
 function Notify(type: string, message: string) {
 	const notification = document.createElement("div") as HTMLDivElement;
 	notification.classList.add("notification");

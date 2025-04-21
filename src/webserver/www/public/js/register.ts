@@ -24,11 +24,9 @@ register.addEventListener('click', async () => {
   });
 
   if (response.status === 200) {
-      // @ts-expect-error Notify is not defined
       window.Notify('success', 'Email sent successfully');
   } else {
       const body = await response.json();
-      // @ts-expect-error Notify is not defined
       window.Notify('error', body.message);
   }
 });
