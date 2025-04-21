@@ -5,7 +5,7 @@ const audio = {
         return assetCache.get("audio") as AudioData[];
     },
     get: (name: string) => {
-        return audio.list().find((a) => a.name === name);
+        return audio.list().find((a: any) => a.name === name);
     }
 }
 
