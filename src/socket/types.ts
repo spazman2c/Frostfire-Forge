@@ -37,4 +37,5 @@ export const packetTypes: PacketType = {
   35: "COMMAND",
   36: "NOTIFY",
   37: "NOCLIP",
+  38: "ANIMATION_SEQUENCE",
 };

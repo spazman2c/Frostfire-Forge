@@ -69,7 +69,9 @@ export default async function generate(data: SpriteSheetData) {
 
         await frame.toFile(path.resolve(output, `${i}.png`));
         const name = `${data.name}_${i}`;
-        const compressedData = zlib.gzipSync(name);
+        // Read the generated PNG file and compress its data
+        const fileData = fs.readFileSync(path.resolve(output, `${i}.png`));
+        const compressedData = zlib.gzipSync(new Uint8Array(fileData));
         const hash = crypto.createHash("sha256").update(name).digest("hex");
         sprites.push({ name, hash, data: compressedData });
         i++;

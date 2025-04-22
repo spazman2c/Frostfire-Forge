@@ -1289,7 +1289,7 @@ function createNPC(data: any) {
 
       context.fillStyle = "black";
       context.fillStyle = "white";
-      context.font = "14px Arial";
+      context.font = "14px 'Brush Script MT', cursive";
       context.textAlign = "center";
       if (this.dialog) {
         if (this.dialog.trim() !== "") {
@@ -1487,6 +1487,14 @@ function createNPC(data: any) {
 }
 
 function createPlayer(data: any) {
+  // @ts-expect-error - pako is not defined because it is loaded in the index.html
+  const inflatedData = pako.inflate(new Uint8Array(data.sprite.data));
+  const base64Data = btoa(
+    Array.from(inflatedData as Uint8Array).map(byte => String.fromCharCode(byte)).join('')
+  );
+  const sprite_idle = new Image();
+  sprite_idle.src = `data:image/png;base64,${base64Data}`;
+
   const player = {
     id: data.id,
     position: {
@@ -1497,35 +1505,39 @@ function createPlayer(data: any) {
     isStealth: data.isStealth,
     isAdmin: data.isAdmin,
     targeted: false,
+    sprite: sprite_idle,
     stats: data.stats,
     show: function (context: CanvasRenderingContext2D) {
-      context.fillStyle = "white";
+      context.globalAlpha = 1;
+      context.font = "14px 'Brush Script MT', cursive";
+      
       // Opacity for stealth mode
       if (this.isStealth) {
-        context.globalAlpha = 0.5;
+        context.fillStyle = "rgba(97, 168, 255, 1)";
       } else {
-        context.globalAlpha = 1;
+        context.fillStyle = "white";
       }
 
-      context.fillRect(this.position.x, this.position.y, 32, 48);
-
       // Draw the player's username
-      context.font = "14px Arial";
       context.textAlign = "center";
 
       // Current player
-      if (data.id === sessionStorage.getItem("connectionId")) {
+      if (data.id === sessionStorage.getItem("connectionId") && !this.isStealth) {
         context.fillStyle = "#ffe561";
       } else {
         if (this.targeted) {
-          context.fillStyle = "#ff0000";
+          context.fillStyle = "#E01F1F";
         } else {
-          context.fillStyle = "#ffffff";
+          if (this.isStealth) {
+            context.fillStyle = "rgba(97, 168, 255, 1)";
+          } else {
+            context.fillStyle = "#ffffff";
+          }
         }
       }
 
       context.shadowColor = "black";
-      context.shadowBlur = 5;
+      context.shadowBlur = 2;
       context.shadowOffsetX = 0;
       context.strokeStyle = "black";
       
@@ -1560,67 +1572,87 @@ function createPlayer(data: any) {
       // Draw the player's chat message
       context.fillStyle = "black";
       context.fillStyle = "white";
-      context.font = "14px Arial";
       context.textAlign = "center";
+      context.shadowBlur = 1;
+      context.shadowColor = "black";
+      context.shadowOffsetX = 1;
+      context.shadowOffsetY = 1;
+      
       if (this.chat) {
         if (this.chat.trim() !== "") {
           const lines = getLines(context, this.chat, 500).reverse();
           let startingPosition = this.position.y;
 
           for (let i = 0; i < lines.length; i++) {
-            startingPosition -= 15;
+            startingPosition -= 20;
+            // Draw background
+            const textWidth = context.measureText(lines[i]).width;
+            context.fillStyle = "rgba(0, 0, 0, 0.2)";
+            context.fillRect(
+              this.position.x + 16 - textWidth/2 - 5, // Center background
+              startingPosition - 17, // Slightly above text
+              textWidth + 10, // Add padding
+              20 // Height of background
+            );
+            // Draw text
+            context.fillStyle = "white";
             context.fillText(lines[i], this.position.x + 16, startingPosition);
           }
         }
       }
 
-      // Draw a green line from center in the directions up, down, left, and right
-      context.strokeStyle = "blue";
-      context.beginPath();
-      // Direction: Up
-      context.moveTo(this.position.x + 16, this.position.y + 24);
-      context.lineTo(this.position.x + 16, this.position.y);
-      context.stroke();
-      context.strokeStyle = "yellow";
-      context.beginPath();
-      // Direction: Down
-      context.moveTo(this.position.x + 16, this.position.y + 24);
-      context.lineTo(this.position.x + 16, this.position.y + 48);
-      context.stroke();
-      context.strokeStyle = "red";
-      context.beginPath();
-      // Direction: Left
-      context.moveTo(this.position.x + 16, this.position.y + 24);
-      context.lineTo(this.position.x, this.position.y + 24);
-      context.stroke();
-      context.strokeStyle = "green";
-      context.beginPath();
-      // Direction: Right
-      context.moveTo(this.position.x + 16, this.position.y + 24);
-      context.lineTo(this.position.x + 32, this.position.y + 24);
-      context.stroke();
-      // show purple dot at center of player
-      context.fillStyle = "purple";
-      context.beginPath();
-      context.arc(
-        this.position.x + 16,
-        this.position.y + 24,
-        2,
-        0,
-        2 * Math.PI
-      );
-      context.fill();
-
       // Draw the player's health bar below the player's name with a width of 100px, centered below the player name
-      context.fillStyle = "black";
-      context.fillRect(this.position.x - 34, this.position.y + 70, 100, 10);
-      context.fillStyle = "green";
-      context.fillRect(
-        this.position.x - 34,
-        this.position.y + 70,
-        (this.stats.health / this.stats.max_health) * 100,
-        10
-      );
+      if (!this.isStealth) {
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(this.position.x - 34, this.position.y + 71, 100, 3);
+
+        // Update the shadowblur to 2
+        context.shadowBlur = 2;
+        
+        // Set health bar color based on health percentage
+        const healthPercent = this.stats.health / this.stats.max_health;
+        if (healthPercent < 0.3) {
+          context.fillStyle = "#C81D1D"; // red
+        } else if (healthPercent < 0.5) {
+          context.fillStyle = "#C87C1D"; // orange
+        } else if (healthPercent < 0.8) {
+          context.fillStyle = "#C8C520"; // yellow
+        } else {
+          context.fillStyle = "#519D41"; // green
+        }
+        
+        context.fillRect(
+          this.position.x - 34,
+          this.position.y + 71,
+          healthPercent * 100,
+          3
+        );
+
+        // Draw the player's stamina bar below the player's health bar with a width of 75px, centered below the player's health bar
+        context.fillStyle = "rgba(0, 0, 0, 0.8)";
+        context.fillRect(this.position.x - 34, this.position.y + 76, 100, 3);
+        context.fillStyle = "#469CD9";
+        context.fillRect(
+          this.position.x - 34,
+          this.position.y + 76,
+          (this.stats.stamina / this.stats.max_stamina) * 100,
+          3
+        );
+      }
+
+      // Reset shadow settings
+      context.shadowColor = "transparent";
+      context.shadowBlur = 0;
+
+      if (this.isStealth) {
+        context.globalAlpha = 0.5;
+      }
+
+      if (this.sprite) {
+        context.drawImage(this.sprite, this.position.x, this.position.y, 32, 48);
+      } else {
+        context.fillRect(this.position.x, this.position.y, 32, 48);
+      }
     },
   };
 

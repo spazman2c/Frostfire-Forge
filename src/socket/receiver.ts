@@ -25,9 +25,8 @@ const spritePromises = spritesheets.map(async (spritesheet: any) => {
   return sprite;
 });
 
-Promise.all(spritePromises).then((sprites) => {
-  assetCache.add("sprites", sprites);
-});
+const sprites = (await Promise.all(spritePromises)).flat();
+assetCache.add("sprites", sprites);
 
 const npcs = assetCache.get("npcs");
 const particles = assetCache.get("particles");
@@ -291,6 +290,10 @@ export default async function packetReceiver(
 
         const playerData = [] as any[];
 
+        const sprite_idle = sprites.find(sprite => 
+          sprite.name === "frostfire-player_4"
+        );
+
         players.forEach((player) => {
           player.ws.send(
             packet.encode(
@@ -308,13 +311,11 @@ export default async function packetReceiver(
                   isAdmin,
                   isStealth,
                   stats,
+                  sprite: sprite_idle.data,
                 },
               })
             )
           );
-        });
-
-        players.forEach((player) => {
           const location = player.location;
           const data = {
             id: player.id,
@@ -328,7 +329,9 @@ export default async function packetReceiver(
             isAdmin: player.isAdmin,
             isStealth: player.isStealth,
             stats: player.stats,
+            sprite: sprite_idle.data,
           };
+
           playerData.push(data);
         });
         ws.send(
