@@ -10,9 +10,10 @@ const npcs = {
     const y = npc.position.y || 0;
     const direction = npc.position.direction || "down";
     const particles = npc.particles || [];
+    const quest = npc.quest || null;
 
     const response = await query(
-      "INSERT INTO npcs (last_updated, map, position, direction, hidden, script, dialog, particles) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO npcs (last_updated, map, position, direction, hidden, script, dialog, particles, quest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         last_updated,
         npc.map,
@@ -22,6 +23,7 @@ const npcs = {
         npc.script || null,
         npc.dialog || null,
         JSON.stringify(particles),
+        quest,
       ]
     );
 
@@ -62,6 +64,7 @@ const npcs = {
         script: npc?.script as string,
         dialog: npc?.dialog as string,
         particles: npc?.particles as Particle[],
+        quest: npc?.quest as number,
       });
     }
 
@@ -86,9 +89,10 @@ const npcs = {
     const y = npc.position.y || 0;
     const direction = npc.position.direction;
     const particles = npc.particles || [];
+    const quest = npc.quest || null;
 
     const response = await query(
-      "UPDATE npcs SET last_updated = ?, map = ?, position = ?, direction = ?, hidden = ?, script = ?, dialog = ?, particles = ? WHERE id = ?",
+      "UPDATE npcs SET last_updated = ?, map = ?, position = ?, direction = ?, hidden = ?, script = ?, dialog = ?, particles = ?, quest = ? WHERE id = ?",
       [
         last_updated,
         npc.map,
@@ -98,6 +102,7 @@ const npcs = {
         npc.script,
         npc.dialog,
         JSON.stringify(particles),
+        quest,
         npc.id,
       ]
     );

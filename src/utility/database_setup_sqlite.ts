@@ -132,6 +132,14 @@ const insertDemoClientConfig = async () => {
   await query(sql);
 }
 
+const insertDemoQuestLog = async () => {
+  log.info("Inserting demo quest log...");
+  const sql = `
+    INSERT OR IGNORE INTO quest_log (username) VALUES ('demo_user');
+  `;
+  await query(sql);
+}
+
 const getAllowedIPs = async () => {
   const sql = `
     select * from allowed_ips;
@@ -282,7 +290,8 @@ const createNpcTable = async () => {
         hidden INTEGER NOT NULL DEFAULT 0,
         script TEXT DEFAULT NULL,
         dialog TEXT DEFAULT NULL,
-        particles TEXT DEFAULT NULL
+        particles TEXT DEFAULT NULL,
+        quest INTEGER DEFAULT NULL
     );
   `;
   await query(sql);
@@ -356,6 +365,38 @@ const createDefaultWorld = async () => {
   `;
   await query(sql);
 }
+
+const createQuestsTable = async () => {
+  log.info("Creating quests table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS quests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description VARCHAR(5000) NOT NULL,
+      reward INT NOT NULL,
+      xp_gain INT NOT NULL,
+      required_quest INT NOT NULL,
+      required_level INT NOT NULL
+    );
+  `;
+  await query(sql);
+}
+
+
+
+const createQuestLogTable = async () => {
+  log.info("Creating quest log table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS quest_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
+      username TEXT NOT NULL UNIQUE,
+      completed_quests TEXT NOT NULL,
+      incomplete_quests TEXT NOT NULL
+    );
+  `;  
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createAccountsTable();
@@ -377,6 +418,8 @@ const setupDatabase = async () => {
   await createDefaultWeather();
   await createWorldTable();
   await createDefaultWorld();
+  await createQuestsTable();
+  await createQuestLogTable();
 };
 
 try {
@@ -387,6 +430,7 @@ try {
   await insertDemoAccount();
   await insertDemoStats();
   await insertDemoClientConfig();
+  await insertDemoQuestLog();
   log.success("Database setup complete!");
   process.exit(0);
 } catch (error) {

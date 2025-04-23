@@ -38,7 +38,7 @@ bun production
 ```
 bun development
 
-*: demo_user
+Username: demo_user
 Password: 12345678
 ```
 
@@ -212,7 +212,7 @@ declare interface Identity {
 <h5>Types</h5>
 
 ```ts
-const PacketTypes: PacketType = {
+export const packetTypes: PacketType = {
   0: "PING",
   1: "PONG",
   2: "CONNECTION_COUNT",
@@ -248,7 +248,12 @@ const PacketTypes: PacketType = {
   32: "MUSIC",
   33: "STARTGAME",
   34: "CREATE_NPC",
-  35: "NOCLIP",
+  35: "COMMAND",
+  36: "NOTIFY",
+  37: "NOCLIP",
+  38: "ANIMATION_SEQUENCE",
+  39: "QUESTLOG",
+  40: "QUESTDETAILS",
 };
 ```
 
@@ -1167,4 +1172,104 @@ await world.getCurrentWeather(world);
 
 ```ts
 await world.getMaxPlayers(world);
+```
+
+<hr>
+<h3>Quest Management</h3>
+
+```ts
+import quest from "../systems/quests";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface Quest {
+  id: number;
+  name: string;
+  description: string;
+  reward: number;
+  xp_gain: number;
+  required_quest: number;
+  required_level: number;
+}
+```
+
+<h5>quest.add();</h5>
+<p style="font-size:0.75em;">Adds a quest to the quest database</p>
+
+```ts
+await quest.add(quest);
+```
+
+<h5>quest.remove();</h5>
+<p style="font-size:0.75em;">Removes a quest from the quest database</p>  
+
+```ts
+await quest.remove(id);
+```
+
+<h5>quest.find();</h5>
+<p style="font-size:0.75em;">Fetches a quest from the quest database</p>
+
+```ts
+await quest.find(id);
+```
+
+<h5>quest.update();</h5>
+<p style="font-size:0.75em;">Updates a quest in the quest database</p>
+
+```ts
+await quest.update(quest);
+```
+
+<h5>quest.list();</h5>
+<p style="font-size:0.75em;">Lists all quests in the quest database</p>
+
+```ts
+await quest.list();
+```
+  
+<hr>
+<h3>Quest Log Management</h3>
+
+```ts
+import questlog from "../systems/questlog";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface QuestLogData {
+  completed: number[];
+  incomplete: number[];
+}
+```
+
+<h5>questlog.get();</h5>
+<p style="font-size:0.75em;">Fetches a player's quest log</p>
+
+```ts
+await questlog.get(username);
+```
+
+<h5>questlog.startQuest();</h5>
+<p style="font-size:0.75em;">Starts a quest for a player</p>
+
+```ts
+await questlog.startQuest(username, id);
+```
+
+<h5>questlog.completeQuest();</h5>
+<p style="font-size:0.75em;">Completes a quest for a player</p>
+
+```ts
+await questlog.completeQuest(username, id);
+```
+
+<h5>questlog.updateQuestLog();</h5>
+<p style="font-size:0.75em;">Updates a player's quest log</p>
+
+```ts
+await questlog.updateQuestLog(username, questLog);
 ```

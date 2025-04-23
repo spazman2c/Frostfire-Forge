@@ -237,7 +237,8 @@ const createNpcTable = async () => {
       dialog VARCHAR(500) NOT NULL,
       hidden INT NOT NULL DEFAULT 0,
       script VARCHAR(5000) NOT NULL,
-      particles VARCHAR(500) NOT NULL
+      particles VARCHAR(500) NOT NULL,
+      quest INT NOT NULL DEFAULT NULL
     )
   `;
   await query(sql);
@@ -321,6 +322,39 @@ const createDefaultWorld = async () => {
   await query(sql);
 }
 
+const createQuestsTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+  log.info("Creating quests table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS quests (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY UNIQUE,
+      name VARCHAR(255) NOT NULL,
+      description VARCHAR(5000) NOT NULL,
+      reward INT NOT NULL,
+      xp_gain INT NOT NULL,
+      required_quest INT NOT NULL,
+      required_level INT NOT NULL
+    )
+  `;
+  await query(sql);
+};
+
+const createQuestLogTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  await query(useDatabaseSql);
+  log.info("Creating quest log table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS quest_log (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY UNIQUE,
+      username VARCHAR(255) UNIQUE NOT NULL,
+      completed_quests TEXT NOT NULL,
+      incomplete_quests TEXT NOT NULL
+    )
+  `;
+  await query(sql);
+};
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -342,6 +376,8 @@ const setupDatabase = async () => {
   await createDefaultWeather();
   await createWorldTable();
   await createDefaultWorld();
+  await createQuestsTable();
+  await createQuestLogTable();
 };
 
 try {

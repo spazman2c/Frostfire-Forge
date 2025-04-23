@@ -38,4 +38,6 @@ export const packetTypes: PacketType = {
   36: "NOTIFY",
   37: "NOCLIP",
   38: "ANIMATION_SEQUENCE",
+  39: "QUESTLOG",
+  40: "QUESTDETAILS",
 };

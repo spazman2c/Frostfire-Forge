@@ -83,6 +83,11 @@ declare interface Player {
   isNoclip?: boolean;
 }
 
+declare interface QuestLogData {
+  completed: number[];
+  incomplete: number[];
+}
+
 type NullablePlayer = Player | null;
 
 // Define inventory item
@@ -108,6 +113,7 @@ declare interface Npc {
   script: Nullable<string>;
   dialog: Nullable<string>;
   particles: Nullable<Particle[]>;
+  quest: Nullable<number>;
 }
 
 // Define location data
@@ -236,4 +242,14 @@ declare interface WorldData {
   weather: string;
   max_players: number;
   default_map: string;
+}
+
+declare interface Quest {
+  id: number;
+  name: string;
+  description: string;
+  reward: number;
+  xp_gain: number;
+  required_quest: number;
+  required_level: number;
 }

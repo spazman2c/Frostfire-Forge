@@ -7,6 +7,8 @@ import cache from "../services/cache";
 import assetCache from "../services/assetCache";
 import language from "../systems/language";
 import packet from "../modules/packet";
+import questlog from "../systems/questlog";
+import quests from "../systems/quests";
 import generate from "../modules/sprites";
 import swears from "../../config/swears.json";
 const maps = assetCache.get("maps");
@@ -138,15 +140,35 @@ export default async function packetReceiver(
         if (items.length > 30) {
           items.length = 30;
         }
+
         ws.send(
           packet.encode(
             JSON.stringify({
               type: "INVENTORY",
-              data: items,
+              data: items as InventoryItem[] | null,
               slots: 30,
             })
           )
         );
+
+        // Retrieve the player's quest log
+        const questLog = (await questlog.get(username)) || [];
+        const incompleteQuest = questLog.incomplete;
+        const completedQuest = questLog.completed;
+
+        // Send the player's quest log
+        ws.send(
+          packet.encode(
+            JSON.stringify({
+              type: "QUESTLOG",
+              data: {
+                completed: completedQuest,
+                incomplete: incompleteQuest,
+              },
+            })
+          )
+        );
+
         // Get the player's stats
         const stats = await player.getStats(username);
         ws.send(
@@ -280,6 +302,7 @@ export default async function packetReceiver(
                   hidden: npc.hidden,
                   dialog: npc.dialog,
                   particles: particleArray,
+                  quest: npc.quest,
                 },
               })
             )
@@ -919,6 +942,12 @@ export default async function packetReceiver(
         currentPlayer.attackDelay = Date.now() + 1000;
         await new Promise((resolve) => setTimeout(resolve, 1000));
         currentPlayer.attackDelay = 0;
+        break;
+      }
+      case "QUESTDETAILS": {
+        const questId = data as unknown as number;
+        const quest = await quests.find(questId);
+        ws.send(packet.encode(JSON.stringify({ type: "QUESTDETAILS", data: quest })));
         break;
       }
       case "STARTGAME": {

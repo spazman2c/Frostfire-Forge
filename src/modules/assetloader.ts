@@ -8,6 +8,7 @@ import spell from "../systems/spells";
 import npc from "../systems/npcs";
 import particle from "../systems/particles";
 import worlds from "../systems/worlds";
+import quest from "../systems/quests";
 // import NPC from "../systems/npc_scripting";
 import assetCache from "../services/assetCache";
 import generate from "../modules/sprites";
@@ -73,6 +74,12 @@ const particleNow = performance.now();
 assetCache.add("particles", await particle.list());
 const particles = assetCache.get("particles") as Particle[];
 log.success(`Loaded ${particles.length} particle(s) from the database in ${(performance.now() - particleNow).toFixed(2)}ms`);
+
+// Load quest data
+const questNow = performance.now();
+assetCache.add("quests", await quest.list());
+const quests = assetCache.get("quests") as Quest[];
+log.success(`Loaded ${quests.length} quest(s) from the database in ${(performance.now() - questNow).toFixed(2)}ms`);
 
 // Load maps
 function loadMaps() {

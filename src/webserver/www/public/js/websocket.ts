@@ -694,6 +694,16 @@ socket.onmessage = async (event) => {
         }
       }
       break;
+    case "QUESTLOG": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      console.log(data);
+      break;
+    }
+    case "QUESTDETAILS": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      console.log(data);
+      break;
+    }
     case "CHAT": {
       players.forEach((player) => {
         if (player.id === data.id) {
@@ -705,7 +715,6 @@ socket.onmessage = async (event) => {
     case "NPCDIALOG": {
       const npc = npcs.find((npc) => npc.id === data.id);
       if (!npc) return;
-      console.log(data.dialog);
       npc.dialog = data.dialog;
       break;
     }
@@ -1268,6 +1277,7 @@ function createNPC(data: any) {
     position: { x: number; y: number };
     dialog: string;
     particles: Particle[];
+    quest: number | null;
     show: (context: CanvasRenderingContext2D) => void;
     updateParticle: (particle: Particle, npc: any, context: CanvasRenderingContext2D) => void;
   } = {
@@ -1278,6 +1288,7 @@ function createNPC(data: any) {
       y: npcCanvas.height / 2 + data.location.y,
     },
     particles: data.particles || [],
+    quest: data.quest || null,
     show: function (this: typeof npc, context: CanvasRenderingContext2D) {
       if (!npcImage || !context) return;
       // Get current players admin status
@@ -1471,6 +1482,7 @@ function createNPC(data: any) {
     id: { writable: false, configurable: false },
     position: { writable: false, configurable: false },
     dialog: { writable: false, configurable: false },
+    quest: { writable: false, configurable: false },
   });
 
   // Execute the npc script in a sandboxed environment where "this" refers to the npc object

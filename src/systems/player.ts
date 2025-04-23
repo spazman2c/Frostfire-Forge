@@ -51,8 +51,12 @@ const player = {
           });
           if (!response) return { error: "An unexpected error occurred" };
 
-        await query("INSERT INTO stats (username, health, max_health, stamina, max_stamina) VALUES (?, ?, ?, ?, ?)", [username, 100, 100, 100, 100]);
-        await query("INSERT INTO clientconfig (username, fps, music_volume, effects_volume, muted) VALUES (?, ?, ?, ?, ?)", [username, 60, 50, 50, 0]);
+        // Create stats
+        await query("INSERT IGNORE INTO stats (username, health, max_health, stamina, max_stamina) VALUES (?, ?, ?, ?, ?)", [username, 100, 100, 100, 100]);
+        // Create client config
+        await query("INSERT IGNORE INTO clientconfig (username, fps, music_volume, effects_volume, muted) VALUES (?, ?, ?, ?, ?)", [username, 60, 50, 50, 0]);
+        // Create quest log
+        await query("INSERT IGNORE INTO quest_log (username) VALUES (?)", [username]);
         return username;
     },
     verify: async (session_id: string) => {
