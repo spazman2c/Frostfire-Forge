@@ -23,4 +23,5 @@ jobs:
           # Delete package.json as a workaround to only install eslint
           rm package.json
           bun install eslint
+          bun install typescript-eslint
           bun eslint
