@@ -19,4 +19,6 @@ jobs:
             bun-version: canary
 
       - name: ESLint
-        run: bun eslint
+        run: |
+          bun install eslint
+          bun eslint
