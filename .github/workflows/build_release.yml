@@ -20,5 +20,7 @@ jobs:
 
       - name: ESLint
         run: |
+          # Delete package.json as a workaround to only install eslint
+          rm package.json
           bun install eslint
           bun eslint
