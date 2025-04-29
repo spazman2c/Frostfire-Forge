@@ -11,7 +11,8 @@
     "setup": "bun --env-file=.env.production ./src/utility/database_setup.ts",
     "setup-sqlite": "bun --env-file=.env.development ./src/utility/database_setup_sqlite.ts",
     "docs": "bun ./src/utility/generate_docs.ts",
-    "create-config": "bun ./src/utility/create_config.ts"
+    "create-config": "bun ./src/utility/create_config.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -25,12 +26,13 @@
     "@types/nodemailer": "^6.4.17",
     "@types/uglify-js": "^3.17.5",
     "eslint": "^9.25.1",
-    "mysql2": "^3.14.0",
+    "husky": "^9.1.7",
+    "mysql2": "^3.14.1",
     "nodemailer": "^6.10.1",
     "pm2": "^5.4.3",
     "sharp": "^0.33.5",
     "ts-node": "^10.9.2",
-    "typescript-eslint": "^8.31.0",
+    "typescript-eslint": "^8.31.1",
     "uglify-js": "^3.19.3"
   }
 }
