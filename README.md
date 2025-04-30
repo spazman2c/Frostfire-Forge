@@ -23,18 +23,12 @@
 
 <h3>Setting up the development environment</h3>
 
-<h4>- Create the config file</h4>
-
-```
-bun create-config
-```
-
 <h4>- Update the .env.development file</h4>
 
-<h4>- Create the sqlite database</h4>
+<h4>- Run the setup script</h4>
 
 ```
-bun setup-sqlite
+bun setup-development
 ```
 
 <h4>- Run the server</h4>
@@ -54,19 +48,13 @@ Password: 12345678
 
 <h3>Setting up the production environment</h3>
 
-<h4>- Create the config file</h4>
+<h4>- Run the setup script</h4>
 
 ```
-bun create-config
+bun setup-production
 ```
 
 <h4>- Update the .env.production file</h4>
-
-<h4>- Create the database</h4>
-
-```
-bun setup
-```
 
 <h4>- Run the server</h4>
 
@@ -86,9 +74,6 @@ pm2 start ./src/utility/daemon.js --name "Game Server"
 > [!IMPORTANT]
 > The below environment variables are required
 
-<p style="font-size:1em;">Location: /.env.production</p>
-
-
 ```
 DATABASE_HOST
 DATABASE_USER
@@ -102,8 +87,8 @@ SQL_SSL_MODE DISABLED | ENABLED
 DATABASE_ENGINE sqlite | mysql
 WEBSRV_PORT
 WEBSRV_PORTSSL
-WEBSRV_USESSL
-WEBSRV_USECERT
+WEBSRV_USESSL true | false
+WEBSRV_USECERT true | false
 GOOGLE_TRANSLATE_API_KEY
 WEB_SOCKET_URL
 ASSET_PATH
