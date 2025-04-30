@@ -19,60 +19,67 @@
 > **Requirements**:
 > - [Bun](https://bun.sh/)
 > - [MySQL](https://www.mysql.com/downloads/)
-> - [Node.js](https://nodejs.org/en/download/)
-> <br>
-> Database Creation:
->
-> ``bun setup``
+> - [Node.js](https://nodejs.org/en/download/) (Optional)
 
-<h5>Running the server</h5>
+<h3>Setting up the development environment</h3>
 
-<p><b>- Production (MySQL)</b></p>
+<h4>- Create the config file</h4>
 
 ```
-bun production
+bun create-config
 ```
 
-<p><b>- Development (Sqlite)</b></p>
+<h4>- Update the .env.development file</h4>
 
-```
-bun development
-
-Username: demo_user
-Password: 12345678
-```
-
-<h5>Running the server as a daemon (PM2)</h5>
-
-```
-pm2 start ./src/utility/daemon.js --name "Game Server"
-```
-
-<h5>Database Setup</h5>
-
-<p><b>- Production (MySQL)</b></p>
-
-```
-bun setup
-```
-
-<p><b>- Development (Sqlite)</b></p>
+<h4>- Create the sqlite database</h4>
 
 ```
 bun setup-sqlite
 ```
 
-<h5>Unit Tests (Production Build Only)</h5>
+<h4>- Run the server</h4>
 
 ```
-bun test
+bun development
 ```
 
-<h5>Create Config</h5>
+<h4>- Login Information</h4>
+
+```
+Username: demo_user
+Password: 12345678
+```
+
+<hr>
+
+<h3>Setting up the production environment</h3>
+
+<h4>- Create the config file</h4>
 
 ```
 bun create-config
 ```
+
+<h4>- Update the .env.production file</h4>
+
+<h4>- Create the database</h4>
+
+```
+bun setup
+```
+
+<h4>- Run the server</h4>
+
+```
+bun production
+```
+
+<h4>- Running the server as a daemon (PM2)</h4>
+
+```
+pm2 start ./src/utility/daemon.js --name "Game Server"
+```
+
 
 <h3>Production Environment Variables</h3>
 
