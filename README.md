@@ -9,7 +9,7 @@
 > [!NOTE]
 > This project is currently a **work in progress**
 >
-> Core Development Team: [Lillious](https://github.com/Lillious), [Deph0](https://github.com/Deph0), [Elyriand](https://github.com/Elyriand21)
+> Core Development Team: [Lillious](https://github.com/Lillious), [Deph0](https://github.com/Deph0)
 >
 > [Discord](https://discord.gg/4spUbuXBvZ)
 
