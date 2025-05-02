@@ -1,4 +1,5 @@
 import { packetTypes } from "./types";
+import { packetManager } from "./packet_manager";
 import log from "../modules/logger";
 import player from "../systems/player";
 import permissions from "../systems/permissions";
@@ -6,7 +7,6 @@ import inventory from "../systems/inventory";
 import cache from "../services/cache";
 import assetCache from "../services/assetCache";
 import language from "../systems/language";
-import packet from "../modules/packet";
 import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
@@ -69,68 +69,38 @@ export default async function packetReceiver(
     // Handle the packet
     switch (type) {
       case "BENCHMARK": {
-        ws.send(
-          packet.encode(JSON.stringify({ type: "BENCHMARK", data: data }))
-        );
+        sendPacket(ws, packetManager.benchmark(data));
         break;
       }
       case "PING": {
-        ws.send(packet.encode(JSON.stringify({ type: "PONG", data: data })));
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "TIME_SYNC",
-              data: Date.now(),
-            })
-          )
-        );
+        sendPacket(ws, packetManager.ping(data));
         break;
       }
       case "PONG": {
-        ws.send(packet.encode(JSON.stringify({ type: "PING", data: data })));
+        sendPacket(ws, packetManager.pong(data));
         break;
       }
       case "LOGIN": {
-        ws.send(
-          packet.encode(
-            JSON.stringify({ type: "LOGIN_SUCCESS", data: ws.data.id, secret: ws.data.secret, publicKey: ws.data.publicKey })
-          )
-        );
+        sendPacket(ws, packetManager.login(ws));
         break;
       }
       case "TIME_SYNC": {
-        // Calculate latency
-        const latency = performance.now() - Number(data) - 5000;
-        if (latency >= 3000) {
-          log.error(
-            `Client with id: ${ws.data.id} has high latency: ${latency}ms and will be disconnected`
-          );
-          ws.close(1001, "High latency");
-        }
-        const ServerTime = performance.now();
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "TIME_SYNC",
-              data: ServerTime,
-            })
-          )
-        );
+        sendPacket(ws, packetManager.timeSync(data, ws));
         break;
       }
+      // TODO:Move this to the auth packet
       case "AUTH": {
         // Set the session id for the player
         const auth = await player.setSessionId(data.toString(), ws.data.id);
         if (!auth) {
-          ws.send(
-            packet.encode(JSON.stringify({ type: "LOGIN_FAILED", data: null }))
-          );
+          sendPacket(ws, packetManager.loginFailed())
           ws.close(1008, "Already logged in");
           break;
         }
         const getUsername = (await player.getUsernameBySession(
           ws.data.id
         )) as any[];
+
         const username = getUsername[0]?.username as string;
         // Get permissions for the player
         const access = await permissions.get(username) as string;
@@ -141,15 +111,7 @@ export default async function packetReceiver(
           items.length = 30;
         }
 
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "INVENTORY",
-              data: items as InventoryItem[] | null,
-              slots: 30,
-            })
-          )
-        );
+        sendPacket(ws, packetManager.inventory(items));
 
         // Retrieve the player's quest log
         const questLog = (await questlog.get(username)) || [];
@@ -157,44 +119,25 @@ export default async function packetReceiver(
         const completedQuest = questLog.completed;
 
         // Send the player's quest log
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "QUESTLOG",
-              data: {
-                completed: completedQuest,
-                incomplete: incompleteQuest,
-              },
-            })
-          )
-        );
+        sendPacket(ws, packetManager.questlog(completedQuest, incompleteQuest));
+
 
         // Get the player's stats
         const stats = await player.getStats(username);
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "STATS",
-              data: stats,
-            })
-          )
-        );
+        sendPacket(ws, packetManager.stats(stats));
+
         // Get client configuration
         const clientConfig = (await player.getConfig(username)) as any[];
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "CLIENTCONFIG",
-              data: clientConfig,
-            })
-          )
-        );
+        sendPacket(ws, packetManager.clientConfig(clientConfig));
+
         const location = (await player.getLocation({
           username: username,
         })) as LocationData | null;
+
         const isAdmin = await player.isAdmin(username);
         let isStealth = await player.isStealth(username);
         let isNoclip = await player.isNoclip(username);
+        
         // Turn off stealth mode if the player is not an admin and is in stealth mode
         if (!isAdmin && isStealth) {
           await player.toggleStealth(username);
@@ -263,51 +206,50 @@ export default async function packetReceiver(
             ""
           )} at ${spawnLocation.x},${spawnLocation.y}`
         );
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "LOAD_MAP",
-              data: [
-                map?.compressed,
-                map?.hash,
-                spawnLocation?.map,
-                position?.x || 0,
-                position?.y || 0,
-                position?.direction || "down",
-              ],
-            })
-          )
-        );
+        const mapData = [ 
+          map?.compressed,
+          map?.hash,
+          spawnLocation?.map,
+          position?.x || 0,
+          position?.y || 0,
+          position?.direction || "down",
+        ];
+
+        sendPacket(ws, packetManager.loadMap(mapData));
 
         // Load NPCs for the current map only
         const npcsInMap = npcs.filter(
           (npc: Npc) => npc.map === spawnLocation.map.replace(".json", "")
         );
 
-        npcsInMap.forEach((npc: Npc) => {
-          const particleArray = typeof npc.particles === 'string' ? (npc.particles as string).split(",").map(name => particles.find((p: Particle) => p.name === name.trim())).filter(Boolean) : [];
-          ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "CREATE_NPC",
-                data: {
-                  id: npc.id,
-                  last_updated: npc.last_updated,
-                  location: {
-                    x: npc.position.x,
-                    y: npc.position.y,
-                    direction: "down",
-                  },
-                  script: npc.script,
-                  hidden: npc.hidden,
-                  dialog: npc.dialog,
-                  particles: particleArray,
-                  quest: npc.quest,
-                },
-              })
-            )
-          );
-        });
+        const npcPackets = npcsInMap.reduce((packets: any[], npc: Npc) => {
+          const particleArray = typeof npc.particles === 'string' ? 
+            (npc.particles as string)
+              .split(",")
+              .map(name => particles.find((p: Particle) => p.name === name.trim()))
+              .filter(Boolean) 
+            : [];
+            
+          const npcData = {
+            id: npc.id,
+            last_updated: npc.last_updated,
+            location: {
+              x: npc.position.x,
+              y: npc.position.y,
+              direction: "down",
+            },
+            script: npc.script,
+            hidden: npc.hidden,
+            dialog: npc.dialog,
+            particles: particleArray,
+            quest: npc.quest,
+            map: npc.map,
+            position: npc.position,
+          };
+          return [...packets, ...packetManager.createNpc(npcData)];
+        }, [] as any[]);
+
+        sendPacket(ws, npcPackets);
 
         const players = filterPlayersByMap(spawnLocation.map);
 
@@ -318,27 +260,22 @@ export default async function packetReceiver(
         );
 
         players.forEach((player) => {
-          player.ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "SPAWN_PLAYER",
-                data: {
-                  id: ws.data.id,
-                  location: {
-                    map: spawnLocation.map,
-                    x: position.x || 0,
-                    y: position.y || 0,
-                    direction: position.direction,
-                  },
-                  username,
-                  isAdmin,
-                  isStealth,
-                  stats,
-                  sprite: sprite_idle.data,
-                },
-              })
-            )
-          );
+          const spawnData = {
+            id: ws.data.id,
+            location: {
+              map: spawnLocation.map,
+              x: position.x || 0,
+              y: position.y || 0,
+              direction: position.direction,
+            },
+            username,
+            isAdmin,
+            isStealth,
+            stats,
+            sprite: sprite_idle.data,
+          }
+          sendPacket(player.ws, packetManager.spawnPlayer(spawnData));
+
           const location = player.location;
           const data = {
             id: player.id,
@@ -357,16 +294,11 @@ export default async function packetReceiver(
 
           playerData.push(data);
         });
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "LOAD_PLAYERS",
-              data: playerData,
-            })
-          )
-        );
+
+        sendPacket(ws, packetManager.loadPlayers(playerData));
         break;
       }
+      // TODO:Move this to the logout packet
       case "LOGOUT": {
         if (!currentPlayer) return;
         await player.setLocation(
@@ -535,17 +467,12 @@ export default async function packetReceiver(
             : playersInMap;
 
           targetPlayers.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
+            const movementData = {
+              id: ws.data.id,
+              _data: currentPlayer.location.position,
+            }
+
+            sendPacket(player.ws, packetManager.moveXY(movementData));
           });
         };
 
@@ -568,32 +495,20 @@ export default async function packetReceiver(
             Number(currentPlayer.location.position.y)
           );
           playersInMapAdmin.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
+            const movementData = {
+              id: ws.data.id,
+              _data: currentPlayer.location.position,
+            }
+            sendPacket(player.ws, packetManager.moveXY(movementData));
           });
         } else {
           const playersInMap = filterPlayersByMap(currentPlayer.location.map);
           playersInMap.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
+            const movementData = {
+              id: ws.data.id,
+              _data: currentPlayer.location.position,
+            }
+            sendPacket(player.ws, packetManager.moveXY(movementData));
           });
         }
         break;
@@ -606,17 +521,11 @@ export default async function packetReceiver(
 
         // Send message to the sender
         const sendMessageToPlayer = (playerWs: any, message: string) => {
-          playerWs.send(
-            packet.encode(
-              JSON.stringify({
-                type: "CHAT",
-                data: {
-                  id: ws.data.id,
-                  message,
-                },
-              })
-            )
-          );
+          const chatData = {
+            id: ws.data.id,
+            message,
+          }
+          sendPacket(playerWs, packetManager.chat(chatData));
         };
 
         if (message == null) {
@@ -711,39 +620,28 @@ export default async function packetReceiver(
         );
 
         if (!selectedPlayer) {
-          ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "SELECTPLAYER",
-                data: null,
-              })
-            )
-          );
+          const selectPlayerData = {
+            id: ws.data.id,
+            data: null,
+          }
+          sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
           break;
         } else {
-          if (selectedPlayer.isStealth && !player.isAdmin) {
-            ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "SELECTPLAYER",
-                  data: null,
-                })
-              )
-            );
+          if (selectedPlayer.isStealth && !currentPlayer.isAdmin) {
+            const selectPlayerData = {
+              id: ws.data.id,
+              data: null,
+            }
+            sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
             break;
+          } else {
+            const selectPlayerData = {
+              id: selectedPlayer.id,
+              username: selectedPlayer.username,
+              stats: selectedPlayer.stats,
+            }
+            sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
           }
-          ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "SELECTPLAYER",
-                data: {
-                  id: selectedPlayer.id,
-                  username: selectedPlayer.username,
-                  stats: selectedPlayer.stats,
-                },
-              })
-            )
-          );
         }
         break;
       }
@@ -758,34 +656,22 @@ export default async function packetReceiver(
           500
         );
 
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "SELECTPLAYER",
-              data: {
-                id: closestPlayer?.id || null,
-                username: closestPlayer?.username || null,
-                stats: closestPlayer?.stats || null,
-              },
-            })
-          )
-        );
+        const selectPlayerData = {
+          id: closestPlayer?.id || null,
+          username: closestPlayer?.username || null,
+          stats: closestPlayer?.stats || null,
+        }
+        sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
         break;
       }
       case "INSPECTPLAYER": {
         if (currentPlayer) {
-          ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "INSPECTPLAYER",
-                data: {
-                  id: currentPlayer?.id,
-                  stats: currentPlayer?.stats,
-                  username: currentPlayer?.username,
-                },
-              })
-            )
-          );
+          const inspectPlayerData = {
+            id: currentPlayer?.id,
+            stats: currentPlayer?.stats,
+            username: currentPlayer?.username,
+          }
+          sendPacket(ws, packetManager.inspectPlayer(inspectPlayerData));
         }
         break;
       }
@@ -800,33 +686,26 @@ export default async function packetReceiver(
         const isStealth = await player.toggleStealth(currentPlayer.username);
         currentPlayer.isStealth = isStealth;
         const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        const stealthData = {
+          id: ws.data.id,
+          isStealth: currentPlayer.isStealth,
+        }
+        sendPacket(ws, packetManager.stealth(stealthData));
         playersInMap.forEach((player) => {
-          player.ws.send(
-            packet.encode(
-              JSON.stringify({
-                type: "STEALTH",
-                data: {
-                  id: ws.data.id,
-                  isStealth: currentPlayer.isStealth,
-                },
-              })
-            )
-          );
+          const stealthData = {
+            id: ws.data.id,
+            isStealth: currentPlayer.isStealth,
+          }
+          sendPacket(player.ws, packetManager.stealth(stealthData));
         });
         // Send the player's new position to all players in the map when they toggle stealth mode off
         if (!isStealth) {
           playersInMap.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "MOVEXY",
-                  data: {
-                    id: ws.data.id,
-                    _data: currentPlayer.location.position,
-                  },
-                })
-              )
-            );
+            const moveXYData = {
+              id: ws.data.id,
+              _data: currentPlayer.location.position,
+            }
+            sendPacket(player.ws, packetManager.moveXY(moveXYData));
           });
         }
         break;
@@ -859,82 +738,51 @@ export default async function packetReceiver(
         const damage = Math.floor(Math.random() * (25 - 10 + 1) + 10);
         target.stats.health -= damage;
 
+        const audioData = {
+          name: "attack_sword",
+          data: assetCache
+            .get("audio")
+            .find((a: SoundData) => a.name === "attack_sword"),
+          pitch: pitch,
+          timestamp: performance.now(),
+        }
+
         // Check if player is currently in stealth mode
         // If the player is in stealth mode, only send an audio packet to admins
         if (currentPlayer.isStealth) {
           playersInMapAdminNearBy.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "AUDIO",
-                  name: "attack_sword",
-                  data: assetCache
-                    .get("audio")
-                    .find((a: SoundData) => a.name === "attack_sword"),
-                  pitch: pitch,
-                })
-              )
-            );
+            sendPacket(player.ws, packetManager.audio(audioData));
           });
         } else {
           playersNearBy.forEach((player) => {
-            player.ws.send(
-              packet.encode(
-                JSON.stringify({
-                  type: "AUDIO",
-                  name: "attack_sword",
-                  data: assetCache
-                    .get("audio")
-                    .find((a: SoundData) => a.name === "attack_sword"),
-                  pitch: pitch,
-                  timestamp: performance.now(),
-                })
-              )
-            );
+            sendPacket(player.ws, packetManager.audio(audioData));
           });
 
           if (target.stats.health <= 0) {
             target.stats.health = 100;
             target.location.position = { x: 0, y: 0, direction: "down" };
             playersInMap.forEach((player) => {
-              player.ws.send(
-                packet.encode(
-                  JSON.stringify({
-                    type: "MOVEXY",
-                    data: {
-                      id: target.id,
-                      _data: target.location.position,
-                    },
-                  })
-                )
-              );
-              player.ws.send(
-                packet.encode(
-                  JSON.stringify({
-                    type: "REVIVE",
-                    data: {
-                      id: target.id,
-                      target: target.id,
-                      stats: target.stats,
-                    },
-                  })
-                )
-              );
+              const moveXYData = {
+                id: target.id,
+                _data: target.location.position,
+              }
+              sendPacket(player.ws, packetManager.moveXY(moveXYData));
+
+              const reviveData = {
+                id: target.id,
+                target: target.id,
+                stats: target.stats,
+              }
+              sendPacket(player.ws, packetManager.revive(reviveData));
             });
           } else {
             playersInMap.forEach((player) => {
-              player.ws.send(
-                packet.encode(
-                  JSON.stringify({
-                    type: "UPDATESTATS",
-                    data: {
-                      id: ws.data.id,
-                      target: target.id,
-                      stats: target.stats,
-                    },
-                  })
-                )
-              );
+              const updateStatsData = {
+                id: ws.data.id,
+                target: target.id,
+                stats: target.stats,
+              }
+              sendPacket(player.ws, packetManager.updateStats(updateStatsData));
             });
           }
         }
@@ -947,22 +795,19 @@ export default async function packetReceiver(
       case "QUESTDETAILS": {
         const questId = data as unknown as number;
         const quest = await quests.find(questId);
-        ws.send(packet.encode(JSON.stringify({ type: "QUESTDETAILS", data: quest })));
+        sendPacket(ws, packetManager.questDetails(quest));
         break;
       }
       case "STARTGAME": {
         // Send music
-        ws.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MUSIC",
-              name: "music_morning_dew",
-              data: assetCache
-                .get("audio")
-                .find((a: SoundData) => a.name === "music_morning_dew"),
-            })
-          )
-        );
+
+        const musicData = {
+          name: "music_morning_dew",
+          data: assetCache
+            .get("audio")
+            .find((a: SoundData) => a.name === "music_morning_dew"),
+        }
+        sendPacket(ws, packetManager.music(musicData));
         break;
       }
       case "COMMAND": {
@@ -976,12 +821,18 @@ export default async function packetReceiver(
           case "DISCONNECT": {
             // admin.kick or admin.*
             if (!currentPlayer.permissions.some((p: string) => p === "admin.kick" || p === "admin.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             } 
             const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              const notifyData = {
+                message: "Please provide a username or ID",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -998,23 +849,35 @@ export default async function packetReceiver(
 
             // Prevent disconnecting yourself
             if (targetPlayer?.id === currentPlayer.id) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot disconnect yourself" } })));
+              const notifyData = {
+                message: "You cannot disconnect yourself",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             if (!targetPlayer) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found or is not online" } })));
+              const notifyData = {
+                message: "Player not found or is not online",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Prevent disconnecting admins
             if (targetPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot disconnect other admins" } })));
+              const notifyData = {
+                message: "You cannot disconnect other admins",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             player.kick(targetPlayer.username, targetPlayer.ws);
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Disconnected ${targetPlayer.username} from the server` } })));
+            const notifyData = {
+              message: `Disconnected ${targetPlayer.username} from the server`,
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
           // Send a message to all players in the current map
@@ -1022,7 +885,10 @@ export default async function packetReceiver(
           case "BROADCAST": {
             // server.notify or server.*
             if (!currentPlayer.permissions.some((p: string) => p === "server.notify" || p === "server.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;  
             }
             let message;
@@ -1043,7 +909,10 @@ export default async function packetReceiver(
             switch (audience) {
               case "ALL": {
                 players.forEach((player) => {
-                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                  const notifyData = {
+                    message: message,
+                  }
+                  sendPacket(player.ws, packetManager.notify(notifyData));
                 });
                 break;
               }
@@ -1051,14 +920,20 @@ export default async function packetReceiver(
                 const playersInMap = filterPlayersByMap(currentPlayer.location.map);
                 const playersInMapAdmins = playersInMap.filter((p) => p.isAdmin);
                 playersInMapAdmins.forEach((player) => {
-                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                  const notifyData = {
+                    message: message,
+                  }
+                  sendPacket(player.ws, packetManager.notify(notifyData));
                 });
                 break;
               }
               case "MAP": {
                 const playersInMap = filterPlayersByMap(currentPlayer.location.map);
                 playersInMap.forEach((player) => {
-                  player.ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message } })));
+                  const notifyData = {
+                    message: message,
+                  }
+                  sendPacket(player.ws, packetManager.notify(notifyData));
                 });
                 break;
               }
@@ -1069,12 +944,18 @@ export default async function packetReceiver(
           case "BAN": {
             // admin.ban or admin.*
             if (!currentPlayer.permissions.some((p: string) => p === "admin.ban" || p === "admin.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              const notifyData = {
+                message: "Please provide a username or ID",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1096,60 +977,90 @@ export default async function packetReceiver(
             }
 
             if (!targetPlayer) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+              const notifyData = {
+                message: "Player not found",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Prevent banning yourself
             if (targetPlayer.id === currentPlayer.id) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot ban yourself" } })));
+              const notifyData = {
+                message: "You cannot ban yourself",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Prevent banning admins
             if (targetPlayer.isAdmin) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot ban other admins" } })));
+              const notifyData = {
+                message: "You cannot ban other admins",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Check if the player is already banned
             if (targetPlayer.banned) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `${targetPlayer.username} is already banned` } })));
+              const notifyData = {
+                message: `${targetPlayer.username} is already banned`,
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             
             // Ban the player
             await player.ban(targetPlayer.username, targetPlayer.ws);
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Banned ${targetPlayer.username} from the server` } })));
+            const notifyData = {
+              message: `Banned ${targetPlayer.username} from the server`,
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
           case "UNBAN": {
             // admin.unban or admin.*
             if (!currentPlayer.permissions.some((p: string) => p === "admin.unban" || p === "admin.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             const identifier = args[0] || null;
             if (!identifier) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              const notifyData = {
+                message: "Please provide a username or ID",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             const targetPlayer = await player.findPlayerInDatabase(identifier) as { username: string, banned: number }[] as any[];
             if (!targetPlayer) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found or is not online" } })));
+              const notifyData = {
+                message: "Player not found or is not online",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Prevent unbanning yourself
             if (targetPlayer[0].id === currentPlayer.id) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot unban yourself" } })));
+              const notifyData = {
+                message: "You cannot unban yourself",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             // Unban the player
             await player.unban(targetPlayer[0].username);
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Unbanned ${targetPlayer[0].username} from the server` } })));
+            const notifyData = {
+              message: `Unbanned ${targetPlayer[0].username} from the server`,
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;           
           }
           // Toggle admin status
@@ -1157,12 +1068,18 @@ export default async function packetReceiver(
           case "SETADMIN": {
             // server.admin or server.*
             if (!currentPlayer.permissions.some((p: string) => p === "server.admin" || p === "server.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             const identifier = args[0].toLowerCase() || null;
             if (!identifier) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a username or ID" } })));
+              const notifyData = {
+                message: "Please provide a username or ID",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1185,7 +1102,10 @@ export default async function packetReceiver(
 
             // Prevent toggling your own admin status
             if (targetPlayer?.id === currentPlayer.id) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot toggle your own admin status" } })));
+              const notifyData = {
+                message: "You cannot toggle your own admin status",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             
@@ -1196,22 +1116,28 @@ export default async function packetReceiver(
               targetPlayer.isAdmin = admin;
               cache.set(targetPlayer.id, targetPlayer);
             }
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `${targetPlayer.username} admin status has been updated to ${admin}` } })));
+            const notifyData = {
+              message: `${targetPlayer.username} admin status has been updated to ${admin}`,
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
           // Shutdown the server
           case "SHUTDOWN": {
             // server.shutdown or server.*
             if (!currentPlayer.permissions.some((p: string) => p === "server.shutdown" || p === "server.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             const players = Object.values(cache.list());
             players.forEach((player) => {
-              player.ws.send(packet.encode(JSON.stringify({ 
-                type: "NOTIFY", 
-                data: { message: "⚠️ Server shutting down - please reconnect in a few minutes ⚠️" } 
-              })));
+              const notifyData = {
+                message: "⚠️ Server shutting down - please reconnect in a few minutes ⚠️",
+              }
+              sendPacket(player.ws, packetManager.notify(notifyData));
             });
 
             // Wait for 5 seconds
@@ -1237,7 +1163,10 @@ export default async function packetReceiver(
           case "RESTART": {
             // server.restart or server.*
             if (!currentPlayer.permissions.some((p: string) => p === "server.restart" || p === "server.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1249,10 +1178,10 @@ export default async function packetReceiver(
               
               const players = Object.values(cache.list());
               players.forEach((player) => {
-                player.ws.send(packet.encode(JSON.stringify({ 
-                  type: "NOTIFY", 
-                  data: { message: "⚠️ Server restart has been aborted ⚠️" } 
-                })));
+                const notifyData = {
+                  message: "⚠️ Server restart has been aborted ⚠️",
+                }
+                sendPacket(player.ws, packetManager.notify(notifyData));
               });
               break;
             }
@@ -1273,10 +1202,10 @@ export default async function packetReceiver(
               restartTimers.push(setTimeout(() => {
                 const players = Object.values(cache.list());
                 players.forEach((player) => {
-                  player.ws.send(packet.encode(JSON.stringify({ 
-                    type: "NOTIFY", 
-                    data: { message: `⚠️ Server restarting in ${minutes} minute${minutes === 1 ? '' : 's'} ⚠️` } 
-                  })));
+                  const notifyData = {
+                    message: `⚠️ Server restarting in ${minutes} minute${minutes === 1 ? '' : 's'} ⚠️`,
+                  }
+                  sendPacket(player.ws, packetManager.notify(notifyData));
                 });
               }, RESTART_DELAY - (minutes * 60 * 1000)));
             });
@@ -1286,10 +1215,10 @@ export default async function packetReceiver(
               restartTimers.push(setTimeout(() => {
                 const players = Object.values(cache.list());
                 players.forEach((player) => {
-                  player.ws.send(packet.encode(JSON.stringify({ 
-                    type: "NOTIFY", 
-                    data: { message: `⚠️ Server restarting in ${seconds} second${seconds === 1 ? '' : 's'} ⚠️` } 
-                  })));
+                  const notifyData = {
+                    message: `⚠️ Server restarting in ${seconds} second${seconds === 1 ? '' : 's'} ⚠️`,
+                  }
+                  sendPacket(player.ws, packetManager.notify(notifyData));
                 });
               }, RESTART_DELAY - (seconds * 1000)));
             });
@@ -1319,7 +1248,10 @@ export default async function packetReceiver(
           case "RESPAWN": {
             // admin.respawn or admin.*
             if (!currentPlayer.permissions.some((p: string) => p === "admin.respawn" || p === "admin.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1346,7 +1278,10 @@ export default async function packetReceiver(
               }
 
               if (!targetPlayer) {
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+                const notifyData = {
+                  message: "Player not found",
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
             }
@@ -1360,11 +1295,18 @@ export default async function packetReceiver(
               cache.set(targetPlayer.id, targetPlayer);
               const playersInMap = filterPlayersByMap(targetPlayer.location.map);
               playersInMap.forEach((player) => {
-                player.ws.send(packet.encode(JSON.stringify({ type: "MOVEXY", data: { id: targetPlayer.id, _data: targetPlayer.location.position } })));
+                const moveData = {
+                  id: targetPlayer.id,
+                  _data: targetPlayer.location.position,
+                }
+                sendPacket(player.ws, packetManager.moveXY(moveData));
               });
             }
             
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Respawned ${targetPlayer.username}` } })));
+            const notifyData = {
+              message: `Respawned ${targetPlayer.username}`,
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
           // Update permissions for a player
@@ -1372,17 +1314,26 @@ export default async function packetReceiver(
           case "PERMISSIONS": {
             // admin.permission or admin.*
             if (!currentPlayer.permissions.some((p: string) => p === "admin.permission" || p === "admin.*")) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You don't have permission to use this command" } })));
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
             const mode = args[0]?.toUpperCase() || null;
             if (!mode) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Please provide a mode" } })));
+              const notifyData = {
+                message: "Please provide a mode",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
             if (mode !== "ADD" && mode !== "REMOVE" && mode !== "SET" && mode !== "CLEAR" && mode !== "LIST") {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid mode" } })));
+              const notifyData = {
+                message: "Invalid mode",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1406,7 +1357,10 @@ export default async function packetReceiver(
             }
             
             if (!targetPlayer) {
-              ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Player not found" } })));
+              const notifyData = {
+                message: "Player not found",
+              }
+              sendPacket(ws, packetManager.notify(notifyData));
               break;
             }
 
@@ -1421,7 +1375,10 @@ export default async function packetReceiver(
               permissionsArray = access.split(",");
               permissionsArray.forEach((permission: string) => {
                 if (!validPermissions.includes(permission)) {
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Invalid permission: ${permission}` } })));
+                  const notifyData = {
+                    message: `Invalid permission: ${permission}`,
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   return;
                 }
               });
@@ -1432,84 +1389,129 @@ export default async function packetReceiver(
                 if (!currentPlayer.permissions.some((p: string) => p === "permission.add" || p === "permission.*")) {
                   // Prevent setting permissions for yourself
                   if (targetPlayer?.id === currentPlayer.id) {
-                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    const notifyData = {
+                      message: "You cannot set permissions for yourself",
+                    }
+                    sendPacket(ws, packetManager.notify(notifyData));
                     break;
                   }
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  const notifyData = {
+                    message: "Invalid command",
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   break;
                 }
                 await permissions.add(targetPlayer.username, permissionsArray);
                 // Update the player cache
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions added to ${targetPlayer.username}` } })));
+                const notifyData = {
+                  message: `Permissions added to ${targetPlayer.username}`,
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
               case "REMOVE": {
                 if (!currentPlayer.permissions.some((p: string) => p === "permission.remove" || p === "permission.*")) {
                   // Prevent setting permissions for yourself
                   if (targetPlayer?.id === currentPlayer.id) {
-                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    const notifyData = {
+                      message: "You cannot set permissions for yourself",
+                    }
+                    sendPacket(ws, packetManager.notify(notifyData));
                     break;
                   }
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  const notifyData = {
+                    message: "Invalid command",
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   break;
                 }
                 await permissions.remove(targetPlayer.username, permissionsArray);
                 // Update the player cache
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions removed from ${targetPlayer.username}` } })));
+                const notifyData = {
+                  message: `Permissions removed from ${targetPlayer.username}`,
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
               case "SET": {
                 if (!currentPlayer.permissions.some((p: string) => p === "permission.add" || p === "permission.*")) {
                   // Prevent setting permissions for yourself
                   if (targetPlayer?.id === currentPlayer.id) {
-                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    const notifyData = {
+                      message: "You cannot set permissions for yourself",
+                    }
+                    sendPacket(ws, packetManager.notify(notifyData));
                     break;
                   }
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  const notifyData = {
+                    message: "Invalid command",
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   break;
                 }
                 await permissions.set(targetPlayer.username, permissionsArray);
                 // Update the player cache
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions set for ${targetPlayer.username}` } })));
+                const notifyData = {
+                  message: `Permissions set for ${targetPlayer.username}`,
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
               case "CLEAR": {
                 if (!currentPlayer.permissions.some((p: string) => p === "permission.remove" || p === "permission.*")) {
                   // Prevent setting permissions for yourself
                   if (targetPlayer?.id === currentPlayer.id) {
-                    ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "You cannot set permissions for yourself" } })));
+                    const notifyData = {
+                      message: "You cannot set permissions for yourself",
+                    }
+                    sendPacket(ws, packetManager.notify(notifyData));
                     break;
                   }
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  const notifyData = {
+                    message: "Invalid command",
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   break;
                 }
                 await permissions.clear(targetPlayer.username);
                 // Update the player cache
                 targetPlayer.permissions = [];
                 cache.set(targetPlayer.id, targetPlayer);
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions cleared for ${targetPlayer.username}` } })));
+                const notifyData = {
+                  message: `Permissions cleared for ${targetPlayer.username}`,
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
               case "LIST": {
                 if (!currentPlayer.permissions.some((p: string) => p === "permission.list" || p === "permission.*")) {
-                  ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+                  const notifyData = {
+                    message: "Invalid command",
+                  }
+                  sendPacket(ws, packetManager.notify(notifyData));
                   break;
                 }
                 const response = await permissions.get(targetPlayer.username) as string || "No permissions found";
-                ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: `Permissions for ${targetPlayer.username}: ${response.replaceAll(",", ", ")}` } })));
+                const notifyData = {
+                  message: `Permissions for ${targetPlayer.username}: ${response.replaceAll(",", ", ")}`,
+                }
+                sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
             }
             break;
           }
           default: {
-            ws.send(packet.encode(JSON.stringify({ type: "NOTIFY", data: { message: "Invalid command" } })));
+            const notifyData = {
+              message: "Invalid command",
+            }
+            sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
         }
@@ -1553,4 +1555,10 @@ function tryParsePacket(data: any) {
     log.error(e as string);
     return undefined;
   }
+}
+
+function sendPacket(ws: any, packets: any[]) {
+  packets.forEach((packet) => {
+    ws.send(packet);
+  });
 }

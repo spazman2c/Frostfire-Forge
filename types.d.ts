@@ -253,3 +253,10 @@ declare interface Quest {
   required_quest: number;
   required_level: number;
 }
+
+// Add data property to the WebSocket object but keep the existing properties
+declare interface WebSocket {
+  data: {
+    [key: string]: any;
+  };
+}
