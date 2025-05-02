@@ -4,7 +4,6 @@ import * as sqlite from "bun:sqlite";
 import fs from "fs";
 import path from "path";
 
-
 const _databaseEngine = process.env.DATABASE_ENGINE || "mysql"
 
 function getSqlCert() {
