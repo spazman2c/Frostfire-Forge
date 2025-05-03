@@ -590,9 +590,16 @@ import player from "../systems/player";
 ```ts
 declare interface Player {
   id?: string;
-  name?: string;
+  username?: string;
   position?: PositionData;
+  location?: LocationData;
   map?: string;
+  stats?: StatsData;
+  isStealth?: boolean;
+  isAdmin?: boolean;
+  isNoclip?: boolean;
+  pvp?: boolean;
+  last_attack?: number;
 }
 ```
 
