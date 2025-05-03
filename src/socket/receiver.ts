@@ -201,6 +201,8 @@ export default async function packetReceiver(
           lastMovementPacket: null,
           permissions: typeof access === "string" ? access.split(",") : [],
           movementInterval: null,
+          pvp: false,
+          last_attack: null,
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -734,7 +736,8 @@ export default async function packetReceiver(
         break;
       }
       case "ATTACK": {
-        if (currentPlayer?.attackDelay > Date.now()) return;
+        if (currentPlayer?.attackDelay > performance.now()) return;
+        if (currentPlayer.stats.stamina < 10) return;
         const _data = data as any;
         const target = cache.get(_data.id);
         if (!target) return;
@@ -763,7 +766,15 @@ export default async function packetReceiver(
 
         // Random whole number between 10 and 25
         const damage = Math.floor(Math.random() * (25 - 10 + 1) + 10);
-        target.stats.health -= damage;
+        const stamina = 10;
+
+        target.stats.health = Math.round(target.stats.health - damage);
+        currentPlayer.stats.stamina -= stamina;
+        
+        // Ensure stamina doesn't go below 0
+        if (currentPlayer.stats.stamina < 0) {
+          currentPlayer.stats.stamina = 0;
+        }
 
         const audioData = {
           name: "attack_sword",
@@ -784,9 +795,10 @@ export default async function packetReceiver(
           playersNearBy.forEach((player) => {
             sendPacket(player.ws, packetManager.audio(audioData));
           });
-
+          // Dead player
           if (target.stats.health <= 0) {
             target.stats.health = 100;
+            target.stats.stamina = 100;
             target.location.position = { x: 0, y: 0, direction: "down" };
             playersInMap.forEach((player) => {
               const moveXYData = {
@@ -809,12 +821,25 @@ export default async function packetReceiver(
                 target: target.id,
                 stats: target.stats,
               };
+
+              const currentPlayerUpdateStatsData = {
+                id: currentPlayer.id,
+                target: currentPlayer.id,
+                stats: currentPlayer.stats,
+              };
               sendPacket(player.ws, packetManager.updateStats(updateStatsData));
+              sendPacket(player.ws, packetManager.updateStats(currentPlayerUpdateStatsData));
             });
           }
         }
+        currentPlayer.pvp = true;
+        target.pvp = true;
+        currentPlayer.last_attack = performance.now();
+        target.last_attack = performance.now();
+
         player.setStats(target.username, target.stats);
-        currentPlayer.attackDelay = Date.now() + 1000;
+        player.setStats(currentPlayer.username, currentPlayer.stats);
+        currentPlayer.attackDelay = performance.now() + 1000;
         await new Promise((resolve) => setTimeout(resolve, 1000));
         currentPlayer.attackDelay = 0;
         break;

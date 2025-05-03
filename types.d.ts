@@ -81,6 +81,8 @@ declare interface Player {
   isStealth?: boolean;
   isAdmin?: boolean;
   isNoclip?: boolean;
+  pvp?: boolean;
+  last_attack?: number;
 }
 
 declare interface QuestLogData {

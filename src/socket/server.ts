@@ -266,6 +266,50 @@ listener.on("onFixedUpdate", async () => {
   }
 });
 
+// Server tick (every 1 second)
+listener.on("onServerTick", async () => {
+  const players = cache.list() as any;
+  Object.keys(players).forEach((p: any) => {
+    const timeSinceLastAttack = players[p].last_attack ? performance.now() - players[p].last_attack : Infinity;
+    if (timeSinceLastAttack > 5000) {
+      players[p].pvp = false;
+    }
+
+    // Return if the player is in combat
+    if (players[p].pvp) return;
+
+    if (players[p].stats.stamina == players[p].stats.max_stamina && players[p].stats.health == players[p].stats.max_health) return;
+    
+    // Regenerate stamina by 1 every 1 second until it reaches 100
+    if (players[p].stats.stamina < players[p].stats.max_stamina) {
+      players[p].stats.stamina += 1;
+    }
+    // Regenerate health by 1 every 1 second until it reaches 100
+    if (players[p].stats.health < players[p].stats.max_health) {
+      players[p].stats.health += 1;
+    }
+
+    const updateStatsData = {
+      id: players[p].id,
+      target: players[p].id,
+      stats: players[p].stats,
+    };
+    
+    player.setStats(players[p].username, players[p].stats);
+
+    // Send to only players in the same map
+    Object.keys(players).forEach((p: any) => {
+      if (players[p].location.map === players[p].location.map) {
+        players[p].ws.send(
+          packet.encode(
+            JSON.stringify({ type: "UPDATESTATS", data: updateStatsData })
+          )
+        );
+      }
+    });
+  });
+});
+
 // On new connection
 listener.on("onConnection", (data) => {
   if (!data) return;

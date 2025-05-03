@@ -410,6 +410,15 @@ Listener.on("onDisconnect", (data) => {
 });
 ```
 
+<h5>onServerTick</h5>
+<p style="font-size:0.75em;">Fires every 1 second</p>
+
+```ts
+Listener.on("onServerTick", (data) => {
+  console.log(`Server tick: ${data}`);
+});
+```
+
 <hr>
 <h3>Inventory Management</h3>
 

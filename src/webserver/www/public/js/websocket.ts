@@ -808,12 +808,7 @@ socket.onmessage = async (event) => {
       const data = JSON.parse(packet.decode(event.data))["data"];
       const target = players.find((player) => player.id === data.target);
       if (!target) return;
-      target.stats = data.stats;
-      if (target.id === sessionStorage.getItem("connectionId")) {
-        updateStats(target.stats.health, target.stats.stamina);
-      } else {
-        updateTargetStats(target.stats.health, target.stats.stamina);
-      }
+      updateStatsNew(target.id, data.stats.health, data.stats.stamina);
       break;
     }
     case "REVIVE": {
@@ -1615,41 +1610,46 @@ function createPlayer(data: any) {
 
       // Draw the player's health bar below the player's name with a width of 100px, centered below the player name
       if (!this.isStealth) {
-        context.fillStyle = "rgba(0, 0, 0, 0.8)";
-        context.fillRect(this.position.x - 34, this.position.y + 71, 100, 3);
+        if (data.id === sessionStorage.getItem("connectionId") || this.targeted) {
+          context.fillStyle = "rgba(0, 0, 0, 0.8)";
+          context.fillRect(this.position.x - 34, this.position.y + 71, 100, 3);
 
-        // Update the shadowblur to 2
-        context.shadowBlur = 2;
+          // Update the shadowblur to 2
+          context.shadowBlur = 2;
         
-        // Set health bar color based on health percentage
-        const healthPercent = this.stats.health / this.stats.max_health;
-        if (healthPercent < 0.3) {
-          context.fillStyle = "#C81D1D"; // red
-        } else if (healthPercent < 0.5) {
-          context.fillStyle = "#C87C1D"; // orange
-        } else if (healthPercent < 0.8) {
-          context.fillStyle = "#C8C520"; // yellow
-        } else {
-          context.fillStyle = "#519D41"; // green
+          // Set health bar color based on health percentage
+          const healthPercent = this.stats.health / this.stats.max_health;
+          if (healthPercent < 0.3) {
+            context.fillStyle = "#C81D1D"; // red
+          } else if (healthPercent < 0.5) {
+            context.fillStyle = "#C87C1D"; // orange
+          } else if (healthPercent < 0.8) {
+            context.fillStyle = "#C8C520"; // yellow
+          } else {
+            context.fillStyle = "#519D41"; // green
+          }
+          
+          context.fillRect(
+            this.position.x - 34,
+            this.position.y + 71,
+            healthPercent * 100,
+            3
+          );
         }
-        
-        context.fillRect(
-          this.position.x - 34,
-          this.position.y + 71,
-          healthPercent * 100,
-          3
-        );
 
         // Draw the player's stamina bar below the player's health bar with a width of 75px, centered below the player's health bar
+        // Check if current player is the same as the player we are drawing
+        if (data.id === sessionStorage.getItem("connectionId") || this.targeted) {
         context.fillStyle = "rgba(0, 0, 0, 0.8)";
         context.fillRect(this.position.x - 34, this.position.y + 76, 100, 3);
         context.fillStyle = "#469CD9";
         context.fillRect(
           this.position.x - 34,
-          this.position.y + 76,
-          (this.stats.stamina / this.stats.max_stamina) * 100,
-          3
-        );
+            this.position.y + 76,
+            (this.stats.stamina / this.stats.max_stamina) * 100,
+            3
+          );
+        }
       }
 
       // Reset shadow settings
@@ -1721,11 +1721,54 @@ window.addEventListener("blur", () => {
   pressedKeys.clear();
 });
 
+function updateStatsNew(id: number, health: number, stamina: number) { 
+  const player = players.find((player) => player.id === id);
+  if (!player) return;
+  player.stats.health = health;
+  player.stats.stamina = stamina;
+  
+  // Update appropriate health/stamina bars based on whether this is current player or target
+  if (player.id === sessionStorage.getItem("connectionId")) {
+    // Update current player's bars
+    updateHealthBar(healthBar, health);
+    staminaBar.style.width = `${stamina}%`;
+  } else if (player.targeted) {
+    // Update target's bars
+    updateHealthBar(targetHealthBar, health);
+    targetStaminaBar.style.width = `${stamina}%`;
+  }
+}
+
+// Helper function to update health bar styling
+function updateHealthBar(bar: HTMLDivElement, health: number) {
+  bar.removeAttribute("class");
+  bar.classList.add("ui");
+  bar.style.width = `${Math.max(0, health)}%`;
+
+  if (health >= 80) {
+    bar.classList.add("green");
+  } else if (health >= 50) {
+    bar.classList.add("yellow");
+  } else if (health >= 30) {
+    bar.classList.add("orange");
+  } else {
+    bar.classList.add("red");
+  }
+}
+
 function updateStats(health: number, stamina: number) {
   healthBar.removeAttribute("class");
   healthBar.classList.add("ui");
   healthBar.style.width = `${health}%`;
   staminaBar.style.width = `${stamina}%`;
+  if (stamina < 0) {
+    staminaBar.style.width = `0%`;
+  }
+  
+  if (health < 0) {
+    healthBar.style.width = `0%`;
+  }
+
   if (health >= 80) {
     healthBar.classList.add("green");
     return;
