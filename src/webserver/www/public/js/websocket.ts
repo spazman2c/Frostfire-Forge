@@ -1532,7 +1532,7 @@ function createPlayer(data: any) {
       if (data.id === sessionStorage.getItem("connectionId") && !this.isStealth) {
         context.fillStyle = "#ffe561";
       } else {
-        if (this.targeted) {
+        if (this.targeted && !this.isStealth) {
           context.fillStyle = "#E01F1F";
         } else {
           if (this.isStealth) {
