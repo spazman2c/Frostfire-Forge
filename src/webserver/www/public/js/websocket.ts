@@ -24,6 +24,7 @@ const inventoryUI = document.getElementById("inventory") as HTMLDivElement;
 const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
 const statUI = document.getElementById("stat-screen") as HTMLDivElement;
 const chatInput = document.getElementById("chat-input") as HTMLInputElement;
+const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
 const startGameButton = document.getElementById("start-game-button") as HTMLButtonElement;
 const loadingScreen = document.getElementById("loading-screen");
 if (startGameButton) {
@@ -707,7 +708,23 @@ socket.onmessage = async (event) => {
     case "CHAT": {
       players.forEach((player) => {
         if (player.id === data.id) {
+          // Escape HTML tags before setting chat message
           player.chat = data.message;
+          // Username with first letter uppercase
+          const username = data?.username?.charAt(0).toUpperCase() + data?.username?.slice(1);
+          const timestamp = new Date().toLocaleTimeString();
+          // Update chat box
+          if (data.message?.trim() !== "" && username) {
+            const message = document.createElement("div");
+            message.classList.add("message");
+            message.style.userSelect = "text";
+            // Escape HTML in the message before inserting
+            const escapedMessage = data.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            message.innerHTML = `${timestamp} ${username}: ${escapedMessage}`;
+            chatMessages.appendChild(message);
+            // Scroll to the bottom of the chat messages
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
         }
       });
       break;

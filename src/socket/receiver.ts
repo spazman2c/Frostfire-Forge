@@ -537,6 +537,7 @@ export default async function packetReceiver(
           const chatData = {
             id: ws.data.id,
             message,
+            username: currentPlayer.username,
           };
           sendPacket(playerWs, packetManager.chat(chatData));
         };
@@ -613,7 +614,13 @@ export default async function packetReceiver(
                 : await language.translate(filteredMessage, player.language);
           }
 
-          sendMessageToPlayer(player.ws, translations[player.language]);
+          const chatData = {
+            id: ws.data.id,
+            message: translations[player.language],
+            username: currentPlayer.username,
+          };
+          
+          sendPacket(player.ws, packetManager.chat(chatData));
         });
 
         break;
