@@ -693,7 +693,10 @@ input::placeholder {
 
 #stats-screen-health-label, #stats-screen-mana-label {
   padding-top: 15px;
-  color: #000;
+  color: #FFF1DA;
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
 }
 
 #start-game-button {
