@@ -7,6 +7,8 @@ const mapScale = 0.1;
 const audioCache = new Map<string, string>();
 const npcImage = new Image();
 npcImage.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAmCAYAAABOFCLqAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TxQ8qDq0g4pChioNdVMSxVLEIFkpboVUHk0u/oElDkuLiKLgWHPxYrDq4OOvq4CoIgh8g7oKToouU+L+k0CLGg+N+vLv3uHsHCI0KU82uKKBqlpGKx8RsblXseYWAPgQxgSGJmXoivZiB5/i6h4+vdxGe5X3uzzGg5E0G+ETiKNMNi3iDeHbT0jnvE4dYSVKIz4knDbog8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4hDiuqRvlC1mWF8xZntVJjrXvyFwby2kqa6zRHEccSEkhChIwayqjAQoRWjRQTKdqPefhHHH+SXDK5ymDkWEAVKiTHD/4Hv7s1C9NTblIgBnS/2PbHGNCzCzTrtv19bNvNE8D/DFxpbX+1Acx9kl5va+EjYHAbuLhua/IecLkDDD/pkiE5kp+mUCgA72f0TTkgeAv0r7m9tfZx+gBkqKvlG+DgEBgvUva6x7t7O3v790yrvx+jlHK64ZQ6gAAAAAZiS0dEAAAAAAAA+UO7fwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+kCCRMwEsjIppIAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAB50lEQVRYw+2YvWvCYBDGn7xk0yRUKtqIiBBaUAoOznXv6B9b6GhnN3GRDErQRG2U1w9cStNB35hEjV/5sOBNuYRcft7de88h95LPW7gR4wHg/fURkrCMDYLOE/hofYMAgCQsQeeJ2EBYIgi7OS5UMS3VI4Oi8wSmpTrGhaq7TACgTBpQUYOyyZIkLJESg2+nyYyz46uGCWXS2IVhQKxsfSqhT7fPkuTHvl788mf7TstJ1PU9ZsTvVyTJjyvoNXZKLN7vZfuEOZrsat+nJwluyO4w/wKGPzaY9l0H4Z8MQ72nIUQJ2FsmNVWz5SBs0WRaOC3VoaZquzDpXhOmYUam3pKwhGmYSPea7jKxbEie8Ry2KZMGILB+Wq1hirlFrKcoJS6A1iYzn+0HyGJ8C99gxgHQ1z0ji9bmRjwgLBF2A8uihVWxgg6XiQSiw2WwKlZcFXFNYK2rI0lHkcAk6QhaVz889J6tISC6Uxdqaazh8Qksixa+2sb2COafrgZQtW0W3srZ87UpCAhvLCfUWTCsVN6yXeOrl6wQQWbl1Lj35eoOE9jaqWo64Gg2r3Zd6quaDvmcOTOYcZvBFPwUlsvZgxOe+KloWHZoSyB+Kho2kHdLIH4qGrZ5twTeT0XDNueWAADcLf3B+AfAy/vU2Mt7LwAAAABJRU5ErkJggg==';
+const typingImage = new Image();
+typingImage.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAADfLRcdAAABhWlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV+/qEhF0A4iDhmqONhFRcSpVLEIFkpboVUHk0u/oElDkuLiKLgWHPxYrDq4OOvq4CoIgh8g7oKToouU+L+k0CLGg+N+vLv3uHsHeJtVphj+GKCopp5OxIVcflUIviIAPwYwh3GRGVoys5iF6/i6h4evd1Ge5X7uz9EnFwwGeATiGNN0k3iDeGbT1DjvE4dZWZSJz4kndLog8SPXJYffOJds9vLMsJ5NzxOHiYVSF0tdzMq6QjxNHJEVlfK9OYdlzluclWqdte/JXxgqqCsZrtMcQQJLSCIFARLqqKAKE1FaVVIMpGk/7uIftv0pcknkqoCRYwE1KBBtP/gf/O7WKE5NOkmhOBB4sayPUSC4C7QalvV9bFmtE8D3DFypHX+tCcx+kt7oaJEjoH8buLjuaNIecLkDDD1poi7ako+mt1gE3s/om/LA4C3Qu+b01t7H6QOQpa6Wb4CDQ2CsRNnrLu/u6e7t3zPt/n4A+Ehy3OEAdvwAAAAGYktHRACjAGoAQYpfYckAAAAJcEhZcwAALiMAAC4jAXilP3YAAAAHdElNRQfpBQQTFRn3o6swAAAAGXRFWHRDb21tZW50AENyZWF0ZWQgd2l0aCBHSU1QV4EOFwAAAIVJREFUSMdjZEACqday/xkGGZh99DEjjM3EMITAkHIsI3LUK4nxwSWOXH80YI6y0ZSDs++9+sQwmgxoDViQOchR/+bTtwFzFLI7pIQFRpMBfZMBLtAY/hfOrl/JPCBqR5MB3SqFZ28/DIrSQISPa7Q0GLjSALlOHm0bjKjSYLSnMJoMGBgAuS4u7T48tcgAAAAASUVORK5CYII=';
 const onlinecount = document.getElementById("onlinecount") as HTMLDivElement;
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
@@ -724,7 +726,25 @@ socket.onmessage = async (event) => {
             chatMessages.appendChild(message);
             // Scroll to the bottom of the chat messages
             chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Set typing to false
+            player.typing = false;
           }
+        }
+      });
+      break;
+    }
+    case "TYPING": {
+      players.forEach((player) => {
+        if (player.id === data.id) {
+          player.typing = true;
+          // Clear any existing timeout for this player
+          if (player.typingTimeout) {
+            clearTimeout(player.typingTimeout);
+          }
+          // Set typing to false after 5 seconds
+          player.typingTimeout = setTimeout(() => {
+            player.typing = false;
+          }, 3000);
         }
       });
       break;
@@ -958,6 +978,29 @@ let isKeyPressed = false;
 let isMoving = false;
 const pressedKeys = new Set();
 const movementKeys = new Set(["KeyW", "KeyA", "KeyS", "KeyD"]);
+let lastTypingPacket = 0;
+let typingTimer: number | null = null;
+
+chatInput.addEventListener("input", () => {
+  // Clear any existing timer
+  if (typingTimer) {
+    window.clearTimeout(typingTimer);
+  }
+
+  // Send typing packet if enough time has passed since last one
+  if (lastTypingPacket + 1000 < performance.now()) {
+    socket.send(packet.encode(JSON.stringify({ type: "TYPING", data: null })));
+    lastTypingPacket = performance.now();
+  }
+
+  // Set new timer to send another packet after delay
+  typingTimer = window.setTimeout(() => {
+    if (chatInput.value.length > 0) {
+      socket.send(packet.encode(JSON.stringify({ type: "TYPING", data: null })));
+      lastTypingPacket = performance.now();
+    }
+  }, 1000);
+});
 
 window.addEventListener("keydown", async (e) => {
   if (!loaded) return;
@@ -1531,6 +1574,9 @@ function createPlayer(data: any) {
     targeted: false,
     sprite: sprite_idle,
     stats: data.stats,
+    typing: false,
+    typingTimeout: null as NodeJS.Timeout | null,
+    typingImage: typingImage,
     show: function (context: CanvasRenderingContext2D) {
       context.globalAlpha = 1;
       context.font = "14px 'Comic Relief'";
@@ -1681,6 +1727,21 @@ function createPlayer(data: any) {
         context.drawImage(this.sprite, this.position.x, this.position.y, 32, 48);
       } else {
         context.fillRect(this.position.x, this.position.y, 32, 48);
+      }
+
+      if (this.typing && this.typingImage) {
+        // Show typing image at top left, using image's natural dimensions
+        // Update opacity to 0.5 if the player is in stealth mode
+        if (this.isStealth) {
+          context.globalAlpha = 0.8;
+        }
+        context.drawImage(
+          this.typingImage, 
+          this.position.x - this.typingImage.width, 
+          this.position.y - this.typingImage.height + 10
+        );
+        // Reset opacity
+        context.globalAlpha = 1;
       }
     },
   };

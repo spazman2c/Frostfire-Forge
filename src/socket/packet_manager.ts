@@ -231,4 +231,9 @@ export const packetManager = {
       packet.encode(JSON.stringify({ type: "NOTIFY", data })),
     ] as any[];
   },
+  typing: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "TYPING", data })),
+    ] as any[];
+  },
 };

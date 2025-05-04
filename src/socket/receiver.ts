@@ -474,7 +474,10 @@ export default async function packetReceiver(
           currentPlayer.location.position = tempPosition;
 
           // Broadcast movement to other players
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          let playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          if (currentPlayer.isStealth) {
+            playersInMap = playersInMap.filter((p) => p.isAdmin);
+          }
           const targetPlayers = currentPlayer.isStealth
             ? playersInMap.filter((p) => p.isAdmin)
             : playersInMap;
@@ -499,7 +502,7 @@ export default async function packetReceiver(
         currentPlayer.location.position = data;
         currentPlayer.location.position.direction = "down";
         if (currentPlayer.isStealth) {
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          let playersInMap = filterPlayersByMap(currentPlayer.location.map);
           const playersInMapAdmin = playersInMap.filter((p) => p.isAdmin);
           currentPlayer.location.position.x = Math.floor(
             Number(currentPlayer.location.position.x)
@@ -515,7 +518,7 @@ export default async function packetReceiver(
             sendPacket(player.ws, packetManager.moveXY(movementData));
           });
         } else {
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          let playersInMap = filterPlayersByMap(currentPlayer.location.map);
           playersInMap.forEach((player) => {
             const movementData = {
               id: ws.data.id,
@@ -543,7 +546,7 @@ export default async function packetReceiver(
         };
 
         if (message == null) {
-          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+          let playersInMap = filterPlayersByMap(currentPlayer.location.map);
           playersInMap.forEach((player) => {
             sendMessageToPlayer(player.ws, "");
           });
@@ -622,7 +625,20 @@ export default async function packetReceiver(
           
           sendPacket(player.ws, packetManager.chat(chatData));
         });
-
+        break;
+      }
+      case "TYPING": {
+        if (!currentPlayer) return;
+        const typingData = {
+          id: ws.data.id,
+        };
+        let playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        if (currentPlayer.isStealth) {
+          playersInMap = playersInMap.filter((p) => p.isAdmin);
+        }
+        playersInMap.forEach((player) => {
+          sendPacket(player.ws, packetManager.typing(typingData));
+        });
         break;
       }
       case "CLIENTCONFIG": {
@@ -717,7 +733,7 @@ export default async function packetReceiver(
         if (!currentPlayer?.isAdmin) return;
         const isStealth = await player.toggleStealth(currentPlayer.username);
         currentPlayer.isStealth = isStealth;
-        const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        let playersInMap = filterPlayersByMap(currentPlayer.location.map);
         const stealthData = {
           id: ws.data.id,
           isStealth: currentPlayer.isStealth,
@@ -749,7 +765,7 @@ export default async function packetReceiver(
         const target = cache.get(_data.id);
         if (!target) return;
 
-        const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        let playersInMap = filterPlayersByMap(currentPlayer.location.map);
         const playersNearBy = filterPlayersByDistance(
           ws,
           700,
@@ -986,7 +1002,7 @@ export default async function packetReceiver(
                 break;
               }
               case "ADMINS": {
-                const playersInMap = filterPlayersByMap(
+                let playersInMap = filterPlayersByMap(
                   currentPlayer.location.map
                 );
                 const playersInMapAdmins = playersInMap.filter(
@@ -1001,7 +1017,7 @@ export default async function packetReceiver(
                 break;
               }
               case "MAP": {
-                const playersInMap = filterPlayersByMap(
+                let playersInMap = filterPlayersByMap(
                   currentPlayer.location.map
                 );
                 playersInMap.forEach((player) => {
@@ -1434,7 +1450,7 @@ export default async function packetReceiver(
                 direction: "down",
               };
               cache.set(targetPlayer.id, targetPlayer);
-              const playersInMap = filterPlayersByMap(
+              let playersInMap = filterPlayersByMap(
                 targetPlayer.location.map
               );
               playersInMap.forEach((player) => {

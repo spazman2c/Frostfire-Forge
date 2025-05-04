@@ -246,6 +246,7 @@ export const packetTypes: PacketType = {
   38: "ANIMATION_SEQUENCE",
   39: "QUESTLOG",
   40: "QUESTDETAILS",
+  41: "TYPING",
 };
 ```
 
