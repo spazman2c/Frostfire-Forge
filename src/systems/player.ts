@@ -283,10 +283,10 @@ const player = {
     },
     setConfig: async (session_id: string, data: any) => {
         if (!session_id) return;
-        if (!data.fps || !data.music_volume || !data.effects_volume || typeof data.muted != 'boolean') return [];
+        if (!data.fps || typeof data.music_volume != 'number' || typeof data.effects_volume != 'number' || typeof data.muted != 'boolean') return [];
         const result = await query("SELECT username FROM accounts WHERE session_id = ?", [session_id]) as any;
         if (!result[0].username) return [];
-        const response = await query("UPDATE clientconfig SET fps = ?, music_volume = ?, effects_volume = ?, muted = ? WHERE username = ?", [data.fps, data.music_volume, data.effects_volume, data.muted, result[0].username]);
+        const response = await query("UPDATE clientconfig SET fps = ?, music_volume = ?, effects_volume = ?, muted = ? WHERE username = ?", [data.fps, data.music_volume || 0, data.effects_volume || 0, data.muted, result[0].username]);
         if (!response) return [];
         return response;
     },

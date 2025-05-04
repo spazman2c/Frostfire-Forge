@@ -1,6 +1,7 @@
 const MAX_BUFFER_SIZE = 1024 * 1024 * 16; // 16MB
 const packetQueue = new Map<string, (() => void)[]>();
 import crypto from "crypto";
+import { packetManager } from "./packet_manager";
 import packetReceiver from "./receiver";
 export const listener = new eventEmitter();
 import { event } from "../systems/events";
@@ -275,18 +276,26 @@ listener.on("onServerTick", async () => {
       players[p].pvp = false;
     }
 
-    // Return if the player is in combat
-    if (players[p].pvp) return;
-
+    // Return if the player is at full stamina and health
     if (players[p].stats.stamina == players[p].stats.max_stamina && players[p].stats.health == players[p].stats.max_health) return;
     
-    // Regenerate stamina by 1 every 1 second until it reaches 100
-    if (players[p].stats.stamina < players[p].stats.max_stamina) {
-      players[p].stats.stamina += 1;
+    // Regenerate stamina by 1% of max stamina every server tick until it reaches max_stamina
+    // Allow stamina to regenerate even if the player is in combat
+    if ((players[p].stats.stamina < players[p].stats.max_stamina)) {
+      players[p].stats.stamina += Math.floor(players[p].stats.max_stamina * 0.01);
+      // If it would go over max stamina, set it to max stamina
+      if (players[p].stats.stamina > players[p].stats.max_stamina) {
+        players[p].stats.stamina = players[p].stats.max_stamina;
+      }
     }
-    // Regenerate health by 1 every 1 second until it reaches 100
+
+    // Regenerate health by 1% of max health every server tick until it reaches max_health if not in combat
     if (players[p].stats.health < players[p].stats.max_health) {
-      players[p].stats.health += 1;
+      players[p].stats.health += players[p].pvp ? 0 : Math.floor(players[p].stats.max_health * 0.01);
+      // If it would go over max health, set it to max health
+      if (players[p].stats.health > players[p].stats.max_health) {
+        players[p].stats.health = players[p].stats.max_health;
+      }
     }
 
     const updateStatsData = {
@@ -300,11 +309,7 @@ listener.on("onServerTick", async () => {
     // Send to only players in the same map
     Object.keys(players).forEach((p: any) => {
       if (players[p].location.map === players[p].location.map) {
-        players[p].ws.send(
-          packet.encode(
-            JSON.stringify({ type: "UPDATESTATS", data: updateStatsData })
-          )
-        );
+        players[p].ws.send(packetManager.updateStats(updateStatsData)[0]);
       }
     });
   });

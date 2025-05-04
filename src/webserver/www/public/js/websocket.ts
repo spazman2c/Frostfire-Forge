@@ -378,7 +378,7 @@ socket.onmessage = async (event) => {
         if (player.targeted) {
           player.targeted = false;
           targetStats.style.display = "none";
-          updateTargetStats(0, 0);
+          updateTargetStats(0, 0, 0, 0);
         }
       });
 
@@ -737,11 +737,11 @@ socket.onmessage = async (event) => {
       document.getElementById(
         "limit-fps-label"
       )!.innerText = `FPS: (${fpsSlider.value})`;
-      musicSlider.value = data.music_volume;
+      musicSlider.value = data.music_volume || 0;
       document.getElementById(
         "music-volume-label"
       )!.innerText = `Music: (${musicSlider.value})`;
-      effectsSlider.value = data.effects_volume;
+      effectsSlider.value = data.effects_volume || 0;
       document.getElementById(
         "effects-volume-label"
       )!.innerText = `Effects: (${effectsSlider.value})`;
@@ -758,14 +758,14 @@ socket.onmessage = async (event) => {
           player.targeted = false;
         });
         targetStats.style.display = "none";
-        updateTargetStats(0, 0);
+        updateTargetStats(0, 0, 0, 0);
         break;
       } else {
         players.forEach((player) => {
           if (player.id === data.id) {
             player.targeted = true;
             targetStats.style.display = "block";
-            updateTargetStats(player.stats.health, player.stats.stamina);
+            updateTargetStats(player.stats.health, player.stats.max_health, player.stats.stamina, player.stats.max_stamina);
           } else {
             player.targeted = false;
           }
@@ -787,7 +787,7 @@ socket.onmessage = async (event) => {
         if (player.isStealth && player.targeted) {
           player.targeted = false;
           targetStats.style.display = "none";
-          updateTargetStats(0, 0);
+          updateTargetStats(0, 0, 0, 0);
         }
 
         const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
@@ -820,7 +820,7 @@ socket.onmessage = async (event) => {
         updateStats(target.stats.health, target.stats.stamina);
       } else {
         target.targeted = false;
-        updateTargetStats(0, 0);
+        updateTargetStats(0, 0, 0, 0);
       }
 
       // untarget all players
@@ -1721,21 +1721,36 @@ window.addEventListener("blur", () => {
   pressedKeys.clear();
 });
 
-function updateStatsNew(id: number, health: number, stamina: number) { 
+function updateStatsNew(id: number | null, health: number, stamina: number) {
+  // If id is null, use the current player
+  if (id === null) {
+    updateHealthBar(healthBar, health);
+    staminaBar.style.width = `${stamina}%`;
+    return;
+  }
+  
   const player = players.find((player) => player.id === id);
   if (!player) return;
   player.stats.health = health;
   player.stats.stamina = stamina;
   
+  // Calculate percentages based on max values
+  const healthPercent = (health / player.stats.max_health) * 100;
+  const staminaPercent = (stamina / player.stats.max_stamina) * 100;
+  
   // Update appropriate health/stamina bars based on whether this is current player or target
   if (player.id === sessionStorage.getItem("connectionId")) {
     // Update current player's bars
-    updateHealthBar(healthBar, health);
-    staminaBar.style.width = `${stamina}%`;
+    updateHealthBar(healthBar, healthPercent);
+    staminaBar.style.width = `${staminaPercent}%`;
+    if (player.targeted) {
+      updateHealthBar(targetHealthBar, healthPercent);
+      targetStaminaBar.style.width = `${staminaPercent}%`;
+    }
   } else if (player.targeted) {
     // Update target's bars
-    updateHealthBar(targetHealthBar, health);
-    targetStaminaBar.style.width = `${stamina}%`;
+    updateHealthBar(targetHealthBar, healthPercent);
+    targetStaminaBar.style.width = `${staminaPercent}%`;
   }
 }
 
@@ -1787,24 +1802,26 @@ function updateStats(health: number, stamina: number) {
   }
 }
 
-function updateTargetStats(health: number, stamina: number) {
+function updateTargetStats(health: number, max_health: number, stamina: number, max_stamina: number) {
   targetHealthBar.removeAttribute("class");
   targetHealthBar.classList.add("ui");
-  targetHealthBar.style.width = `${health}%`;
-  targetStaminaBar.style.width = `${stamina}%`;
-  if (health >= 80) {
+  const healthPercent = (health / max_health) * 100;
+  const staminaPercent = (stamina / max_stamina) * 100;
+  targetHealthBar.style.width = `${healthPercent}%`;
+  targetStaminaBar.style.width = `${staminaPercent}%`;
+  if (healthPercent >= 80) {
     targetHealthBar.classList.add("green");
     return;
   }
-  if (health >= 50 && health < 80) {
+  if (healthPercent >= 50 && healthPercent < 80) {
     targetHealthBar.classList.add("yellow");
     return;
   }
-  if (health >= 30 && health < 50) {
+  if (healthPercent >= 30 && healthPercent < 50) {
     targetHealthBar.classList.add("orange");
     return;
   }
-  if (health < 30) {
+  if (healthPercent < 30) {
     targetHealthBar.classList.add("red");
     return;
   }
@@ -1932,68 +1949,22 @@ effectsSlider.addEventListener("input", () => {
   )!.innerText = `Effects: (${effectsSlider.value})`;
 });
 
-fpsSlider.addEventListener("change", () => {
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "CLIENTCONFIG",
-        data: {
-          fps: parseInt(fpsSlider.value),
-          music_volume: parseInt(musicSlider.value),
-          effects_volume: parseInt(effectsSlider.value),
-          muted: mutedCheckbox.checked,
-        } as ConfigData,
-      })
-    )
-  );
-});
-
-musicSlider.addEventListener("change", () => {
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "CLIENTCONFIG",
-        data: {
-          fps: parseInt(fpsSlider.value),
-          music_volume: parseInt(musicSlider.value),
-          effects_volume: parseInt(effectsSlider.value),
-          muted: mutedCheckbox.checked,
-        } as ConfigData,
-      })
-    )
-  );
-});
-
-effectsSlider.addEventListener("change", () => {
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "CLIENTCONFIG",
-        data: {
-          fps: parseInt(fpsSlider.value),
-          music_volume: parseInt(musicSlider.value),
-          effects_volume: parseInt(effectsSlider.value),
-          muted: mutedCheckbox.checked,
-        } as ConfigData,
-      })
-    )
-  );
-});
-
-mutedCheckbox.addEventListener("change", () => {
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "CLIENTCONFIG",
-        data: {
-          fps: parseInt(fpsSlider.value),
-          music_volume: parseInt(musicSlider.value),
-          effects_volume: parseInt(effectsSlider.value),
-          muted: mutedCheckbox.checked,
-        } as ConfigData,
-      })
-    )
-  );
+[fpsSlider, musicSlider, effectsSlider, mutedCheckbox].forEach(element => {
+  element.addEventListener("change", () => {
+    socket.send(
+      packet.encode(
+        JSON.stringify({
+          type: "CLIENTCONFIG",
+          data: {
+            fps: parseInt(fpsSlider.value),
+            music_volume: parseInt(musicSlider.value) || 0,
+            effects_volume: parseInt(effectsSlider.value) || 0,
+            muted: mutedCheckbox.checked,
+          } as ConfigData,
+        })
+      )
+    );
+  });
 });
 
 // Capture click and get coordinates from canvas
