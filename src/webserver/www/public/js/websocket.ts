@@ -397,6 +397,8 @@ socket.onmessage = async (event) => {
         break;
       }
 
+      player.typing = false;
+
       player.position.x = playerCanvas.width / 2 + data._data.x;
       player.position.y = playerCanvas.height / 2 + data._data.y;
       // If the player is the client, scroll to the player's position
@@ -1735,6 +1737,11 @@ function createPlayer(data: any) {
         if (this.isStealth) {
           context.globalAlpha = 0.8;
         }
+        // Add a shadow to the typing image
+        context.shadowColor = "black";
+        context.shadowBlur = 2;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
         context.drawImage(
           this.typingImage, 
           this.position.x - this.typingImage.width, 
@@ -1742,6 +1749,8 @@ function createPlayer(data: any) {
         );
         // Reset opacity
         context.globalAlpha = 1;
+        context.shadowColor = "transparent";
+        context.shadowBlur = 0;
       }
     },
   };
