@@ -13,6 +13,20 @@ import login_html from "./www/public/index.html";
 import register_html from "./www/public/register.html";
 import game_html from "./www/public/game.html";
 
+// Load whitelisted and blacklisted IPs and functions
+import { w_ips, b_ips, blacklistAdd } from "../systems/security";
+
+// Load security rules from security.cfg
+const security = fs.existsSync(path.join(import.meta.dir, "../../config/security.cfg")) 
+  ? fs.readFileSync(path.join(import.meta.dir, "../../config/security.cfg"), "utf8").split("\n").filter(line => line.trim() !== "" && !line.startsWith("#"))
+  : [];
+
+if (security.length > 0) {
+  log.success(`Loaded ${security.length} security rules`);
+} else {
+  log.warn("No security rules found");
+}
+
 // Load assets
 import "../modules/assetloader";
 
@@ -30,9 +44,9 @@ const routes = {
   "/": login_html,
   "/registration": register_html,
   "/game": game_html,
-  "/login": login,
-  "/verify": authenticate,
-  "/register": register,
+  "/login": (req: Request, server: any) => login(req, server),
+  "/verify": (req: Request, server: any) => authenticate(req, server),
+  "/register": (req: Request, server: any) => register(req, server),
   "/map/hash": {
     GET: async (req: Request) => {
       const url = new URL(req.url);
@@ -165,8 +179,27 @@ Bun.serve({
     "/tileset/hash": routes["/tileset/hash"],
     "/tileset": routes["/tileset"],
   },
-  fetch(req) {
+  async fetch(req: Request, server: any) {
     const url = new URL(req.url);
+    const address = server.requestIP(req);
+    if (!address) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+    const ip = address.address;
+    // Check if the ip is blacklisted
+    if (b_ips.includes(ip)) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
+    // Check if the ip is whitelisted
+    if (!w_ips.includes(ip)) {
+      const path = url.pathname.split("/")[1];
+      if (security.includes(path)) {
+        // Ban the IP
+        await blacklistAdd(ip);
+        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+      }
+    }    
+
     if (_https && url.protocol === "http:") {
       return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
     }
@@ -183,7 +216,12 @@ Bun.serve({
   : {}),
 });
 
-async function authenticate(req: Request) {
+async function authenticate(req: Request, server: any) {
+  // Check if ip banned
+  const ip = server.requestIP(req)?.address;
+  if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+  }
   const url = new URL(req.url);
   const email = url.searchParams.get("email");
   const token = url.searchParams.get("token");
@@ -205,8 +243,13 @@ async function authenticate(req: Request) {
   return Response.redirect(`${process.env.DOMAIN}/game`, 301);
 }
 
-async function register(req: Request) {
+async function register(req: Request, server: any) {
   try {
+    // Check if ip banned
+    const ip = server.requestIP(req)?.address;
+    if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
     const body = await req.json();
     const { username, email, password, password2 } = body;
     if (!username || !password || !email || !password2) {
@@ -256,8 +299,13 @@ async function register(req: Request) {
   }
 }
 
-async function login(req: Request) {
+async function login(req: Request, server: any) {
   try {
+    // Check if ip banned
+    const ip = server.requestIP(req)?.address;
+    if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
     const body = await req.json();
     const { username, password } = body;
     if (!username || !password) {

@@ -26,6 +26,13 @@ class IpService {
       this.blocked_ips.splice(index, 1);
     }
   }
+
+  whitelistRemove(ip: string): void {
+    const index = this.allowed_ips.indexOf(ip);
+    if (index > -1) {
+      this.allowed_ips.splice(index, 1);
+    }
+  }
 }
 
 export const service: IpService = new IpService();

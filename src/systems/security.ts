@@ -1,32 +1,9 @@
-import log from "../modules/logger";
-import * as authentication from "../services/authentication";
 import query from "../controllers/sqldatabase";
 import { service } from "../services/ip";
-const w_ips = service.getWhitelistedIPs();
-const b_ips = service.getBlacklistedIPs();
-import { NullRoutingService } from "../services/nullrouting";
-import { checkSecurityRule } from "../services/security";
-import path from "path";
-let requests = 0;
+import log from "../modules/logger";
+export const w_ips = service.getWhitelistedIPs();
+export const b_ips = service.getBlacklistedIPs();
 
-// Calculate requests per second to the website to determine if the website is under attack
-setInterval(() => {
-  if (requests > 100) {
-    if (!NullRoutingService.isEnabled()) {
-      log.error(`[DDOS DETECTED] - Requests per second: ${requests}`);
-      // Enable null routing
-      NullRoutingService.enable();
-    }
-  } else {
-    if (NullRoutingService.isEnabled()) {
-      // Disable null routing
-      NullRoutingService.disable();
-    }
-  }
-  requests = 0;
-}, 1000);
-
-// Get all blocked IPs from the database and store them in memory for faster access
 query("SELECT * FROM blocked_ips", [])
   .then((result: any) => {
     result.forEach((element: any) => {
@@ -39,7 +16,6 @@ query("SELECT * FROM blocked_ips", [])
     }
   });
 
-// Get all allowed IPs from the database and store them in memory for faster access
 query("SELECT * FROM allowed_ips", [])
   .then((result: any) => {
     result.forEach((element: any) => {
@@ -52,55 +28,38 @@ query("SELECT * FROM allowed_ips", [])
     }
   });
 
-export default function filter(req: any, res: any, next: any, ip: any): void {
-  requests++;
-  if (w_ips.includes(ip)) return next(); // Check if IP is whitelisted and if so, allow the request
-  // Check if the user is banned and if so, block the request
-  if (req.cookies.email) {
-    authentication
-      .checkAccess(req.cookies.email)
-      .then((results: any) => {
-        if (results === -1) {
-          res.clearCookie("email");
-          res.clearCookie("session");
-          res.status(403);
-          res.sendFile(
-            path.join(import.meta.dir, "../../www/public/errors/403.html")
-          );
-          return;
-        } else {
-          checkAccess(req, res, next, ip);
-        }
-      })
-      .catch((err: any) => {
-        log.error(err);
-      });
-  } else {
-    checkAccess(req, res, next, ip);
+  export const blacklistAdd = async (ip: string) => {
+    const result = await query("INSERT INTO blocked_ips (ip) VALUES (?)", [ip]) as any;
+    // Check if the ip is already in the database
+    if (result.affectedRows > 0) {
+      log.info(`Added ${ip} to the blacklist`);
+      service.blacklistAdd(ip);
+    }
   }
-}
 
-function checkAccess(req: any, res: any, next: any, ip: any) {
-  // Check if null routing is enabled and if so, block the request
-  if (NullRoutingService.isEnabled()) return;
-  if (b_ips.includes(ip)) {
-    res.status(403);
-    return;
+  export const whitelistAdd = async (ip: string) => {
+    const result = await query("INSERT INTO allowed_ips (ip) VALUES (?)", [ip]) as any;
+    // Check if the ip is already in the database
+    if (result.affectedRows > 0) {
+      log.info(`Added ${ip} to the whitelist`);
+      service.whitelistAdd(ip);
+    }
   }
-  checkSecurityRule(req.url)
-    .then(() => {
-      query("INSERT IGNORE INTO blocked_ips (ip) VALUES (?)", [ip])
-        .then(() => {
-          log.info(`[BLOCKED] - ${ip} - ${req.url}`);
-          service.blacklistAdd(ip);
-        })
-        .catch((err: any) => {
-          log.error(err);
-        });
-      res.status(418);
-      return;
-    })
-    .catch((err: any) => {
-      if (err === "NOT_FOUND") next();
-    });
-}
+
+  export const blacklistRemove = async (ip: string) => {
+    const result = await query("DELETE FROM blocked_ips WHERE ip = ?", [ip]) as any;
+    // Check if the ip is already in the database
+    if (result.affectedRows > 0) {
+      log.info(`Removed ${ip} from the blacklist`);
+      service.blacklistRemove(ip);
+    }
+  }
+
+  export const whitelistRemove = async (ip: string) => {
+    const result = await query("DELETE FROM allowed_ips WHERE ip = ?", [ip]) as any;
+    // Check if the ip is already in the database
+    if (result.affectedRows > 0) {
+      log.info(`Removed ${ip} from the whitelist`);
+      service.whitelistRemove(ip);
+    }
+  }
