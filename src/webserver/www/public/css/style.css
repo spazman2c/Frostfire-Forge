@@ -51,6 +51,15 @@ a {
   filter: invert(100%);
 }
 
+@font-face {
+  font-family: 'Comic Relief';
+  src: url('../fonts/ComicRelief-Regular.ttf') format('truetype');
+}
+
+html, body {
+  font-family: 'Comic Relief';
+}
+
 body {
   margin: 0;
   padding: 0;

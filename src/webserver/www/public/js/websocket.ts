@@ -1295,7 +1295,7 @@ function createNPC(data: any) {
 
       context.fillStyle = "black";
       context.fillStyle = "white";
-      context.font = "14px 'Brush Script MT'";
+      context.font = "14px 'Comic Relief'";
       context.textAlign = "center";
       if (this.dialog) {
         if (this.dialog.trim() !== "") {
@@ -1516,7 +1516,7 @@ function createPlayer(data: any) {
     stats: data.stats,
     show: function (context: CanvasRenderingContext2D) {
       context.globalAlpha = 1;
-      context.font = "14px 'Brush Script MT'";
+      context.font = "14px 'Comic Relief'";
       
       // Opacity for stealth mode
       if (this.isStealth) {

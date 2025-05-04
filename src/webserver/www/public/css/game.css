@@ -1,7 +1,14 @@
 /* Hide the scroll bars */
+/* Load font from file */
+@font-face {
+  font-family: 'Comic Relief';
+  src: url('../fonts/ComicRelief-Regular.ttf') format('truetype');
+}
+
 html,
 body {
     overflow: hidden;
+    font-family: 'Comic Relief';
 }
 
 body {
