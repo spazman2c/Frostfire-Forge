@@ -648,7 +648,7 @@ socket.onmessage = async (event) => {
     case "LOGIN_SUCCESS":
       {
         const connectionId = JSON.parse(packet.decode(event.data))["data"];
-        const publicKey = JSON.parse(packet.decode(event.data))["publicKey"];
+        const chatDecryptionKey = JSON.parse(packet.decode(event.data))["chatDecryptionKey"];
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
         const sessionToken = getCookie("token");
         if (!sessionToken) {
@@ -657,7 +657,7 @@ socket.onmessage = async (event) => {
         }
 
         // Store public key
-        sessionStorage.setItem("publicKey", publicKey);
+        sessionStorage.setItem("chatDecryptionKey", chatDecryptionKey);
 
         const language = navigator.language.split("-")[0] || navigator.language || "en";
         socket.send(
@@ -747,6 +747,14 @@ socket.onmessage = async (event) => {
           player.typingTimeout = setTimeout(() => {
             player.typing = false;
           }, 3000);
+        }
+      });
+      break;
+    }
+    case "STOPTYPING": {
+      players.forEach((player) => {
+        if (player.id === data.id) {
+          player.typing = false;
         }
       });
       break;
@@ -1123,6 +1131,14 @@ window.addEventListener("keydown", async (e) => {
     if (pauseMenu.style.display == "block") return;
     chatInput.focus();
   } else if (e.code === "Enter" && chatInput == document.activeElement) {
+    socket.send(
+      packet.encode(
+        JSON.stringify({
+          type: "STOPTYPING",
+          data: null,
+        })
+      )
+    );
     if (pauseMenu.style.display == "block") return;
     if (!chatInput?.value || chatInput?.value?.trim() === "") {
       chatInput.value = "";
@@ -1157,9 +1173,9 @@ window.addEventListener("keydown", async (e) => {
       return;
     } 
     if (window?.crypto?.subtle) {
-      const publicKey = sessionStorage.getItem("publicKey");
-      if (!publicKey) return;
-      const encryptedMessage = await encryptRsa(publicKey, chatInput.value.trim().toString() || " ");
+      const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
+      if (!chatDecryptionKey) return;
+      const encryptedMessage = await encryptRsa(chatDecryptionKey, chatInput.value.trim().toString() || " ");
       socket.send(
         packet.encode(
           JSON.stringify({
@@ -1248,11 +1264,17 @@ function handleKeyPress() {
   if (pauseMenu.style.display == "block") return;
   if (isMoving) return;
 
+  // Get current player
+  const currentPlayer = players.find(
+    (player) => player.id === sessionStorage.getItem("connectionId")
+  );
+  if (currentPlayer?.typing) return; // Don't move if typing
+
   isMoving = true;
   let lastDirection = ""; // Track last sent direction
 
   function runMovement() {
-    if (!isKeyPressed) {
+    if (!isKeyPressed || currentPlayer?.typing) {
       // Send abort packet when movement stops
       if (lastDirection !== "") {
         socket.send(
@@ -2098,8 +2120,8 @@ document.addEventListener("click", (event) => {
   );
 });
 
-async function encryptRsa(publicKey: string, data: string) {
-  const cleanedKey = cleanBase64Key(publicKey);
+async function encryptRsa(chatDecryptionKey: string, data: string) {
+  const cleanedKey = cleanBase64Key(chatDecryptionKey);
   const importedKey = await window.crypto.subtle.importKey(
     "spki",
     new Uint8Array(atob(cleanedKey).split('').map(c => c.charCodeAt(0))),
@@ -2160,3 +2182,36 @@ function showNotification(message: string, autoClose: boolean = true, reconnect:
     }, timeout);
   }
 }
+
+// Add these event listeners near other chat input related code
+chatInput.addEventListener("focus", () => {
+  // Send abort packet when chat is opened
+  socket.send(
+    packet.encode(
+      JSON.stringify({
+        type: "MOVEXY",
+        data: "ABORT",
+      })
+    )
+  );
+  // Clear pressed keys to prevent continued movement
+  pressedKeys.clear();
+  isKeyPressed = false;
+  isMoving = false;
+});
+
+chatInput.addEventListener("blur", () => {
+  // Send abort packet when chat is closed
+  socket.send(
+    packet.encode(
+      JSON.stringify({
+        type: "MOVEXY",
+        data: "ABORT",
+      })
+    )
+  );
+  // Clear pressed keys to prevent continued movement
+  pressedKeys.clear();
+  isKeyPressed = false;
+  isMoving = false;
+});

@@ -169,7 +169,7 @@ Permission: admin.respawn | admin.*
 <h4>Update Player Permissions</h4>
 
 ```
-/permission [username | id] [mode] [permissions?]
+/permission [mode] [username | id] [permissions?]
 Aliases: permissions
 Permission: admin.permission | admin.*
 
@@ -247,6 +247,7 @@ export const packetTypes: PacketType = {
   39: "QUESTLOG",
   40: "QUESTDETAILS",
   41: "TYPING",
+  42: "STOPTYPING",
 };
 ```
 

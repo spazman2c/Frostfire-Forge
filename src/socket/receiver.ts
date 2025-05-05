@@ -875,7 +875,6 @@ export default async function packetReceiver(
       }
       case "STARTGAME": {
         // Send music
-
         const musicData = {
           name: "music_morning_dew",
           data: assetCache
@@ -885,11 +884,25 @@ export default async function packetReceiver(
         sendPacket(ws, packetManager.music(musicData));
         break;
       }
+      case "STOPTYPING": {
+        if (!currentPlayer) return;
+        let playersInMap = filterPlayersByMap(currentPlayer.location.map);
+        const stopTypingData = {
+          id: ws.data.id,
+        };
+        if (currentPlayer.isStealth) {
+          playersInMap = playersInMap.filter((p) => p.isAdmin);
+        }
+        playersInMap.forEach((player) => {
+          sendPacket(player.ws, packetManager.stopTyping(stopTypingData));
+        });
+        break;
+      }
       case "COMMAND": {
         if (!currentPlayer) return;
         const _data = data as any;
-        const command = _data.command.toUpperCase();
-        const args = _data.args;
+        const command = _data?.command?.toUpperCase();
+        const args = _data?.args;
         switch (command) {
           // Kick a player
           case "KICK":
@@ -1267,7 +1280,7 @@ export default async function packetReceiver(
               player.ws.close(1000, "Server is restarting");
             });
             // Keep checking until all players are disconnected
-            const checkInterval = setInterval(() => {
+            const checkInterval = setInterval(async () => {
               const remainingPlayers = Object.values(cache.list());
               remainingPlayers.forEach((player) => {
                 player.ws.close(1000, "Server is restarting");
@@ -1275,7 +1288,8 @@ export default async function packetReceiver(
 
               if (remainingPlayers.length === 0) {
                 clearInterval(checkInterval);
-                process.exit(0);
+                await player.clear();
+                Bun.spawn(["bun", "transpile-production"]);
               }
             }, 100);
             break;
@@ -1370,7 +1384,7 @@ export default async function packetReceiver(
                   player.ws.close(1000, "Server is restarting");
                 });
                 // Keep checking until all players are disconnected
-                const checkInterval = setInterval(() => {
+                const checkInterval = setInterval(async () => {
                   const remainingPlayers = Object.values(cache.list());
                   remainingPlayers.forEach((player) => {
                     player.ws.close(1000, "Server is restarting");
@@ -1378,7 +1392,8 @@ export default async function packetReceiver(
 
                   if (remainingPlayers.length === 0) {
                     clearInterval(checkInterval);
-                    process.exit(0);
+                    await player.clear();
+                    Bun.spawn(["bun", "transpile-production"]);
                   }
                 }, 100);
               }, RESTART_DELAY)
@@ -1508,6 +1523,13 @@ export default async function packetReceiver(
 
             let targetPlayer;
             const identifier = args[1]?.toLowerCase() || null;
+            if (!identifier) {
+              const notifyData = {
+                message: "Please provide a username or ID",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
 
             // Find player by ID or username in cache first
             const players = Object.values(cache.list());

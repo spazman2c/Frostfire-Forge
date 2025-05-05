@@ -29,7 +29,7 @@ declare interface Subscription {
 declare interface Identity {
   id: string;
   useragent: string;
-  publicKey: string;
+  chatDecryptionKey: string;
 }
 
 // Define client rate limit

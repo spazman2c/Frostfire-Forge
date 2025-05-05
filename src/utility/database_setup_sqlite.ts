@@ -267,7 +267,7 @@ const createPermissionTypesTable = async () => {
       ('server.admin'),
       ('server.notify'),
       ('server.restart'),
-      ('server.shutdown');
+      ('server.shutdown')
   `;
   await query(sql);
 }

@@ -70,10 +70,10 @@ const Server = Bun.serve<Packet, any>({
     const id = crypto.randomBytes(32).toString("hex");
     const useragent = req.headers.get("user-agent");
     // Base64 encode the public key
-    const publicKey = keyPair.publicKey;
+    const chatDecryptionKey = keyPair.publicKey;
     if (!useragent)
       return new Response("User-Agent header is missing", { status: 400 });
-    const success = Server.upgrade(req, { data: { id, useragent, publicKey } });
+    const success = Server.upgrade(req, { data: { id, useragent, chatDecryptionKey } });
     return success
       ? undefined
       : new Response("WebSocket upgrade error", { status: 400 });
@@ -87,8 +87,8 @@ const Server = Bun.serve<Packet, any>({
     async open(ws: any) {
       ws.binaryType = "arraybuffer";
       // Add the client to the set of connected clients
-      if (!ws.data?.id || !ws.data?.useragent || !ws.data?.publicKey) return;
-      connections.add({ id: ws.data.id, useragent: ws.data.useragent, publicKey: ws.data.publicKey });
+      if (!ws.data?.id || !ws.data?.useragent || !ws.data?.chatDecryptionKey) return;
+      connections.add({ id: ws.data.id, useragent: ws.data.useragent, chatDecryptionKey: ws.data.chatDecryptionKey });
       packetQueue.set(ws.data.id, []);
       // Emit the onConnection event
       listener.emit("onConnection", ws.data.id);

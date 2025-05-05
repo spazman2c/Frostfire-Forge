@@ -9,7 +9,10 @@ const permissions = {
     },    
     set: async (username: string, permissions: string[]) => {
         // Set permissions for a player
-        await query("INSERT INTO permissions (username, permissions) VALUES (?, ?)", [username, permissions.join(",")]);
+        await query(
+            "INSERT INTO permissions (username, permissions) VALUES (?, ?) ON DUPLICATE KEY UPDATE permissions = ?",
+            [username, permissions.join(","), permissions.join(",")]
+        );
         log.info(`Permissions ${permissions.join(",")} set for ${username}`);
     },
     get: async (username: string) => {

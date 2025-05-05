@@ -41,4 +41,5 @@ export const packetTypes: PacketType = {
   39: "QUESTLOG",
   40: "QUESTDETAILS",
   41: "TYPING",
+  42: "STOPTYPING",
 };

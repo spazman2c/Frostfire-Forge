@@ -29,7 +29,7 @@ export const packetManager = {
           type: "LOGIN_SUCCESS",
           data: ws.data.id,
           secret: ws.data.secret,
-          publicKey: ws.data.publicKey,
+          chatDecryptionKey: ws.data.chatDecryptionKey,
         })
       )
     ] as any[];
@@ -234,6 +234,11 @@ export const packetManager = {
   typing: (data: any) => {
     return [
       packet.encode(JSON.stringify({ type: "TYPING", data })),
+    ] as any[];
+  },
+  stopTyping: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "STOPTYPING", data })),
     ] as any[];
   },
 };
