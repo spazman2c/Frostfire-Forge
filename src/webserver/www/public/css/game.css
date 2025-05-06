@@ -17,19 +17,6 @@ body {
     padding: 0;
 }
 
-#loading-screen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url("../img/background.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
-  z-index: 1000;
-}
-
 #container {
   width: 100vw; /* Full width of the viewport */
   height: 100vh; /* Full height of the viewport */
