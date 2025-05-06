@@ -1,4 +1,9 @@
 const socket = new WebSocket(`__VAR.WEBSOCKETURL__`);
+let sentRequests = 0;
+let receivedResponses = 0;
+const debugContainer = document.getElementById("debug-container") as HTMLDivElement;
+const positionText = document.getElementById("position") as HTMLDivElement;
+const packetsSentReceived = document.getElementById("packets-sent-received") as HTMLDivElement;
 import * as pako from "../libs/pako.js";
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
@@ -30,15 +35,11 @@ const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
 const startGameButton = document.getElementById("start-game-button") as HTMLButtonElement;
 const loadingScreen = document.getElementById("loading-screen");
 if (startGameButton) {
-  startGameButton.addEventListener("click", () => {
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "STARTGAME",
-          data: null,
-        })
-      )
-    );
+  startGameButton.addEventListener("click", () => { 
+    sendRequest({
+      type: "STARTGAME",
+      data: null,
+    });
     // Hide the start game button
     startGameButton.style.display = "none";
     // Hide the loading screen
@@ -249,14 +250,10 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
   const deadzone = 0.5;
   if (Math.abs(x) < deadzone && Math.abs(y) < deadzone) {
     if (lastSentDirection !== "ABORT") {
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "MOVEXY",
+      sendRequest({
+        type: "MOVEXY",
             data: "ABORT",
-          })
-        )
-      );
+      });
       lastSentDirection = "ABORT";
     }
     return;
@@ -288,24 +285,19 @@ window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
   // Only send if direction changed
   if (direction && direction !== lastSentDirection) {
     if (pauseMenu.style.display == "block") return;
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "MOVEXY",
+    sendRequest({
+      type: "MOVEXY",
           data: direction,
-        })
-      )
-    );
+    });
     lastSentDirection = direction;
   }
 });
 
 socket.onopen = () => {
-  const _packet = {
+  sendRequest({
     type: "PING",
     data: null,
-  };
-  socket.send(packet.encode(JSON.stringify(_packet)));
+  });
 };
 
 socket.onclose = () => {
@@ -320,24 +312,24 @@ socket.onerror = () => {
 };
 
 socket.onmessage = async (event) => {
+  receivedResponses++;
   if (!(event.data instanceof ArrayBuffer)) return;
   const data = JSON.parse(packet.decode(event.data))["data"];
   const type = JSON.parse(packet.decode(event.data))["type"];
   switch (type) {
     case "PONG":
-      socket.send(packet.encode(JSON.stringify({ type: "LOGIN", data: null })));
+      sendRequest({
+        type: "LOGIN",
+        data: null,
+      });
       break;
 
     case "TIME_SYNC": {
       setTimeout(async () => {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
+        sendRequest({
               type: "TIME_SYNC",
               data: data,
-            })
-          )
-        );
+        });
       }, 5000);
       break;
     }
@@ -407,6 +399,7 @@ socket.onmessage = async (event) => {
           player.position.x - window.innerWidth / 2 + 8,
           player.position.y - window.innerHeight / 2 + 48
         );
+        positionText.innerText = `Position: ${data._data.x}, ${data._data.y}`;
         if (fullmap.style.display === "block") {
           if (player.id === sessionStorage.getItem("connectionId")) {
             const dot = document.getElementsByClassName("self")[0] as HTMLDivElement;
@@ -660,9 +653,11 @@ socket.onmessage = async (event) => {
         sessionStorage.setItem("chatDecryptionKey", chatDecryptionKey);
 
         const language = navigator.language.split("-")[0] || navigator.language || "en";
-        socket.send(
-          packet.encode(JSON.stringify({ type: "AUTH", data: sessionToken, language }))
-        );
+        sendRequest({
+          type: "AUTH",
+          data: sessionToken,
+          language,
+        });
       }
       break;
     case "LOGIN_FAILED":
@@ -999,14 +994,20 @@ chatInput.addEventListener("input", () => {
 
   // Send typing packet if enough time has passed since last one
   if (lastTypingPacket + 1000 < performance.now()) {
-    socket.send(packet.encode(JSON.stringify({ type: "TYPING", data: null })));
+    sendRequest({
+      type: "TYPING",
+      data: null,
+    });
     lastTypingPacket = performance.now();
   }
 
   // Set new timer to send another packet after delay
   typingTimer = window.setTimeout(() => {
     if (chatInput.value.length > 0) {
-      socket.send(packet.encode(JSON.stringify({ type: "TYPING", data: null })));
+      sendRequest({
+        type: "TYPING",
+        data: null,
+      });
       lastTypingPacket = performance.now();
     }
   }, 1000);
@@ -1014,6 +1015,15 @@ chatInput.addEventListener("input", () => {
 
 window.addEventListener("keydown", async (e) => {
   if (!loaded) return;
+  // Check if f2 is pressed
+  if (e.code === "F2") {
+    if (debugContainer.style.display === "block") {
+      debugContainer.style.display = "none";
+    } else {
+      debugContainer.style.display = "block";
+    }
+    return;
+  }
   if (movementKeys.has(e.code) && chatInput !== document.activeElement) {
     if (pauseMenu.style.display == "block") return;
     pressedKeys.add(e.code);
@@ -1074,14 +1084,10 @@ window.addEventListener("keydown", async (e) => {
       statUI.style.transition = "1s";
       statUI.style.left = "-570";
     } else {
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "INSPECTPLAYER",
+      sendRequest({
+        type: "INSPECTPLAYER",
             data: null,
-          })
-        )
-      );
+      });
     }
   }
 
@@ -1103,42 +1109,41 @@ window.addEventListener("keydown", async (e) => {
     if (!loaded) return;
     if (chatInput === document.activeElement) return;
     if (pauseMenu.style.display == "block") return;
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "TARGETCLOSEST",
-          data: null,
-        })
-      )
-    );
+    sendRequest({
+      type: "TARGETCLOSEST",
+      data: null,
+    });
   }
 
   if (e.code === "KeyX") {
     if (!loaded) return;
     if (chatInput === document.activeElement) return;
     if (pauseMenu.style.display == "block") return;
-    socket.send(packet.encode(JSON.stringify({ type: "STEALTH", data: null })));
+    sendRequest({
+      type: "STEALTH",
+      data: null,
+    });
   }
 
   if (e.code === "KeyZ") {
     if (!loaded) return;
     if (chatInput === document.activeElement) return;
     if (pauseMenu.style.display == "block") return;
-    socket.send(packet.encode(JSON.stringify({ type: "NOCLIP", data: null })));
+    sendRequest({
+      type: "NOCLIP",
+      data: null,
+    });
   }
 
   if (e.code === "Enter" && chatInput !== document.activeElement) {
     if (pauseMenu.style.display == "block") return;
+    sentRequests++;
     chatInput.focus();
   } else if (e.code === "Enter" && chatInput == document.activeElement) {
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "STOPTYPING",
-          data: null,
-        })
-      )
-    );
+    sendRequest({
+      type: "STOPTYPING",
+      data: null,
+    });
     if (pauseMenu.style.display == "block") return;
     if (!chatInput?.value || chatInput?.value?.trim() === "") {
       chatInput.value = "";
@@ -1157,17 +1162,13 @@ window.addEventListener("keydown", async (e) => {
         arg.startsWith('"') ? arg.slice(1, -1) : arg
       );
 
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "COMMAND",
+      sendRequest({
+        type: "COMMAND",
             data: {
               command: commandName,
               args: commandArgs,
             },
-          })
-        )
-      );
+      });
       chatInput.value = "";
       chatInput.blur();
       return;
@@ -1176,30 +1177,23 @@ window.addEventListener("keydown", async (e) => {
       const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
       if (!chatDecryptionKey) return;
       const encryptedMessage = await encryptRsa(chatDecryptionKey, chatInput.value.trim().toString() || " ");
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "CHAT",
+      sendRequest({
+        type: "CHAT",
             data: {
               message: encryptedMessage,
               mode: "decrypt"
             }
-          })
-        )
-      );
+      });
     } else {
       // Fallback to non-encrypted chat if Web Crypto API is not available
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "CHAT",
+      sentRequests++;
+      sendRequest({
+        type: "CHAT",
             data: {
               message: chatInput.value.trim().toString() || " ",
               mode: null
             }
-          })
-        )
-      );
+      });
     }
 
     const previousMessage = chatInput.value.trim();
@@ -1210,14 +1204,10 @@ window.addEventListener("keydown", async (e) => {
       for (const player of players) {
       if (player.id === sessionStorage.getItem("connectionId")) {
         if (player.chat === previousMessage) {
-        socket.send(
-          packet.encode(
-          JSON.stringify({
+          sendRequest({
             type: "CHAT",
             data: null,
-          })
-          )
-        );
+          });
         }
       }
       }
@@ -1232,14 +1222,10 @@ window.addEventListener("keydown", async (e) => {
     if (pauseMenu.style.display == "block") return;
     const target = players.find((player) => player.targeted);
     if (!target) return;
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "ATTACK",
+    sendRequest({
+      type: "ATTACK",
           data: target,
-        })
-      )
-    );
+    });
   }
 
   const blacklistedKeys = ['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
@@ -1277,14 +1263,10 @@ function handleKeyPress() {
     if (!isKeyPressed || currentPlayer?.typing) {
       // Send abort packet when movement stops
       if (lastDirection !== "") {
-        socket.send(
-          packet.encode(
-            JSON.stringify({
-              type: "MOVEXY",
+        sendRequest({
+          type: "MOVEXY",
               data: "ABORT",
-            })
-          )
-        );
+        });
       }
       isMoving = false;
       lastDirection = "";
@@ -1320,14 +1302,10 @@ function handleKeyPress() {
 
     // Only send if direction changed
     if (currentDirection !== "" && currentDirection !== lastDirection) {
-      socket.send(
-        packet.encode(
-          JSON.stringify({
-            type: "MOVEXY",
+      sendRequest({
+        type: "MOVEXY",
             data: currentDirection,
-          })
-        )
-      );
+      });
       lastDirection = currentDirection;
     }
 
@@ -1585,6 +1563,8 @@ function createPlayer(data: any) {
   );
   const sprite_idle = new Image();
   sprite_idle.src = `data:image/png;base64,${base64Data}`;
+
+  positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
 
   const player = {
     id: data.id,
@@ -2029,14 +2009,10 @@ document
 document
   .getElementById("pause-menu-action-exit")
   ?.addEventListener("click", () => {
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "LOGOUT",
+    sendRequest({
+      type: "LOGOUT",
           data: null,
-        })
-      )
-    );
+    });
     window.location.href = "/";
   });
 
@@ -2060,19 +2036,15 @@ effectsSlider.addEventListener("input", () => {
 
 [fpsSlider, musicSlider, effectsSlider, mutedCheckbox].forEach(element => {
   element.addEventListener("change", () => {
-    socket.send(
-      packet.encode(
-        JSON.stringify({
-          type: "CLIENTCONFIG",
+    sendRequest({
+      type: "CLIENTCONFIG",
           data: {
             fps: parseInt(fpsSlider.value),
             music_volume: parseInt(musicSlider.value) || 0,
             effects_volume: parseInt(effectsSlider.value) || 0,
             muted: mutedCheckbox.checked,
           } as ConfigData,
-        })
-      )
-    );
+    });
   });
 });
 
@@ -2087,14 +2059,10 @@ document.addEventListener("contextmenu", (event) => {
 
   const moveX = Math.floor(x - playerCanvas.width / 2 - 16);
   const moveY = Math.floor(y - playerCanvas.height / 2 - 24);
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "TELEPORTXY",
+  sendRequest({
+    type: "TELEPORTXY",
         data: { x: moveX, y: moveY },
-      })
-    )
-  );
+  });
 });
 
 document.addEventListener("click", (event) => {
@@ -2109,15 +2077,10 @@ document.addEventListener("click", (event) => {
 
   const moveX = x - playerCanvas.width / 2 - 16;
   const moveY = y - playerCanvas.height / 2 - 24;
-
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "SELECTPLAYER",
+  sendRequest({
+    type: "SELECTPLAYER",
         data: { x: moveX, y: moveY },
-      })
-    )
-  );
+  });
 });
 
 async function encryptRsa(chatDecryptionKey: string, data: string) {
@@ -2186,14 +2149,10 @@ function showNotification(message: string, autoClose: boolean = true, reconnect:
 // Add these event listeners near other chat input related code
 chatInput.addEventListener("focus", () => {
   // Send abort packet when chat is opened
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "MOVEXY",
-        data: "ABORT",
-      })
-    )
-  );
+  sendRequest({
+    type: "MOVEXY",
+    data: "ABORT",
+  });
   // Clear pressed keys to prevent continued movement
   pressedKeys.clear();
   isKeyPressed = false;
@@ -2202,16 +2161,24 @@ chatInput.addEventListener("focus", () => {
 
 chatInput.addEventListener("blur", () => {
   // Send abort packet when chat is closed
-  socket.send(
-    packet.encode(
-      JSON.stringify({
-        type: "MOVEXY",
-        data: "ABORT",
-      })
-    )
-  );
+  sendRequest({
+    type: "MOVEXY",
+    data: "ABORT",
+  });
   // Clear pressed keys to prevent continued movement
   pressedKeys.clear();
   isKeyPressed = false;
   isMoving = false;
 });
+
+function sendRequest(data: any) {
+  sentRequests++;
+  socket.send(packet.encode(JSON.stringify(data)));
+}
+
+setInterval(() => {
+  if (packetsSentReceived.innerText === `Sent: ${sentRequests}, Received: ${receivedResponses}`) return;
+  packetsSentReceived.innerText = `Sent: ${sentRequests}, Received: ${receivedResponses}`;
+  sentRequests = 0;
+  receivedResponses = 0;
+}, 1000);
