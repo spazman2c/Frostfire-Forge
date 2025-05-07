@@ -28,12 +28,14 @@ const currentPlayerCanvas = document.getElementById(
 ) as HTMLCanvasElement;
 const currentgameContext = currentPlayerCanvas.getContext("2d");
 const inventoryUI = document.getElementById("inventory") as HTMLDivElement;
+const spellBookUI = document.getElementById("spell-book-container") as HTMLDivElement;
 const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
 const statUI = document.getElementById("stat-screen") as HTMLDivElement;
 const chatInput = document.getElementById("chat-input") as HTMLInputElement;
 const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
 const startGameButton = document.getElementById("start-game-button") as HTMLButtonElement;
 const loadingScreen = document.getElementById("loading-screen");
+const xpBar = document.getElementById("xp-bar") as HTMLDivElement;
 if (startGameButton) {
   startGameButton.addEventListener("click", () => { 
     sendRequest({
@@ -92,6 +94,7 @@ const healthLabel = document.getElementById("stats-screen-health-label") as HTML
 const manaLabel = document.getElementById("stats-screen-mana-label") as HTMLDivElement;
 let loaded: boolean = false;
 let toggleInventory = false;
+let toggleSpellBook = false;
 const times = [] as number[];
 let lastFrameTime = 0; // Track the time of the last frame
 let controllerConnected = false;
@@ -761,10 +764,8 @@ socket.onmessage = async (event) => {
       break;
     }
     case "STATS": {
-      // Normalize the health and stamina values to a percentage value with 0-100
-      const health = (data.health / data.max_health) * 100;
-      const stamina = (data.stamina / data.max_stamina) * 100;
-      updateStats(health, stamina);
+      updateStats(data.health, data.stamina, data.max_stamina, data.max_health);
+      updateXp(data.xp, data.level, data.max_xp);
       // Update the player's stats so the health and stamina bars are accurate
       players.forEach((player) => {
         if (player.id === data.id) {
@@ -850,7 +851,7 @@ socket.onmessage = async (event) => {
       const data = JSON.parse(packet.decode(event.data))["data"];
       const target = players.find((player) => player.id === data.target);
       if (!target) return;
-      updateStatsNew(target.id, data.stats.health, data.stats.stamina);
+      updateStatsNew(target.id, data.stats.health, data.stats.stamina, data.stats.max_stamina);
       break;
     }
     case "REVIVE": {
@@ -859,7 +860,7 @@ socket.onmessage = async (event) => {
       if (!target) return;
       target.stats = data.stats;
       if (target.id === sessionStorage.getItem("connectionId")) {
-        updateStats(target.stats.health, target.stats.stamina);
+        updateStats(target.stats.health, target.stats.stamina, target.stats.max_stamina, target.stats.max_health);
       } else {
         target.targeted = false;
         updateTargetStats(0, 0, 0, 0);
@@ -870,6 +871,15 @@ socket.onmessage = async (event) => {
       players.forEach((player) => {
         player.targeted = false;
       });
+      break;
+    }
+    case "UPDATE_XP": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      console.log(data);
+      // Only update the xp bar if the current player is the target
+      if (data.id === sessionStorage.getItem("connectionId")) {
+        updateXp(data.xp, data.level, data.max_xp);
+      }
       break;
     }
     case "AUDIO": {
@@ -905,6 +915,11 @@ socket.onmessage = async (event) => {
     default:
       break;
   }
+}
+
+function updateXp(xp: number, level: number, max_xp: number) {
+  const xpPercent = (xp / max_xp) * 100;
+  xpBar.style.width = `${Math.max(0, Math.min(100, xpPercent))}%`;
 }
 
 function playMusic(name: string, data: Uint8Array, timestamp: number): void {
@@ -1071,6 +1086,22 @@ window.addEventListener("keydown", async (e) => {
       inventoryUI.style.transition = "1s";
       inventoryUI.style.right = "10";
       toggleInventory = true;
+    }
+  }
+
+  // Open spell book UI
+  if (e.code === "KeyP") {
+    if (!loaded) return;
+    if (chatInput === document.activeElement) return;
+    if (pauseMenu.style.display == "block") return;
+    if (toggleSpellBook) {
+      spellBookUI.style.transition = "1s";
+      spellBookUI.style.right = "-425";
+      toggleSpellBook = false;
+    } else {
+      spellBookUI.style.transition = "1s";
+      spellBookUI.style.right = "10";
+      toggleSpellBook = true;
     }
   }
 
@@ -1810,7 +1841,7 @@ window.addEventListener("blur", () => {
   pressedKeys.clear();
 });
 
-function updateStatsNew(id: number | null, health: number, stamina: number) {
+function updateStatsNew(id: number | null, health: number, stamina: number, max_stamina: number) {
   // If id is null, use the current player
   if (id === null) {
     updateHealthBar(healthBar, health);
@@ -1822,6 +1853,7 @@ function updateStatsNew(id: number | null, health: number, stamina: number) {
   if (!player) return;
   player.stats.health = health;
   player.stats.stamina = stamina;
+  player.stats.max_stamina = max_stamina;
   
   // Calculate percentages based on max values
   const healthPercent = (health / player.stats.max_health) * 100;
@@ -1860,32 +1892,32 @@ function updateHealthBar(bar: HTMLDivElement, health: number) {
   }
 }
 
-function updateStats(health: number, stamina: number) {
+function updateStats(health: number, stamina: number, max_stamina: number, max_health: number) {
+  const healthPercent = (health / max_health) * 100;
+  const staminaPercent = (stamina / max_stamina) * 100;
+  staminaBar.style.width = `${staminaPercent}%`;
   healthBar.removeAttribute("class");
   healthBar.classList.add("ui");
-  healthBar.style.width = `${health}%`;
-  staminaBar.style.width = `${stamina}%`;
-  if (stamina < 0) {
+  healthBar.style.width = `${healthPercent}%`;
+  if (staminaPercent < 0) {
     staminaBar.style.width = `0%`;
   }
-  
-  if (health < 0) {
+  if (healthPercent < 0) {
     healthBar.style.width = `0%`;
   }
-
-  if (health >= 80) {
+  if (healthPercent >= 80) {
     healthBar.classList.add("green");
     return;
   }
-  if (health >= 50 && health < 80) {
+  if (healthPercent >= 50 && healthPercent < 80) {
     healthBar.classList.add("yellow");
     return;
   }
-  if (health >= 30 && health < 50) {
+  if (healthPercent >= 30 && healthPercent < 50) {
     healthBar.classList.add("orange");
     return;
   }
-  if (health < 30) {
+  if (healthPercent < 30) {
     healthBar.classList.add("red");
     return;
   }

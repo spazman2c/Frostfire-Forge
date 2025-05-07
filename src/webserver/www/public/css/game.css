@@ -61,13 +61,13 @@ body {
   padding: 35px;
   padding-bottom: 15px;
   padding-top: 25px;
-  max-width: calc((50px + 10px) * 5 - 30px);
+  max-width: calc((40px + 10px) * 5 - 30px);
   gap: 5px;
 }
 
 #inventory #grid .slot {
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   box-sizing: border-box;
   font-size: 12px;
   font-weight: lighter;
@@ -85,16 +85,65 @@ body {
   user-select: none;
 }
 
+#spell-book-container {
+  position: fixed;
+  top: 50;
+  right: -425;
+  z-index: 100;
+  background: url("../img/ui/ui-spellbook.png");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  width: 404px;
+  height: 388px;
+}
+
+#spell-book-container #grid {
+  display: grid;
+  grid-template-rows: repeat(5, 40px);   /* 5 rows, each 50px tall */
+  grid-auto-flow: column;                /* Fill down, then next column */
+  grid-auto-columns: 40px;               /* Each column is 50px wide */
+  padding-top: 75px;
+  padding-left: 45px;
+  padding-bottom: 75px;
+  gap: 15px 50px;                    /* 5px vertical, 15px horizontal gap */
+  width: max-content;
+  height: max-content;
+  justify-content: start;
+  align-content: start;
+  box-sizing: border-box;
+}
+
+#spell-book-container #grid .slot {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: lighter;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow: hidden;
+  color: #bdbdbd;
+  background: url("../img/ui/ui-spellbook-slot.png");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  user-select: none;
+}
+
 #hotbar #grid {
   display: flex;
-  padding: 25px;
+  padding-top: 30px;
+  padding-bottom: 25px;
   padding-left: 35px;
   padding-right: 35px;
 }
 
 #hotbar #grid .slot {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   box-sizing: border-box;
   font-size: 12px;
   font-weight: lighter;
@@ -293,6 +342,20 @@ input::placeholder {
   background-size: 100% 100%;
   width: 469px;
   height: 82px;
+}
+
+#xp-bar-container {
+  position: absolute;
+  height: 8px;
+  top: 21px;
+  left: 34px;
+  right: 34px;
+}
+
+#xp-bar {
+  height: 100%;
+  width: 50%;
+  background: url("../img/ui/ui-xp-bar.png");
 }
 
 #loading-screen {

@@ -248,6 +248,7 @@ export const packetTypes: PacketType = {
   40: "QUESTDETAILS",
   41: "TYPING",
   42: "STOPTYPING",
+  43: "UPDATE_XP",
 };
 ```
 
@@ -779,6 +780,28 @@ await player.canAttack(self, target, range);
 ```ts
 await player.findClosestPlayer(self, players, range);
 ```
+
+<h5>player.increaseXp();</h5>
+<p style="font-size:0.75em;">Increases a player's xp</p>
+
+```ts
+await player.increaseXp(username, xp);
+```
+
+<h5>player.getNewMaxXp();</h5>
+<p style="font-size:0.75em;">Returns the new max xp for a player</p>
+
+```ts
+await player.getNewMaxXp(level);
+```
+
+<h5>player.increaseLevel();</h5>
+<p style="font-size:0.75em;">Increases a player's level</p>
+
+```ts
+await player.increaseLevel(username);
+```
+
 
 <hr>
 <h3>Audio Management</h3>

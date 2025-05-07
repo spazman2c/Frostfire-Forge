@@ -257,14 +257,17 @@ const player = {
     getStats: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
-        const response = await query("SELECT max_health, health, max_stamina, stamina FROM stats WHERE username = ?",
+        const response = await query("SELECT max_health, health, max_stamina, stamina, xp, max_xp, level FROM stats WHERE username = ?",
             [username]) as StatsData[];
         if (!response || response.length === 0) return [];
         return {
             health: response[0].health,
             max_health: response[0].max_health,
             stamina: response[0].stamina,
-            max_stamina: response[0].max_stamina
+            max_stamina: response[0].max_stamina,
+            level: response[0].level,
+            xp: response[0].xp,
+            max_xp: response[0].max_xp
         };
     },
     setStats: async (username: string, stats: StatsData) => {
@@ -273,7 +276,44 @@ const player = {
         if (!stats.health || !stats.max_health || !stats.stamina || !stats.max_stamina) return;
         const response = await query("UPDATE stats SET health = ?, max_health = ?, stamina = ?, max_stamina = ? WHERE username = ?", [stats.health, stats.max_health, stats.stamina, stats.max_stamina, username]);
         if (!response) return [];
-        return response ;
+        return response;
+    },
+    increaseXp: async (username: string, xp: number) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        // Get the current xp, level and max_xp
+        const stats = await player.getStats(username) as StatsData;
+        // Loop to handle multiple level-ups
+        while (xp > 0) {
+            const xpToLevel = stats.max_xp - stats.xp;
+            if (xp >= xpToLevel) {
+                stats.level++;
+                xp -= xpToLevel;
+                stats.xp = 0;
+                // Update the max_xp required to level up dynamically
+                stats.max_xp = player.getNewMaxXp(stats.level);
+            } else {
+                stats.xp += xp;
+                xp = 0;
+            }
+        }
+        // Update the xp and level
+        const response = await query("UPDATE stats SET xp = ?, max_xp = ?, level = ? WHERE username = ?", [stats.xp, stats.max_xp, stats.level, username]);
+        if (!response) return [];
+        return {
+            xp: stats.xp,
+            level: stats.level,
+            max_xp: stats.max_xp
+        }
+    },
+    getNewMaxXp: (level: number) => {
+        return Math.floor(100 * Math.pow(1.1, level - 1));
+    },
+    increaseLevel: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("UPDATE stats SET level = level + 1 WHERE username = ?", [username]);
+        return response;
     },
     getConfig: async (username: string) => {
         if (!username) return;

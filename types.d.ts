@@ -136,6 +136,9 @@ declare interface StatsData {
   max_health: number;
   stamina: number;
   max_stamina: number;
+  level: number;
+  xp: number;
+  max_xp: number;
 }
 
 // Define config data

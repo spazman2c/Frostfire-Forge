@@ -820,9 +820,24 @@ export default async function packetReceiver(
           });
           // Dead player
           if (target.stats.health <= 0) {
-            target.stats.health = 100;
-            target.stats.stamina = 100;
+            target.stats.health = target.stats.max_health;
+            target.stats.stamina = target.stats.max_stamina;
             target.location.position = { x: 0, y: 0, direction: "down" };
+            // Give the attacker xp
+            const xp = 10;
+            const updatedStats = await player.increaseXp(currentPlayer.username, xp) as StatsData;
+            currentPlayer.stats.xp = updatedStats.xp;
+            currentPlayer.stats.level = updatedStats.level;
+            currentPlayer.stats.max_xp = updatedStats.max_xp;
+            // Send the current player's updated xp to the current player
+            const updateXpData = {
+              id: currentPlayer.id,
+              xp: currentPlayer.stats.xp,
+              level: currentPlayer.stats.level, 
+              max_xp: currentPlayer.stats.max_xp,
+            };
+            sendPacket(ws, packetManager.updateXp(updateXpData));
+            
             playersInMap.forEach((player) => {
               const moveXYData = {
                 id: target.id,

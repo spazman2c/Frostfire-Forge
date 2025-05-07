@@ -42,4 +42,5 @@ export const packetTypes: PacketType = {
   40: "QUESTDETAILS",
   41: "TYPING",
   42: "STOPTYPING",
+  43: "UPDATE_XP",
 };

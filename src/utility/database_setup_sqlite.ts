@@ -100,13 +100,19 @@ const insertDemoStats = async () => {
       health,
       max_health,
       stamina,
-      max_stamina
+      max_stamina,
+      xp,
+      max_xp,
+      level
     ) VALUES (
       'demo_user',
       100,
       100,
       100,
-      100
+      100,
+      0,
+      0,
+      1
     );
     `;
   await query(sql);
