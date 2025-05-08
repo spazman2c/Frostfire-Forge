@@ -10,7 +10,6 @@ import language from "../systems/language";
 import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
-import swears from "../../config/swears.json";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
@@ -587,34 +586,15 @@ export default async function packetReceiver(
         // If there are no players in the map, return
         if (playersInMap.length === 0) return;
 
-        // Translate the original message to English so that we can filter it against an English swear word list
-        const englishMessage =
-          currentPlayer.language === "en"
-            ? (decryptedMessage as string)
-            : await language.translate(decryptedMessage as string, "en");
-        let filteredMessage = englishMessage;
-
-        // Check for swear words
-        for (const swear of swears) {
-          const swearRegex = new RegExp(swear.id, "gi");
-          while (swearRegex.test(filteredMessage)) {
-            const randomLength = Math.floor(Math.random() * 5) + 1;
-            filteredMessage = filteredMessage.replace(
-              swearRegex,
-              "*".repeat(randomLength)
-            );
-          }
-        }
-
         const translations: Record<string, string> = {};
 
         playersInMap.forEach(async (player) => {
           if (!translations[player.language]) {
             // Skip translation if target language matches source language
             translations[player.language] =
-              player.language === "en"
-                ? filteredMessage
-                : await language.translate(filteredMessage, player.language);
+              player.language === currentPlayer.language
+                ? decryptedMessage
+                : await language.translate(decryptedMessage, player.language);
           }
 
           const chatData = {

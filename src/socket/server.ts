@@ -12,7 +12,6 @@ import cache from "../services/cache.ts";
 import packet from "../modules/packet";
 import path from "node:path";
 import fs from "node:fs";
-import { WebSocket } from "ws";
 import { generateKeyPair } from "../modules/cipher";
 
 // Load settings
