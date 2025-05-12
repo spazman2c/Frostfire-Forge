@@ -99,11 +99,10 @@ let cameraY = 0;
 let lastSentDirection = "";
 
 // Add near the top with other canvas declarations
-const mapCanvas = document.createElement('canvas');
-const mapCtx = mapCanvas.getContext('2d');
-document.body.appendChild(mapCanvas);
-mapCanvas.style.position = 'absolute';
-mapCanvas.style.zIndex = '1';
+// const mapCanvas = document.createElement('canvas');
+// document.body.appendChild(mapCanvas);
+// mapCanvas.style.position = 'absolute';
+// mapCanvas.style.zIndex = '1';
 canvas.style.position = 'absolute';
 canvas.style.zIndex = '2';
 
@@ -266,7 +265,7 @@ function animationLoop() {
   window.requestAnimationFrame(animationLoop);
 }
 
-const cameraSmoothing = 0.05;
+const cameraSmoothing = 0.08;
 function updateCamera(currentPlayer: any) {
   if (!loaded) return;
   
@@ -556,115 +555,101 @@ socket.onmessage = async (event) => {
 
         async function drawMap(images: string[]): Promise<void> {
           return new Promise((resolve) => {
-            mapCanvas.width = mapData.width * mapData.tilewidth;
-            mapCanvas.height = mapData.height * mapData.tileheight;
+            const mapWidth = mapData.width * mapData.tilewidth;
+            const mapHeight = mapData.height * mapData.tileheight;
             
-            mapCanvas.style.width = mapData.width * mapData.tilewidth + "px";
-            mapCanvas.style.height = mapData.height * mapData.tilewidth + "px";
+            // Create canvas for each layer
+            const layerCanvases = mapData.layers.map((_layer: any, index: number) => {
+              const layerCanvas = document.createElement('canvas');
+              layerCanvas.width = mapWidth;
+              layerCanvas.height = mapHeight;
+              layerCanvas.style.position = 'absolute';
+              layerCanvas.style.zIndex = (_layer.zIndex || index < 6 ? index : index + 1).toString();
+              layerCanvas.style.width = mapWidth + "px";
+              layerCanvas.style.height = mapHeight + "px";
+              
+              document.body.appendChild(layerCanvas);
+              return {
+                canvas: layerCanvas,
+                ctx: layerCanvas.getContext('2d', { alpha: true })!
+              };
+            });
             
-            // Match dimensions of game canvas
-            canvas.width = mapCanvas.width;
-            canvas.height = mapCanvas.height;
-            canvas.style.width = mapCanvas.style.width;
-            canvas.style.height = mapCanvas.style.height;
+            // Match game canvas dimensions
+            canvas.width = mapWidth;
+            canvas.height = mapHeight;
+            canvas.style.width = mapWidth + "px";
+            canvas.style.height = mapHeight + "px";
+            canvas.style.zIndex = '7';
             
-            if (!mapCtx) return;
-            mapCtx.imageSmoothingEnabled = false;
-            
-            interface Layer {
-              data: number[];
-              zIndex?: number;
-            }
-            
-            interface Tileset {
-              firstgid: number;
-              tilecount: number;
-              imagewidth: number;
-              tilewidth: number;
-              tileheight: number;
-            }
-            
-            const layers: Layer[] = mapData.layers;
-            
-            // Sort layers by 'zIndex' or default order
-            const sortedLayers = [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+            // Sort layers by zIndex
+            const sortedLayers = [...mapData.layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
             let currentLayer = 0;
             let progress = 0;
-            const step = 100 / layers.length;
+            const step = 100 / mapData.layers.length;
             
-            async function processLayer(layer: Layer): Promise<void> {
-              const batchSize = 10; // Adjust for performance
+            async function processLayer(layer: any, layerCanvas: any): Promise<void> {
+              const ctx = layerCanvas.ctx;
+              ctx.imageSmoothingEnabled = false;
+              
+              const batchSize = 10;
               progress += step;
               progressBar.style.width = `${progress}%`;
-            
+              
               async function processRowBatch(startY: number): Promise<void> {
                 for (let y = startY; y < startY + batchSize && y < mapData.height; y++) {
                   for (let x = 0; x < mapData.width; x++) {
                     const tileIndex = layer.data[y * mapData.width + x];
-                    if (tileIndex === 0) continue; // Skip empty tiles
-            
-                    // Find the correct tileset for the tileIndex
+                    if (tileIndex === 0) continue;
+                    
                     const tileset = tilesets.find(
-                      (t: Tileset) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
+                      (t: any) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
                     );
                     if (!tileset) continue;
-            
+                    
                     const image = images[tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
                     if (!image) continue;
-            
-                    // Calculate tile position within the tileset
+                    
                     const localTileIndex = tileIndex - tileset.firstgid;
                     const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
                     const tileX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
                     const tileY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
-            
-                    // Calculate tile position on the canvas
-                    const drawX = x * mapData.tilewidth;
-                    const drawY = y * mapData.tileheight;
-            
-                    if (!mapCtx) return;
-            
-                    mapCtx.drawImage(
+                    
+                    ctx.drawImage(
                       image,
                       tileX,
                       tileY,
                       tileset.tilewidth,
                       tileset.tileheight,
-                      drawX,
-                      drawY,
+                      x * mapData.tilewidth,
+                      y * mapData.tileheight,
                       mapData.tilewidth,
                       mapData.tileheight
                     );
                   }
                 }
-            
-                // Process next batch of rows
+                
                 if (startY + batchSize < mapData.height) {
-                  await new Promise((resolve) => setTimeout(resolve, 0));
+                  await new Promise(resolve => setTimeout(resolve, 0));
                   await processRowBatch(startY + batchSize);
                 }
               }
-            
+              
               await processRowBatch(0);
             }
             
             async function renderLayers(): Promise<void> {
               while (currentLayer < sortedLayers.length) {
                 const layer = sortedLayers[currentLayer];
-                await processLayer(layer);
+                await processLayer(layer, layerCanvases[currentLayer]);
                 currentLayer++;
-            
-                // Update the canvas display after rendering each layer
-                await new Promise((resolve) => requestAnimationFrame(resolve));
+                await new Promise(resolve => requestAnimationFrame(resolve));
               }
-            
-              // After map is drawn, start animation loop
+              
               canvas.style.display = "block";
-              mapCanvas.style.display = "block";
               startGameButton.style.display = "block";
               progressBarContainer.style.display = "none";
-              // updateFullMap();
-            
+              
               resolve();
             }
             
@@ -1925,25 +1910,6 @@ function updateTargetStats(health: number, max_health: number, stamina: number, 
   }
 }
 
-// Update the updateFullMap function to use the map buffer
-// function updateFullMap() {
-//   if (!loaded) return;
-
-//   const dataUrl = mapCanvas.toDataURL("image/png");
-
-//   const image = fullmap.querySelector("img");
-//   if (image) {
-//     image.src = dataUrl;
-//   } else {
-//     const newImage = new Image();
-//     newImage.src = dataUrl;
-//     fullmap.appendChild(newImage);
-//   }
-
-//   fullmap.style.width = mapCanvas.width * mapScale + "px";
-//   fullmap.style.height = mapCanvas.height * mapScale + "px";
-// }
-
 document
   .getElementById("pause-menu-action-back")
   ?.addEventListener("click", () => {
@@ -2021,7 +1987,6 @@ document.addEventListener("click", (event) => {
   // Check if we clicked on a player
   if (!loaded) return;
   if ((event.target as HTMLElement)?.classList.contains("ui")) return;
-  if ((event.target as HTMLElement)?.id != "players") return;
 
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
@@ -2138,49 +2103,3 @@ function stopMovement() {
   isKeyPressed = false;
   isMoving = false;
 }
-
-// Update the updatePlayerDots function to use viewport culling
-// function updatePlayerDots() {
-//   if (!loaded) return;
-
-//   const viewportWidth = window.innerWidth;
-//   const viewportHeight = window.innerHeight;
-//   const scrollX = window.scrollX;
-//   const scrollY = window.scrollY;
-
-//   for (const player of players) {
-//     let dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
-    
-//     // Create dot if it doesn't exist
-//     if (!dot) {
-//       dot = document.createElement('div');
-//       dot.classList.add('player-dot');
-//       dot.setAttribute('data-id', player.id);
-      
-//       // Add special class for current player
-//       if (player.id === sessionStorage.getItem("connectionId")) {
-//         dot.classList.add('self');
-//       }
-      
-//       fullmap.appendChild(dot);
-//     }
-
-//     if (!isInViewport(player.position.x, player.position.y, scrollX, scrollY, viewportWidth, viewportHeight, 128)) {
-//       dot.style.display = 'none';
-//       continue;
-//     }
-
-//     // Update dot position and make visible
-//     dot.style.display = '';
-//     dot.style.left = `${player.position.x * mapScale}px`;
-//     dot.style.top = `${player.position.y * mapScale}px`;
-    
-//     // Update opacity for stealth players
-//     if (player.isStealth) {
-//       const currentPlayer = players.find(p => p.id === sessionStorage.getItem("connectionId"));
-//       dot.style.opacity = currentPlayer?.isAdmin ? "1" : "0";
-//     } else {
-//       dot.style.opacity = "1";
-//     }
-//   }
-// }
