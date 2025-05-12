@@ -8,7 +8,7 @@ import * as pako from "../libs/pako.js";
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
 const npcs = [] as any[];
-const mapScale = 0.1;
+// const mapScale = 0.1;
 const audioCache = new Map<string, string>();
 const npcImage = new Image();
 npcImage.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAmCAYAAABOFCLqAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TxQ8qDq0g4pChioNdVMSxVLEIFkpboVUHk0u/oElDkuLiKLgWHPxYrDq4OOvq4CoIgh8g7oKToouU+L+k0CLGg+N+vLv3uHsHCI0KU82uKKBqlpGKx8RsblXseYWAPgQxgSGJmXoivZiB5/i6h4+vdxGe5X3uzzGg5E0G+ETiKNMNi3iDeHbT0jnvE4dYSVKIz4knDbog8SPXZZffOBcdFnhmyMik5olDxGKxg+UOZiVDJZ4hDiuqRvlC1mWF8xZntVJjrXvyFwby2kqa6zRHEccSEkhChIwayqjAQoRWjRQTKdqPefhHHH+SXDK5ymDkWEAVKiTHD/4Hv7s1C9NTblIgBnS/2PbHGNCzCzTrtv19bNvNE8D/DFxpbX+1Acx9kl5va+EjYHAbuLhua/IecLkDDD/pkiE5kp+mUCgA72f0TTkgeAv0r7m9tfZx+gBkqKvlG+DgEBgvUva6x7t7O3v790yrvx+jlHK64ZQ6gAAAAAZiS0dEAAAAAAAA+UO7fwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+kCCRMwEsjIppIAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAB50lEQVRYw+2YvWvCYBDGn7xk0yRUKtqIiBBaUAoOznXv6B9b6GhnN3GRDErQRG2U1w9cStNB35hEjV/5sOBNuYRcft7de88h95LPW7gR4wHg/fURkrCMDYLOE/hofYMAgCQsQeeJ2EBYIgi7OS5UMS3VI4Oi8wSmpTrGhaq7TACgTBpQUYOyyZIkLJESg2+nyYyz46uGCWXS2IVhQKxsfSqhT7fPkuTHvl788mf7TstJ1PU9ZsTvVyTJjyvoNXZKLN7vZfuEOZrsat+nJwluyO4w/wKGPzaY9l0H4Z8MQ72nIUQJ2FsmNVWz5SBs0WRaOC3VoaZquzDpXhOmYUam3pKwhGmYSPea7jKxbEie8Ry2KZMGILB+Wq1hirlFrKcoJS6A1iYzn+0HyGJ8C99gxgHQ1z0ji9bmRjwgLBF2A8uihVWxgg6XiQSiw2WwKlZcFXFNYK2rI0lHkcAk6QhaVz889J6tISC6Uxdqaazh8Qksixa+2sb2COafrgZQtW0W3srZ87UpCAhvLCfUWTCsVN6yXeOrl6wQQWbl1Lj35eoOE9jaqWo64Gg2r3Zd6quaDvmcOTOYcZvBFPwUlsvZgxOe+KloWHZoSyB+Kho2kHdLIH4qGrZ5twTeT0XDNueWAADcLf3B+AfAy/vU2Mt7LwAAAABJRU5ErkJggg==';
@@ -17,16 +17,8 @@ typingImage.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAVCAYAAAD
 const onlinecount = document.getElementById("onlinecount") as HTMLDivElement;
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d");
-const playerCanvas = document.getElementById("players") as HTMLCanvasElement;
-const npcCanvas = document.getElementById("npcs") as HTMLCanvasElement;
-const npcContext = npcCanvas.getContext("2d");
-const gameContext = playerCanvas.getContext("2d");
 const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 const progressBarContainer = document.getElementById("progress-bar-container") as HTMLDivElement;
-const currentPlayerCanvas = document.getElementById(
-  "current-player"
-) as HTMLCanvasElement;
-const currentgameContext = currentPlayerCanvas.getContext("2d");
 const inventoryUI = document.getElementById("inventory") as HTMLDivElement;
 const spellBookUI = document.getElementById("spell-book-container") as HTMLDivElement;
 const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
@@ -73,7 +65,7 @@ const targetStaminaBar = document.getElementById(
   "target-stamina-progress-bar"
 ) as HTMLDivElement;
 //const map = document.getElementById("map") as HTMLDivElement;
-const fullmap = document.getElementById("full-map") as HTMLDivElement;
+//const fullmap = document.getElementById("full-map") as HTMLDivElement;
 //const mapPosition = document.getElementById("position") as HTMLDivElement;
 const pauseMenu = document.getElementById(
   "pause-menu-container"
@@ -99,44 +91,27 @@ const times = [] as number[];
 let lastFrameTime = 0; // Track the time of the last frame
 let controllerConnected = false;
 
-// Add these variables near the top with other declarations
+// Adjust these values near the top with other declarations
 let cameraX = 0;
 let cameraY = 0;
-const cameraSmoothing = 0.1; // Adjust between 0 and 1 (lower = smoother but slower)
 
 // Add this variable with other declarations at the top
 let lastSentDirection = "";
 
+// Add near the top with other canvas declarations
+const mapCanvas = document.createElement('canvas');
+const mapCtx = mapCanvas.getContext('2d');
+document.body.appendChild(mapCanvas);
+mapCanvas.style.position = 'absolute';
+mapCanvas.style.zIndex = '1';
+canvas.style.position = 'absolute';
+canvas.style.zIndex = '2';
+
+let lastUpdate = performance.now(); // Declare outside function
+
 function lerp(start: number, end: number, amount: number) {
   return start + (end - start) * amount;
 }
-
-function updateCamera() {
-  if (!loaded) return;
-  
-  const currentPlayer = players.find(
-    (player) => player.id === sessionStorage.getItem("connectionId")
-  );
-  
-  if (currentPlayer) {
-    // Calculate target camera position
-    const targetX = currentPlayer.position.x - window.innerWidth / 2 + 8;
-    const targetY = currentPlayer.position.y - window.innerHeight / 2 + 48;
-    
-    // Smoothly interpolate camera position
-    cameraX = lerp(cameraX, targetX, cameraSmoothing);
-    cameraY = lerp(cameraY, targetY, cameraSmoothing);
-    
-    // Apply camera position
-    window.scrollTo(cameraX, cameraY);
-  }
-  
-  // Request next frame
-  requestAnimationFrame(updateCamera);
-}
-
-// Start camera updates
-updateCamera();
 
 // Event listener for gamepad connection
 window.addEventListener("gamepadconnected", () => {
@@ -159,86 +134,168 @@ const packet = {
   },
 };
 
-function npcAnimationLoop() {
-  if (!npcContext || !npcCanvas) return;
-  npcContext.clearRect(0, 0, npcCanvas.width, npcCanvas.height);
-  npcs.forEach((npc) => {
-    npc.show(npcContext);
-    npc.particles.forEach((particle: Particle) => {
-      npc.updateParticle(particle, npc, npcContext);
-    });
-  });
-  window.requestAnimationFrame(npcAnimationLoop);
-}
+// Add these at the top level with other state variables
+let lastDirection = "";
+let pendingRequest = false;
 
 function animationLoop() {
-  if (!ctx || !gameContext) return;
+  if (!ctx) return;
 
-  // Get the desired frame rate from the slider
-  const fpsTarget = parseFloat(fpsSlider.value); // Convert to a number if needed
-  const frameDuration = 1000 / fpsTarget; // Duration of each frame in milliseconds
-
-  // Get the current time
+  const fpsTarget = parseFloat(fpsSlider.value);
+  const frameDuration = 1000 / fpsTarget;
   const now = performance.now();
 
-  // If enough time has passed since the last frame, proceed
-  if (now - lastFrameTime >= frameDuration) {
-    lastFrameTime = now;
-
-    // Clear the canvas
-    gameContext.clearRect(0, 0, playerCanvas.width, playerCanvas.height);
-
-    const currentPlayer = players.find(
-      (player) => player.id === sessionStorage.getItem("connectionId")
-    );
-    // All players except the current player
-    players.forEach((player) => {
-      if (player.id !== sessionStorage.getItem("connectionId")) {
-        if (player.isStealth) {
-          if (currentPlayer) {
-            if (currentPlayer.isAdmin) {
-              player.show(gameContext);
-            }
-          }
-        } else {
-          player.show(gameContext);
-        }
-      }
-    });
-
-    // Calculate FPS
-    while (times.length > 0 && times[0] <= now - 1000) {
-      times.shift();
-    }
-    times.push(now);
+  // Skip frame if not enough time has passed
+  if (now - lastFrameTime < frameDuration) {
+    window.requestAnimationFrame(animationLoop);
+    return;
   }
 
-  // Request the next frame
+  lastFrameTime = now;
+
+  const currentPlayer = players.find(
+    (player) => player.id === sessionStorage.getItem("connectionId")
+  );
+  
+  if (!currentPlayer) {
+    window.requestAnimationFrame(animationLoop);
+    return;
+  }
+
+  // Update camera for current player
+  updateCamera(currentPlayer);
+
+  // Handle movement updates if moving
+  if (isMoving && isKeyPressed) {
+    const currentKeys = new Set([...pressedKeys]);
+    let currentDirection = "";
+    
+    if (currentKeys.has("KeyW") && currentKeys.has("KeyA")) currentDirection = "UPLEFT";
+    else if (currentKeys.has("KeyW") && currentKeys.has("KeyD")) currentDirection = "UPRIGHT";
+    else if (currentKeys.has("KeyS") && currentKeys.has("KeyA")) currentDirection = "DOWNLEFT";
+    else if (currentKeys.has("KeyS") && currentKeys.has("KeyD")) currentDirection = "DOWNRIGHT";
+    else if (currentKeys.has("KeyW")) currentDirection = "UP";
+    else if (currentKeys.has("KeyS")) currentDirection = "DOWN";
+    else if (currentKeys.has("KeyA")) currentDirection = "LEFT";
+    else if (currentKeys.has("KeyD")) currentDirection = "RIGHT";
+
+    if (currentDirection && currentDirection !== lastDirection && !pendingRequest) {
+      pendingRequest = true;
+      sendRequest({
+        type: "MOVEXY",
+        data: currentDirection,
+      });
+      lastDirection = currentDirection;
+      
+      setTimeout(() => {
+        pendingRequest = false;
+      }, 50);
+    }
+  } else if (isMoving && !isKeyPressed) {
+    // Handle movement stop
+    if (lastDirection !== "") {
+      sendRequest({
+        type: "MOVEXY",
+        data: "ABORT",
+      });
+    }
+    isMoving = false;
+    lastDirection = "";
+  }
+
+  // Calculate visible area once
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  // Clear entire visible viewport
+  ctx.clearRect(scrollX, scrollY, viewportWidth, viewportHeight);
+
+  // Filter visible entities with extended viewport
+  const visiblePlayers = players.filter(player => 
+    isInViewport(
+      player.position.x, 
+      player.position.y, 
+      scrollX - 64,
+      scrollY - 64,
+      viewportWidth + 128,
+      viewportHeight + 128
+    ) && (player.id === sessionStorage.getItem("connectionId") || !player.isStealth || (player.isStealth && currentPlayer.isAdmin))
+  );
+
+  const visibleNpcs = npcs.filter(npc => 
+    isInViewport(
+      npc.position.x,
+      npc.position.y,
+      scrollX - 64,
+      scrollY - 64,
+      viewportWidth + 128,
+      viewportHeight + 128
+    )
+  );
+
+  // Render visible entities
+  visiblePlayers.forEach(player => player.show(ctx));
+  
+  visibleNpcs.forEach(npc => {
+    npc.show(ctx);
+    // Only process particles for visible NPCs
+    if (npc.particles) {
+      npc.particles
+        .filter((particle: any) => 
+          particle.visible && 
+          isInViewport(
+            particle.x,
+            particle.y,
+            scrollX - 64,
+            scrollY - 64,
+            viewportWidth + 128,
+            viewportHeight + 128,
+            32
+          ) 
+        )
+        .forEach((particle: any) => npc.updateParticle(particle, npc, ctx));
+    }
+  });
+
+  // Update FPS counter
+  if (times.length > 60) times.shift();
+  times.push(now);
+
   window.requestAnimationFrame(animationLoop);
 }
 
-function currentPlayerLoop() {
-  if (!ctx || !currentgameContext) return;
-  currentgameContext.clearRect(
-    0,
-    0,
-    currentPlayerCanvas.width,
-    currentPlayerCanvas.height
-  );
-  players.forEach((player) => {
-    if (player.id === sessionStorage.getItem("connectionId")) {
-      player.show(currentgameContext);
-    }
-  });
-
-
-  window.requestAnimationFrame(currentPlayerLoop);
+const cameraSmoothing = 0.05;
+function updateCamera(currentPlayer: any) {
+  if (!loaded) return;
+  
+  if (currentPlayer) {
+    const now = performance.now();
+    const deltaTime = Math.min((now - lastUpdate) / 16.67, 2);
+    lastUpdate = now;
+    
+    // Calculate target camera position without rounding initially
+    const targetX = currentPlayer.position.x - window.innerWidth / 2 + 8;
+    const targetY = currentPlayer.position.y - window.innerHeight / 2 + 48;
+    
+    // Apply smoothing to unrounded values
+    const smoothing = 1 - Math.pow(1 - cameraSmoothing, deltaTime);
+    cameraX = lerp(cameraX, targetX, smoothing);
+    cameraY = lerp(cameraY, targetY, smoothing);
+    
+    // Round only for the final scroll position
+    window.scrollTo(Math.round(cameraX), Math.round(cameraY));
+  }
 }
 
-// Start the animation loops
-animationLoop();
-currentPlayerLoop();
-npcAnimationLoop();
+// Helper function to check if an entity is in viewport
+function isInViewport(x: number, y: number, scrollX: number, scrollY: number, viewportWidth: number, viewportHeight: number, buffer: number = 64) {
+  return !(x < scrollX - buffer || 
+           x > scrollX + viewportWidth + buffer || 
+           y < scrollY - buffer || 
+           y > scrollY + viewportHeight + buffer);
+}
 
 // Event listener for joystick movement
 window.addEventListener("gamepadjoystick", (e: CustomEventInit) => {
@@ -388,38 +445,26 @@ socket.onmessage = async (event) => {
 
       // Handle movement abort
       if (data._data === "abort") {
-        // Stop any ongoing movement animations/updates for this player
         break;
       }
 
       player.typing = false;
 
-      player.position.x = playerCanvas.width / 2 + data._data.x;
-      player.position.y = playerCanvas.height / 2 + data._data.y;
-      // If the player is the client, scroll to the player's position
-      if (data.id == sessionStorage.getItem("connectionId")) {
-        window.scrollTo(
-          player.position.x - window.innerWidth / 2 + 8,
-          player.position.y - window.innerHeight / 2 + 48
-        );
-        positionText.innerText = `Position: ${data._data.x}, ${data._data.y}`;
-        if (fullmap.style.display === "block") {
-          if (player.id === sessionStorage.getItem("connectionId")) {
-            const dot = document.getElementsByClassName("self")[0] as HTMLDivElement;
-            if (dot) {
-              dot.style.left = `${player.position.x * mapScale}px`;
-              dot.style.top = `${player.position.y * mapScale}px`;
-            }
-          }
-        }
+      // Smoothly update player position
+      const targetX = canvas.width / 2 + data._data.x;
+      const targetY = canvas.height / 2 + data._data.y;
+      
+      // Update position directly for non-client players
+      if (data.id !== sessionStorage.getItem("connectionId")) {
+        player.position.x = targetX;
+        player.position.y = targetY;
       } else {
-        if (fullmap.style.display === "block") {
-          const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
-          if (dot) {
-            dot.style.left = `${player.position.x * mapScale}px`;
-            dot.style.top = `${player.position.y * mapScale}px`;
-          }
-        }
+        // For the client player, update position directly to avoid input lag
+        player.position.x = targetX;
+        player.position.y = targetY;
+        
+        // Update position text
+        positionText.innerText = `Position: ${data._data.x}, ${data._data.y}`;
       }
       break;
     }
@@ -432,10 +477,10 @@ socket.onmessage = async (event) => {
     case "LOAD_MAP":
       {
         // Remove the full map image if it exists to update the map image with a new one
-        const image = fullmap.querySelector("img") as HTMLImageElement;
-        if (image) {
-          fullmap.removeChild(image);
-        }
+        // const image = fullmap.querySelector("img") as HTMLImageElement;
+        // if (image) {
+        //   fullmap.removeChild(image);
+        // }
         // Uncompress zlib compressed data
         // @ts-expect-error - pako is not defined because it is loaded in the index.html
         const inflated = pako.inflate(new Uint8Array(new Uint8Array(data[0].data)), { to: "string" });
@@ -510,135 +555,126 @@ socket.onmessage = async (event) => {
         }
 
         async function drawMap(images: string[]): Promise<void> {
-          canvas.width = mapData.width * mapData.tilewidth;
-          canvas.height = mapData.height * mapData.tileheight;
-        
-          playerCanvas.width = mapData.width * mapData.tilewidth;
-          playerCanvas.height = mapData.height * mapData.tileheight;
-        
-          currentPlayerCanvas.width = playerCanvas.width;
-          currentPlayerCanvas.height = playerCanvas.height;
-        
-          canvas.style.width = mapData.width * mapData.tilewidth + "px";
-          canvas.style.height = mapData.height * mapData.tilewidth + "px";
-        
-          playerCanvas.style.width = mapData.width * mapData.tilewidth + "px";
-          playerCanvas.style.height = mapData.height * mapData.tilewidth + "px";
-        
-          currentPlayerCanvas.style.width = playerCanvas.style.width;
-          currentPlayerCanvas.style.height = playerCanvas.style.height;
-
-          npcCanvas.width = mapData.width * mapData.tilewidth;
-          npcCanvas.height = mapData.height * mapData.tileheight;
-
-          npcCanvas.style.width = mapData.width * mapData.tilewidth + "px";
-          npcCanvas.style.height = mapData.height * mapData.tilewidth + "px";
-        
-          if (!ctx) return;
-          ctx.imageSmoothingEnabled = false;
-        
-          interface Layer {
-            data: number[];
-            zIndex?: number;
-          }
-        
-          interface Tileset {
-            firstgid: number;
-            tilecount: number;
-            imagewidth: number;
-            tilewidth: number;
-            tileheight: number;
-          }
-        
-          const layers: Layer[] = mapData.layers;
-        
-          // Sort layers by 'zIndex' or default order
-          const sortedLayers = [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-          let currentLayer = 0;
-          let progress = 0;
-          const step = 100 / layers.length;
-        
-          async function processLayer(layer: Layer): Promise<void> {
-            const batchSize = 10; // Adjust for performance
-            progress += step;
-            progressBar.style.width = `${progress}%`;
-        
-            async function processRowBatch(startY: number): Promise<void> {
-              for (let y = startY; y < startY + batchSize && y < mapData.height; y++) {
-                for (let x = 0; x < mapData.width; x++) {
-                  const tileIndex = layer.data[y * mapData.width + x];
-                  if (tileIndex === 0) continue; // Skip empty tiles
-        
-                  // Find the correct tileset for the tileIndex
-                  const tileset = tilesets.find(
-                    (t: Tileset) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
-                  );
-                  if (!tileset) continue;
-        
-                  const image = images[tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
-                  if (!image) continue;
-        
-                  // Calculate tile position within the tileset
-                  const localTileIndex = tileIndex - tileset.firstgid;
-                  const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
-                  const tileX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
-                  const tileY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
-        
-                  // Calculate tile position on the canvas
-                  const drawX = x * mapData.tilewidth;
-                  const drawY = y * mapData.tileheight;
-        
-                  if (!ctx) return;
-        
-                  ctx.drawImage(
-                    image,
-                    tileX,
-                    tileY,
-                    tileset.tilewidth,
-                    tileset.tileheight,
-                    drawX,
-                    drawY,
-                    mapData.tilewidth,
-                    mapData.tileheight
-                  );
+          return new Promise((resolve) => {
+            mapCanvas.width = mapData.width * mapData.tilewidth;
+            mapCanvas.height = mapData.height * mapData.tileheight;
+            
+            mapCanvas.style.width = mapData.width * mapData.tilewidth + "px";
+            mapCanvas.style.height = mapData.height * mapData.tilewidth + "px";
+            
+            // Match dimensions of game canvas
+            canvas.width = mapCanvas.width;
+            canvas.height = mapCanvas.height;
+            canvas.style.width = mapCanvas.style.width;
+            canvas.style.height = mapCanvas.style.height;
+            
+            if (!mapCtx) return;
+            mapCtx.imageSmoothingEnabled = false;
+            
+            interface Layer {
+              data: number[];
+              zIndex?: number;
+            }
+            
+            interface Tileset {
+              firstgid: number;
+              tilecount: number;
+              imagewidth: number;
+              tilewidth: number;
+              tileheight: number;
+            }
+            
+            const layers: Layer[] = mapData.layers;
+            
+            // Sort layers by 'zIndex' or default order
+            const sortedLayers = [...layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+            let currentLayer = 0;
+            let progress = 0;
+            const step = 100 / layers.length;
+            
+            async function processLayer(layer: Layer): Promise<void> {
+              const batchSize = 10; // Adjust for performance
+              progress += step;
+              progressBar.style.width = `${progress}%`;
+            
+              async function processRowBatch(startY: number): Promise<void> {
+                for (let y = startY; y < startY + batchSize && y < mapData.height; y++) {
+                  for (let x = 0; x < mapData.width; x++) {
+                    const tileIndex = layer.data[y * mapData.width + x];
+                    if (tileIndex === 0) continue; // Skip empty tiles
+            
+                    // Find the correct tileset for the tileIndex
+                    const tileset = tilesets.find(
+                      (t: Tileset) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
+                    );
+                    if (!tileset) continue;
+            
+                    const image = images[tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
+                    if (!image) continue;
+            
+                    // Calculate tile position within the tileset
+                    const localTileIndex = tileIndex - tileset.firstgid;
+                    const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
+                    const tileX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
+                    const tileY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
+            
+                    // Calculate tile position on the canvas
+                    const drawX = x * mapData.tilewidth;
+                    const drawY = y * mapData.tileheight;
+            
+                    if (!mapCtx) return;
+            
+                    mapCtx.drawImage(
+                      image,
+                      tileX,
+                      tileY,
+                      tileset.tilewidth,
+                      tileset.tileheight,
+                      drawX,
+                      drawY,
+                      mapData.tilewidth,
+                      mapData.tileheight
+                    );
+                  }
+                }
+            
+                // Process next batch of rows
+                if (startY + batchSize < mapData.height) {
+                  await new Promise((resolve) => setTimeout(resolve, 0));
+                  await processRowBatch(startY + batchSize);
                 }
               }
-        
-              // Process next batch of rows
-              if (startY + batchSize < mapData.height) {
-                await new Promise((resolve) => setTimeout(resolve, 0));
-                await processRowBatch(startY + batchSize);
+            
+              await processRowBatch(0);
+            }
+            
+            async function renderLayers(): Promise<void> {
+              while (currentLayer < sortedLayers.length) {
+                const layer = sortedLayers[currentLayer];
+                await processLayer(layer);
+                currentLayer++;
+            
+                // Update the canvas display after rendering each layer
+                await new Promise((resolve) => requestAnimationFrame(resolve));
               }
+            
+              // After map is drawn, start animation loop
+              canvas.style.display = "block";
+              mapCanvas.style.display = "block";
+              startGameButton.style.display = "block";
+              progressBarContainer.style.display = "none";
+              // updateFullMap();
+            
+              resolve();
             }
-        
-            await processRowBatch(0);
-          }
-        
-          async function renderLayers(): Promise<void> {
-            while (currentLayer < sortedLayers.length) {
-              const layer = sortedLayers[currentLayer];
-              await processLayer(layer);
-              currentLayer++;
-        
-              // Update the canvas display after rendering each layer
-              await new Promise((resolve) => requestAnimationFrame(resolve));
-            }
-        
-            // Once all layers are drawn, start the animation loop
-            canvas.style.display = "block";
-            animationLoop();
-            // Show the start game button
-            startGameButton.style.display = "block";
-            // Hide the progress bar
-            progressBarContainer.style.display = "none";
-            updateFullMap();
-          }
-        
-          loaded = true;
-          await renderLayers();
+            
+            loaded = true;
+            renderLayers();
+          });
         }        
 
         await drawMap(images);
+        animationLoop();
       }
       break;
     case "LOGIN_SUCCESS":
@@ -1053,6 +1089,7 @@ window.addEventListener("keydown", async (e) => {
   // Open pause menu
   if (e.code === "Escape") {
     if (!loaded) return;
+    stopMovement();
     chatInput.blur();
     // If any menu is open, close it
     if (
@@ -1123,17 +1160,17 @@ window.addEventListener("keydown", async (e) => {
   }
 
   // Open Full Map
-  if (e.code === "KeyM") {
-    if(!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    if (fullmap.style.display === "block") {
-      fullmap.style.display = "none";
-    } else {
-      fullmap.style.display = "block";
-      updatePlayerDots();
-    }
-  }
+  // if (e.code === "KeyM") {
+  //   if(!loaded) return;
+  //   if (chatInput === document.activeElement) return;
+  //   if (pauseMenu.style.display == "block") return;
+  //   if (fullmap.style.display === "block") {
+  //     fullmap.style.display = "none";
+  //   } else {
+  //     fullmap.style.display = "block";
+  //     updatePlayerDots();
+  //   }
+  // }
 
   if (e.code === "Tab") {
     e.preventDefault();
@@ -1281,69 +1318,9 @@ function handleKeyPress() {
   if (pauseMenu.style.display == "block") return;
   if (isMoving) return;
 
-  // Get current player
-  const currentPlayer = players.find(
-    (player) => player.id === sessionStorage.getItem("connectionId")
-  );
-  if (currentPlayer?.typing) return; // Don't move if typing
-
   isMoving = true;
-  let lastDirection = ""; // Track last sent direction
-
-  function runMovement() {
-    if (!isKeyPressed || currentPlayer?.typing) {
-      // Send abort packet when movement stops
-      if (lastDirection !== "") {
-        sendRequest({
-          type: "MOVEXY",
-              data: "ABORT",
-        });
-      }
-      isMoving = false;
-      lastDirection = "";
-      return;
-    }
-
-    if (pauseMenu.style.display == "block") return;
-
-    let currentDirection = "";
-
-    // Calculate current direction based on pressed keys
-    if (pressedKeys.size > 1) {
-      if (pressedKeys.has("KeyW") && pressedKeys.has("KeyA")) {
-        currentDirection = "UPLEFT";
-      } else if (pressedKeys.has("KeyW") && pressedKeys.has("KeyD")) {
-        currentDirection = "UPRIGHT";
-      } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyA")) {
-        currentDirection = "DOWNLEFT";
-      } else if (pressedKeys.has("KeyS") && pressedKeys.has("KeyD")) {
-        currentDirection = "DOWNRIGHT";
-      }
-    } else {
-      if (pressedKeys.has("KeyW")) {
-        currentDirection = "UP";
-      } else if (pressedKeys.has("KeyS")) {
-        currentDirection = "DOWN";
-      } else if (pressedKeys.has("KeyA")) {
-        currentDirection = "LEFT";
-      } else if (pressedKeys.has("KeyD")) {
-        currentDirection = "RIGHT";
-      }
-    }
-
-    // Only send if direction changed
-    if (currentDirection !== "" && currentDirection !== lastDirection) {
-      sendRequest({
-        type: "MOVEXY",
-            data: currentDirection,
-      });
-      lastDirection = currentDirection;
-    }
-
-    setTimeout(runMovement, 0);
-  }
-
-  runMovement();
+  lastDirection = "";
+  pendingRequest = false;
 }
 
 async function isLoaded() {
@@ -1372,8 +1349,8 @@ function createNPC(data: any) {
     id: data.id,
     dialog: data.dialog || "",
     position: {
-      x: npcCanvas.width / 2 + data.location.x,
-      y: npcCanvas.height / 2 + data.location.y,
+      x: canvas.width / 2 + data.location.x,
+      y: canvas.height / 2 + data.location.y,
     },
     particles: data.particles || [],
     quest: data.quest || null,
@@ -1600,8 +1577,8 @@ function createPlayer(data: any) {
   const player = {
     id: data.id,
     position: {
-      x: playerCanvas.width / 2 + data.location.x,
-      y: playerCanvas.height / 2 + data.location.y,
+      x: canvas.width / 2 + data.location.x,
+      y: canvas.height / 2 + data.location.y,
     },
     chat: "",
     isStealth: data.isStealth,
@@ -1799,9 +1776,9 @@ function createPlayer(data: any) {
   players.push(player);
 
   // Update player dots on the full map if it is open
-  if (fullmap.style.display === "block") {
-    updatePlayerDots();
-  }
+  // if (fullmap.style.display === "block") {
+  //   updatePlayerDots();
+  // }
 }
 
 function getLines(ctx: any, text: string, maxWidth: number) {
@@ -1948,81 +1925,24 @@ function updateTargetStats(health: number, max_health: number, stamina: number, 
   }
 }
 
-function updatePlayerDots() {
-  const currentPlayer = players.find(
-    (player) => player.id === sessionStorage.getItem("connectionId")
-  );
-  // Add a new dot for each player
-  players.forEach((player) => {
-    if (player.id === sessionStorage.getItem("connectionId")) {
-      const dot = document.getElementsByClassName("self")[0] as HTMLElement;
-      if (dot) {
-        dot.style.left = `${player.position.x * mapScale}px`;
-        dot.style.top = `${player.position.y * mapScale}px`;
-      } else {
-        const newDot = document.createElement("div");
-        newDot.classList.add("dot");
-        newDot.classList.add("self");
-        newDot.style.left = `${player.position.x * mapScale}px`;
-        newDot.style.top = `${player.position.y * mapScale}px`;
-        fullmap.appendChild(newDot);
-      }
-    } else {
-      // Get by data-id attribute
-      const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
-      if (dot) {
-        dot.style.left = `${player.position.x * mapScale}px`;
-        dot.style.top = `${player.position.y * mapScale}px`;
-        if (player.isStealth) {
-          if (currentPlayer?.isAdmin) {
-            dot.style.opacity = "1";
-          } else {
-            dot.style.opacity = "0";
-          }
-        } else {
-          dot.style.opacity = "1";
-        }
-      } else {
-        const newDot = document.createElement("div");
-        newDot.classList.add("dot");
-        newDot.classList.add("other");
-        newDot.setAttribute("data-id", player.id);
-        newDot.style.left = `${player.position.x * mapScale}px`;
-        newDot.style.top = `${player.position.y * mapScale}px`;
-        if (player.isStealth) {
-          if (currentPlayer?.isAdmin) {
-            newDot.style.opacity = "1";
-          } else {
-            newDot.style.opacity = "0";
-          }
-        } else {
-          newDot.style.opacity = "1";
-        }
-        fullmap.appendChild(newDot);
-      }
-    }
-  });
-}
+// Update the updateFullMap function to use the map buffer
+// function updateFullMap() {
+//   if (!loaded) return;
 
-async function updateFullMap() {
-  if (!loaded) return;
+//   const dataUrl = mapCanvas.toDataURL("image/png");
 
-  // Generate the data URL for the full map
-  const dataUrl = canvas.toDataURL("image/png");
+//   const image = fullmap.querySelector("img");
+//   if (image) {
+//     image.src = dataUrl;
+//   } else {
+//     const newImage = new Image();
+//     newImage.src = dataUrl;
+//     fullmap.appendChild(newImage);
+//   }
 
-  const image = fullmap.querySelector("img");
-
-  if (image) {
-    image.src = dataUrl;
-  } else {
-    const newImage = new Image();
-    newImage.src = dataUrl;
-    fullmap.appendChild(newImage);
-  }
-
-  fullmap.style.width = canvas.width * mapScale + "px";
-  fullmap.style.height = canvas.height * mapScale + "px";
-}
+//   fullmap.style.width = mapCanvas.width * mapScale + "px";
+//   fullmap.style.height = mapCanvas.height * mapScale + "px";
+// }
 
 document
   .getElementById("pause-menu-action-back")
@@ -2089,8 +2009,8 @@ document.addEventListener("contextmenu", (event) => {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
 
-  const moveX = Math.floor(x - playerCanvas.width / 2 - 16);
-  const moveY = Math.floor(y - playerCanvas.height / 2 - 24);
+  const moveX = Math.floor(x - canvas.width / 2 - 16);
+  const moveY = Math.floor(y - canvas.height / 2 - 24);
   sendRequest({
     type: "TELEPORTXY",
         data: { x: moveX, y: moveY },
@@ -2107,8 +2027,8 @@ document.addEventListener("click", (event) => {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
 
-  const moveX = x - playerCanvas.width / 2 - 16;
-  const moveY = y - playerCanvas.height / 2 - 24;
+  const moveX = x - canvas.width / 2 - 16;
+  const moveY = y - canvas.height / 2 - 24;
   sendRequest({
     type: "SELECTPLAYER",
         data: { x: moveX, y: moveY },
@@ -2180,15 +2100,7 @@ function showNotification(message: string, autoClose: boolean = true, reconnect:
 
 // Add these event listeners near other chat input related code
 chatInput.addEventListener("focus", () => {
-  // Send abort packet when chat is opened
-  sendRequest({
-    type: "MOVEXY",
-    data: "ABORT",
-  });
-  // Clear pressed keys to prevent continued movement
-  pressedKeys.clear();
-  isKeyPressed = false;
-  isMoving = false;
+  stopMovement();
 });
 
 chatInput.addEventListener("blur", () => {
@@ -2214,3 +2126,61 @@ setInterval(() => {
   sentRequests = 0;
   receivedResponses = 0;
 }, 1000);
+
+function stopMovement() {
+  // Send abort packet when chat is opened
+  sendRequest({
+    type: "MOVEXY",
+    data: "ABORT",
+  });
+  // Clear pressed keys to prevent continued movement
+  pressedKeys.clear();
+  isKeyPressed = false;
+  isMoving = false;
+}
+
+// Update the updatePlayerDots function to use viewport culling
+// function updatePlayerDots() {
+//   if (!loaded) return;
+
+//   const viewportWidth = window.innerWidth;
+//   const viewportHeight = window.innerHeight;
+//   const scrollX = window.scrollX;
+//   const scrollY = window.scrollY;
+
+//   for (const player of players) {
+//     let dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
+    
+//     // Create dot if it doesn't exist
+//     if (!dot) {
+//       dot = document.createElement('div');
+//       dot.classList.add('player-dot');
+//       dot.setAttribute('data-id', player.id);
+      
+//       // Add special class for current player
+//       if (player.id === sessionStorage.getItem("connectionId")) {
+//         dot.classList.add('self');
+//       }
+      
+//       fullmap.appendChild(dot);
+//     }
+
+//     if (!isInViewport(player.position.x, player.position.y, scrollX, scrollY, viewportWidth, viewportHeight, 128)) {
+//       dot.style.display = 'none';
+//       continue;
+//     }
+
+//     // Update dot position and make visible
+//     dot.style.display = '';
+//     dot.style.left = `${player.position.x * mapScale}px`;
+//     dot.style.top = `${player.position.y * mapScale}px`;
+    
+//     // Update opacity for stealth players
+//     if (player.isStealth) {
+//       const currentPlayer = players.find(p => p.id === sessionStorage.getItem("connectionId"));
+//       dot.style.opacity = currentPlayer?.isAdmin ? "1" : "0";
+//     } else {
+//       dot.style.opacity = "1";
+//     }
+//   }
+// }
