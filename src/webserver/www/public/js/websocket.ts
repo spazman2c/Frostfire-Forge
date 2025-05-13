@@ -104,7 +104,6 @@ let lastSentDirection = "";
 // mapCanvas.style.position = 'absolute';
 // mapCanvas.style.zIndex = '1';
 canvas.style.position = 'absolute';
-canvas.style.zIndex = '2';
 
 let lastUpdate = performance.now(); // Declare outside function
 
@@ -137,6 +136,7 @@ const packet = {
 let lastDirection = "";
 let pendingRequest = false;
 
+animationLoop();
 function animationLoop() {
   if (!ctx) return;
 
@@ -487,73 +487,63 @@ socket.onmessage = async (event) => {
         const mapHash = data[1] as string;
         const mapName = data[2];
 
-        const fetchMap = async () => {
-          const response = await fetch(`/map/hash?name=${mapName}`);
-          if (!response.ok) {
-            throw new Error("Failed to fetch map");
-          }
-          return response.json();
-        };
-
-        const serverMapHashResponse = await fetchMap();
-        const serverMapHashData = serverMapHashResponse.hash;
-
-        if (!serverMapHashData) {
-          throw new Error("No map hash data found");
-        }
-
-        if (serverMapHashData !== mapHash) {
-          throw new Error("Map hash mismatch");
-        }
-
-        const tilesets = mapData.tilesets;
-        if (!tilesets) {
-          throw new Error("No tilesets found");
-        }
-
-        const fetchTilesetImages = async () => {
-          const fetchPromises = tilesets.map(async (tileset: any) => {
-            const name = tileset.image.split("/").pop();
-            const response = await fetch(`/tileset?name=${name}`);
-            if (!response.ok) {
-              throw new Error(`Failed to fetch tileset image: ${name}`);
+        const validateMap = async (mapName: string, mapHash: string) => {
+            const response = await fetch(`/map/hash?name=${mapName}`);
+            if (!response.ok || response.headers.get('content-length') === '0') {
+                throw new Error("Failed to fetch map");
             }
-            const data = await response.json();
-            return data;
-          });
-
-          return Promise.all(fetchPromises);
+            const { hash } = await response.json();
+            if (hash !== mapHash) throw new Error("Map hash mismatch");
         };
 
-        const result = await fetchTilesetImages();
-        if (result.length === 0) {
-          throw new Error("No tileset images found");
+        const loadTilesets = async (tilesets: any[]) => {
+            if (!tilesets?.length) throw new Error("No tilesets found");
+
+            // Fetch all tileset data and hashes concurrently
+            const tilesetPromises = tilesets.map(async (tileset) => {
+                const name = tileset.image.split("/").pop();
+                const [tilesetResponse, hashResponse] = await Promise.all([
+                    fetch(`/tileset?name=${name}`),
+                    fetch(`/tileset/hash?name=${name}`)
+                ]);
+
+                if (!tilesetResponse.ok || !hashResponse.ok) {
+                    throw new Error(`Failed to fetch tileset: ${name}`);
+                }
+
+                const [tilesetData, hashData] = await Promise.all([
+                    tilesetResponse.json(),
+                    hashResponse.json()
+                ]);
+
+                if (hashData.hash !== tilesetData.tileset.hash) {
+                    throw new Error(`Hash mismatch for tileset: ${name}`);
+                }
+
+                // @ts-expect-error - pako is loaded in index.html
+                const inflatedData = pako.inflate(new Uint8Array(tilesetData.tileset.data.data), { to: "string" });
+                
+                return new Promise<HTMLImageElement>((resolve, reject) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.onerror = () => reject(new Error(`Failed to load tileset image: ${name}`));
+                    image.src = `data:image/png;base64,${inflatedData}`;
+                });
+            });
+
+            return Promise.all(tilesetPromises);
+        };
+        try {
+            await validateMap(mapName, mapHash);
+            const images = await loadTilesets(mapData.tilesets);
+            if (!images.length) throw new Error("No tileset images loaded");
+            await drawMap(images);
+        } catch (error) {
+            console.error("Map loading failed:", error);
+            throw error;
         }
 
-        const images = [] as string[];
-        for (const r of result) {
-          const response = await fetch(`/tileset/hash?name=${r.tileset.name}`);
-          if (!response.ok) {
-            throw new Error("Failed to fetch tileset hash");
-          }
-          const data = await response.json();
-
-          if (data.hash !== r.tileset.hash) {
-            throw new Error("Tileset hash mismatch");
-          }
-
-          const image = new Image();
-          // Uncompress zlib compressed data
-          // @ts-expect-error - pako is not defined because it is loaded in the index.html
-          const inflatedTilesetData = pako.inflate(new Uint8Array(r.tileset.data.data), { to: "string" });
-          image.src = `data:image/png;base64,${inflatedTilesetData}`;
-          await new Promise((resolve) => {
-            image.onload = () => resolve(true);
-          });
-          images.push(image as unknown as string);
-        }
-
-        async function drawMap(images: string[]): Promise<void> {
+        async function drawMap(images: HTMLImageElement[]): Promise<void> {
           return new Promise((resolve) => {
             const mapWidth = mapData.width * mapData.tilewidth;
             const mapHeight = mapData.height * mapData.tileheight;
@@ -561,17 +551,19 @@ socket.onmessage = async (event) => {
             // Create canvas for each layer
             const layerCanvases = mapData.layers.map((_layer: any, index: number) => {
               const layerCanvas = document.createElement('canvas');
+              // Set dimensions
               layerCanvas.width = mapWidth;
               layerCanvas.height = mapHeight;
+              // Set styles
               layerCanvas.style.position = 'absolute';
               layerCanvas.style.zIndex = (_layer.zIndex || index < 6 ? index : index + 1).toString();
-              layerCanvas.style.width = mapWidth + "px";
-              layerCanvas.style.height = mapHeight + "px";
+              layerCanvas.style.width = `${mapWidth}px`;
+              layerCanvas.style.height = `${mapHeight}px`;
               
               document.body.appendChild(layerCanvas);
               return {
-                canvas: layerCanvas,
-                ctx: layerCanvas.getContext('2d', { alpha: true })!
+                  canvas: layerCanvas,
+                  ctx: layerCanvas.getContext('2d', { willReadFrequently: false })!
               };
             });
             
@@ -602,12 +594,12 @@ socket.onmessage = async (event) => {
                     const tileIndex = layer.data[y * mapData.width + x];
                     if (tileIndex === 0) continue;
                     
-                    const tileset = tilesets.find(
+                    const tileset = mapData.tilesets.find(
                       (t: any) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
                     );
                     if (!tileset) continue;
                     
-                    const image = images[tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
+                    const image = images[mapData.tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
                     if (!image) continue;
                     
                     const localTileIndex = tileIndex - tileset.firstgid;
@@ -657,9 +649,6 @@ socket.onmessage = async (event) => {
             renderLayers();
           });
         }        
-
-        await drawMap(images);
-        animationLoop();
       }
       break;
     case "LOGIN_SUCCESS":
@@ -1049,19 +1038,150 @@ chatInput.addEventListener("input", () => {
   }, 1000);
 });
 
-window.addEventListener("keydown", async (e) => {
-  if (!loaded) return;
-  // Check if f2 is pressed
-  if (e.code === "F2") {
-    if (debugContainer.style.display === "block") {
-      debugContainer.style.display = "none";
-    } else {
-      debugContainer.style.display = "block";
+// Keyboard event handler configuration
+const keyHandlers = {
+  F2: () => toggleDebugContainer(),
+  Escape: () => handleEscapeKey(),
+  KeyB: () => {
+    toggleInventory = toggleUI(inventoryUI, toggleInventory, -350);
+  },
+  KeyP: () => {
+    toggleSpellBook = toggleUI(spellBookUI, toggleSpellBook, -425);
+  },
+  KeyC: () => handleStatsUI(),
+  Tab: (e: KeyboardEvent) => {
+    e.preventDefault();
+    sendRequest({ type: "TARGETCLOSEST", data: null });
+  },
+  KeyX: () => sendRequest({ type: "STEALTH", data: null }),
+  KeyZ: () => sendRequest({ type: "NOCLIP", data: null }),
+  Enter: async () => handleEnterKey(),
+  Space: () => handleSpaceKey()
+} as const;
+
+// Movement keys configuration
+const blacklistedKeys = new Set(['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight']);
+
+// Helper functions
+function toggleDebugContainer() {
+  debugContainer.style.display = debugContainer.style.display === "block" ? "none" : "block";
+}
+
+function toggleUI(element: HTMLElement, toggleFlag: boolean, hidePosition: number) {
+  element.style.transition = "1s";
+  element.style.right = toggleFlag ? hidePosition.toString() : "10";
+  return !toggleFlag;
+}
+
+function handleStatsUI() {
+  const isCurrentPlayerStats = statUI.getAttribute("data-id") === sessionStorage.getItem("connectionId");
+  if (statUI.style.left === "10px" && isCurrentPlayerStats) {
+    statUI.style.transition = "1s";
+    statUI.style.left = "-570";
+  } else {
+    sendRequest({ type: "INSPECTPLAYER", data: null });
+  }
+}
+
+function handleEscapeKey() {
+  stopMovement();
+  chatInput.blur();
+  
+  const isPauseMenuVisible = pauseMenu.style.display === "block";
+  pauseMenu.style.display = isPauseMenuVisible ? "none" : "block";
+  
+  // Close other menus
+  menuElements.forEach(elementId => {
+    const element = document.getElementById(elementId);
+    if (element?.style.display === "block") {
+      element.style.display = "none";
     }
+  });
+}
+
+async function handleEnterKey() {
+  const isTyping = chatInput === document.activeElement;
+  
+  if (!isTyping) {
+    sentRequests++;
+    chatInput.focus();
     return;
   }
-  if (movementKeys.has(e.code) && chatInput !== document.activeElement) {
-    if (pauseMenu.style.display == "block") return;
+
+  sendRequest({ type: "STOPTYPING", data: null });
+  
+  const message = chatInput.value.trim();
+  if (!message) {
+    chatInput.value = "";
+    chatInput.blur();
+    return;
+  }
+
+  if (message.startsWith("/")) {
+    handleCommand(message);
+  } else {
+    await handleChatMessage(message);
+  }
+
+  chatInput.value = "";
+  chatInput.blur();
+}
+
+function handleCommand(message: string) {
+  const command = message.substring(1);
+  const commandParts = command.match(/[^\s"]+|"([^"]*)"/g) || [];
+  const commandName = commandParts[0];
+  const commandArgs = commandParts.slice(1).map(arg => 
+    arg.startsWith('"') ? arg.slice(1, -1) : arg
+  );
+
+  sendRequest({
+    type: "COMMAND",
+    data: { command: commandName, args: commandArgs }
+  });
+}
+
+async function handleChatMessage(message: string) {
+  if (window?.crypto?.subtle) {
+    const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
+    if (!chatDecryptionKey) return;
+    
+    const encryptedMessage = await encryptRsa(chatDecryptionKey, message || " ");
+    sendRequest({
+      type: "CHAT",
+      data: { message: encryptedMessage, mode: "decrypt" }
+    });
+  } else {
+    sentRequests++;
+    sendRequest({
+      type: "CHAT",
+      data: { message: message || " ", mode: null }
+    });
+  }
+
+  // Set timeout to clear chat
+  setTimeout(() => {
+    const currentPlayer = players.find(p => p.id === sessionStorage.getItem("connectionId"));
+    if (currentPlayer?.chat === message) {
+      sendRequest({ type: "CHAT", data: null });
+    }
+  }, 7000 + message.length * 35);
+}
+
+function handleSpaceKey() {
+  const target = players.find(player => player.targeted);
+  if (target) {
+    sendRequest({ type: "ATTACK", data: target });
+  }
+}
+
+// Main keyboard event handlers
+window.addEventListener("keydown", async (e) => {
+  if (!loaded || (pauseMenu.style.display === "block" && e.code !== "Escape")) return;
+  if (chatInput === document.activeElement && !["Enter", "Escape"].includes(e.code)) return;
+
+  // Handle movement keys
+  if (movementKeys.has(e.code)) {
     pressedKeys.add(e.code);
     if (!isKeyPressed) {
       isKeyPressed = true;
@@ -1071,223 +1191,18 @@ window.addEventListener("keydown", async (e) => {
     }
   }
 
-  // Open pause menu
-  if (e.code === "Escape") {
-    if (!loaded) return;
-    stopMovement();
-    chatInput.blur();
-    // If any menu is open, close it
-    if (
-      document.getElementById("pause-menu-container")?.style.display != "block"
-    ) {
-      pauseMenu.style.display = "block";
-    } else {
-      pauseMenu.style.display = "none";
-    }
-
-    for (const element of menuElements) {
-      if (document.getElementById(element)?.style.display == "block") {
-        const menuElement = document.getElementById(element);
-        if (menuElement) {
-          menuElement.style.display = "none";
-        }
-      }
-    }
+  // Handle other mapped keys
+  const handler = keyHandlers[e.code as keyof typeof keyHandlers];
+  if (handler) {
+    handler(e);
   }
 
-  // Open inventory UI
-  if (e.code === "KeyB") {
-    if (!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    if (toggleInventory) {
-      inventoryUI.style.transition = "1s";
-      inventoryUI.style.right = "-350";
-      toggleInventory = false;
-    } else {
-      inventoryUI.style.transition = "1s";
-      inventoryUI.style.right = "10";
-      toggleInventory = true;
-    }
-  }
-
-  // Open spell book UI
-  if (e.code === "KeyP") {
-    if (!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    if (toggleSpellBook) {
-      spellBookUI.style.transition = "1s";
-      spellBookUI.style.right = "-425";
-      toggleSpellBook = false;
-    } else {
-      spellBookUI.style.transition = "1s";
-      spellBookUI.style.right = "10";
-      toggleSpellBook = true;
-    }
-  }
-
-  // Open Stats UI
-  if (e.code === "KeyC") {
-    if(!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    // If the menu is open and the current players id is the data-id attribute of the target stats container, close the menu
-    if (statUI.style.left === "10px" && statUI.getAttribute("data-id") === sessionStorage.getItem("connectionId")) {
-      statUI.style.transition = "1s";
-      statUI.style.left = "-570";
-    } else {
-      sendRequest({
-        type: "INSPECTPLAYER",
-            data: null,
-      });
-    }
-  }
-
-  // Open Full Map
-  // if (e.code === "KeyM") {
-  //   if(!loaded) return;
-  //   if (chatInput === document.activeElement) return;
-  //   if (pauseMenu.style.display == "block") return;
-  //   if (fullmap.style.display === "block") {
-  //     fullmap.style.display = "none";
-  //   } else {
-  //     fullmap.style.display = "block";
-  //     updatePlayerDots();
-  //   }
-  // }
-
-  if (e.code === "Tab") {
-    e.preventDefault();
-    if (!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    sendRequest({
-      type: "TARGETCLOSEST",
-      data: null,
-    });
-  }
-
-  if (e.code === "KeyX") {
-    if (!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    sendRequest({
-      type: "STEALTH",
-      data: null,
-    });
-  }
-
-  if (e.code === "KeyZ") {
-    if (!loaded) return;
-    if (chatInput === document.activeElement) return;
-    if (pauseMenu.style.display == "block") return;
-    sendRequest({
-      type: "NOCLIP",
-      data: null,
-    });
-  }
-
-  if (e.code === "Enter" && chatInput !== document.activeElement) {
-    if (pauseMenu.style.display == "block") return;
-    sentRequests++;
-    chatInput.focus();
-  } else if (e.code === "Enter" && chatInput == document.activeElement) {
-    sendRequest({
-      type: "STOPTYPING",
-      data: null,
-    });
-    if (pauseMenu.style.display == "block") return;
-    if (!chatInput?.value || chatInput?.value?.trim() === "") {
-      chatInput.value = "";
-      chatInput.blur();
-      return;
-    }
-
-    // Check if we are sending a command
-    if (chatInput.value.trim().startsWith("/")) {
-      const command = chatInput.value.trim().substring(1);
-      // Match either quoted strings or non-space sequences
-      const commandParts = command.match(/[^\s"]+|"([^"]*)"/g) || [];
-      // Remove quotes and get command name and args
-      const commandName = commandParts[0];
-      const commandArgs = commandParts.slice(1).map(arg => 
-        arg.startsWith('"') ? arg.slice(1, -1) : arg
-      );
-
-      sendRequest({
-        type: "COMMAND",
-            data: {
-              command: commandName,
-              args: commandArgs,
-            },
-      });
-      chatInput.value = "";
-      chatInput.blur();
-      return;
-    } 
-    if (window?.crypto?.subtle) {
-      const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
-      if (!chatDecryptionKey) return;
-      const encryptedMessage = await encryptRsa(chatDecryptionKey, chatInput.value.trim().toString() || " ");
-      sendRequest({
-        type: "CHAT",
-            data: {
-              message: encryptedMessage,
-              mode: "decrypt"
-            }
-      });
-    } else {
-      // Fallback to non-encrypted chat if Web Crypto API is not available
-      sentRequests++;
-      sendRequest({
-        type: "CHAT",
-            data: {
-              message: chatInput.value.trim().toString() || " ",
-              mode: null
-            }
-      });
-    }
-
-    const previousMessage = chatInput.value.trim();
-    if (previousMessage === "") return;
-
-    setTimeout(async () => {
-      // Check if the chat is still the same value
-      for (const player of players) {
-      if (player.id === sessionStorage.getItem("connectionId")) {
-        if (player.chat === previousMessage) {
-          sendRequest({
-            type: "CHAT",
-            data: null,
-          });
-        }
-      }
-      }
-    }, 7000 + chatInput.value.length * 35);
-    chatInput.value = "";
-    chatInput.blur();
-  }
-
-  if (e.code === "Space") {
-    if (!loaded) return;
-    // Check if paused
-    if (pauseMenu.style.display == "block") return;
-    const target = players.find((player) => player.targeted);
-    if (!target) return;
-    sendRequest({
-      type: "ATTACK",
-          data: target,
-    });
-  }
-
-  const blacklistedKeys = ['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight'];
-  if (blacklistedKeys.includes(e.code)) {
+  // Prevent blacklisted keys
+  if (blacklistedKeys.has(e.code)) {
     e.preventDefault();
   }
 });
 
-// Listen for keyup events to stop movement
 window.addEventListener("keyup", (e) => {
   if (chatInput === document.activeElement) return;
   if (movementKeys.has(e.code)) {
@@ -1299,10 +1214,7 @@ window.addEventListener("keyup", (e) => {
 });
 
 function handleKeyPress() {
-  if (!loaded || controllerConnected) return;
-  if (pauseMenu.style.display == "block") return;
-  if (isMoving) return;
-
+  if (!loaded || controllerConnected || pauseMenu.style.display === "block" || isMoving) return;
   isMoving = true;
   lastDirection = "";
   pendingRequest = false;
