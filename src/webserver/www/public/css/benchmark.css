@@ -34,6 +34,7 @@ hr {
 
 input[type=range] {
     -webkit-appearance: none;
+    appearance: none;
 }
 
 input[type="range"] {

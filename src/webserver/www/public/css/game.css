@@ -604,6 +604,14 @@ input::placeholder {
   margin-left: 35px;
 }
 
+#options-menu-left-container label {
+  color: #FFF1DA;
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+  margin-left: 10px;
+}
+
 #options-menu-right-container {
   margin-right: 40px;
   align-items: center;
@@ -864,4 +872,84 @@ input::placeholder {
 
 .debug {
   color: #000000;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="range"] {
+  height: 10px;
+  background-color: #FFF1DA;
+  outline: none;
+  transition: background-color 0.3s ease;
+  border-radius: 5px;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  border-radius: 5px;
+}
+
+input[type="range"]::-moz-range-track {
+  border-radius: 5px;
+}
+
+input[type="range"]::-ms-track {
+  border-radius: 5px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 100%;
+  background-color: #815E44;
+  border-radius: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb,
+input[type="range"]:focus::-webkit-slider-thumb {
+  background-color: #664B37;
+}
+
+input[type=range]::-moz-range-thumb {
+  -moz-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 100%;
+  background-color: #815E44;
+  border-radius: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+input[type=range]:hover::-moz-range-thumb,
+input[type=range]:focus::-moz-range-thumb {
+  background-color: #664B37;
+}
+
+input[type=range]::-ms-thumb {
+  -ms-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 100%;
+  background-color: #815E44;
+  transition: background-color 0.2s ease;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+input[type=range]:hover::-ms-thumb,
+input[type=range]:focus::-ms-thumb {
+  background-color: #664B37;
+}
+
+/* disabled range slider */
+input[type=range]:disabled {
+  opacity: 0.5;
 }
