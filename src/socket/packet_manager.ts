@@ -247,4 +247,9 @@ export const packetManager = {
       packet.encode(JSON.stringify({ type: "UPDATE_XP", data })),
     ] as any[];
   },
+  animation: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "ANIMATION", data })),
+    ] as any[];
+  },
 };

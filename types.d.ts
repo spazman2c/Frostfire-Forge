@@ -83,6 +83,7 @@ declare interface Player {
   isNoclip?: boolean;
   pvp?: boolean;
   last_attack?: number;
+  animation?: string;
 }
 
 declare interface QuestLogData {

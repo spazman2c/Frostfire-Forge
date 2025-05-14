@@ -31,6 +31,30 @@ if (!asset) {
 
 const assetData = JSON.parse(asset);
 
+function loadAnimations() {
+  const now = performance.now();
+  if (fs.existsSync(path.join(import.meta.dir, assetData.animations.path))) {
+    const animationFiles = parseAnimations();
+    const animations = [] as any[];
+  for (const file of animationFiles) {
+    if (validateAnimationFile(file)) {
+        // Add raw compressed data to cache using zlib
+        const buffer = fs.readFileSync(path.join(import.meta.dir, assetData.animations.path, file));
+        const compressed = zlib.deflateSync(buffer);
+        animations.push({ name: file, data: compressed });
+      }
+    }
+    assetCache.add("animations", animations);
+    log.success(`Loaded ${animations.length} animation(s) in ${(performance.now() - now).toFixed(2)}ms`);
+  } else {
+    console.log("No animations found");
+  }
+}
+
+console.log("Animations", assetCache.get("animations"));
+
+loadAnimations();
+
 // Load world data
 const worldNow = performance.now();
 assetCache.add("worlds", await worlds.list());
@@ -316,3 +340,26 @@ async function loadSpriteSheets() {
 }
 
 await loadSpriteSheets();
+
+function parseAnimations() {
+  const animationFiles = fs
+    .readdirSync(path.join(import.meta.dir, assetData.animations.path))
+    .filter((file) => file.toLowerCase().endsWith(".png"));
+  return animationFiles;
+}
+
+function validateAnimationFile(file: string) {
+  // Check for PNG byte
+  const buffer = fs.readFileSync(
+    path.join(import.meta.dir, assetData.animations.path, file)
+  );
+  if (
+    buffer[0] !== 0x89 ||
+    buffer[1] !== 0x50 ||
+    buffer[2] !== 0x4e ||
+    buffer[3] !== 0x47
+  ) {
+    return false;
+  }
+  return true;
+}

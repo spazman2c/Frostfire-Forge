@@ -181,6 +181,7 @@ export default async function packetReceiver(
 
         cache.add(ws.data.id, {
           username,
+          animation: null,
           isAdmin,
           isStealth,
           isNoclip,
@@ -261,10 +262,6 @@ export default async function packetReceiver(
 
         const playerData = [] as any[];
 
-        const sprite_idle = sprites.find(
-          (sprite) => sprite.name === "frostfire-player_4"
-        );
-
         players.forEach((player) => {
           const spawnData = {
             id: ws.data.id,
@@ -278,9 +275,10 @@ export default async function packetReceiver(
             isAdmin,
             isStealth,
             stats,
-            sprite: sprite_idle.data,
+            animation: null,
           };
           sendPacket(player.ws, packetManager.spawnPlayer(spawnData));
+          sendAnimation(player.ws, "player_idle_down.png");
 
           const location = player.location;
           const data = {
@@ -295,13 +293,15 @@ export default async function packetReceiver(
             isAdmin: player.isAdmin,
             isStealth: player.isStealth,
             stats: player.stats,
-            sprite: sprite_idle.data,
+            animation: null,
           };
 
           playerData.push(data);
         });
 
         sendPacket(ws, packetManager.loadPlayers(playerData));
+
+        sendAnimation(ws, "player_idle_down.png");
         break;
       }
       // TODO:Move this to the logout packet
@@ -331,6 +331,7 @@ export default async function packetReceiver(
         const speed = 2;
         const targetFPS = 60;
         const frameTime = 1000 / targetFPS; // Time per frame in milliseconds
+        const lastDirection = currentPlayer.location.position.direction;
 
         const directionAdjustments = {
           up: {
@@ -408,6 +409,34 @@ export default async function packetReceiver(
           if (currentPlayer.movementInterval) {
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
+            if (lastDirection) {
+              switch (lastDirection) {
+                case "down":
+                  sendAnimation(ws, "player_idle_down.png");
+                  break;
+                case "up":
+                  sendAnimation(ws, "player_idle_up.png");
+                  break;
+                case "left":
+                  sendAnimation(ws, "player_idle_left.png");
+                  break;
+                case "right":
+                  sendAnimation(ws, "player_idle_right.png");
+                  break;
+                case "upleft":
+                  sendAnimation(ws, "player_idle_up.png");
+                  break;
+                case "upright":
+                  sendAnimation(ws, "player_idle_up.png");
+                  break;
+                case "downleft":
+                  sendAnimation(ws, "player_idle_down.png");
+                  break;
+                case "downright":
+                  sendAnimation(ws, "player_idle_down.png");
+                  break;
+              }
+            }
           }
           return;
         }
@@ -427,6 +456,33 @@ export default async function packetReceiver(
           "downright",
         ];
         if (!directions.includes(moveDirection)) return;
+
+        switch (moveDirection) {
+          case "down":
+            sendAnimation(ws, "player_walk_down.png");
+            break;
+          case "up":
+            sendAnimation(ws, "player_walk_up.png");
+            break;
+          case "left":
+            sendAnimation(ws, "player_walk_left.png");
+            break;
+          case "right":
+            sendAnimation(ws, "player_walk_right.png");
+            break;
+          case "upleft":
+            sendAnimation(ws, "player_walk_up.png");
+            break;
+          case "upright":
+            sendAnimation(ws, "player_walk_up.png");
+            break;
+          case "downleft":
+            sendAnimation(ws, "player_walk_down.png");
+            break;
+          case "downright":
+            sendAnimation(ws, "player_walk_down.png");
+            break;            
+        }
 
         // Clear any existing movement
         if (currentPlayer.movementInterval) {
@@ -467,6 +523,30 @@ export default async function packetReceiver(
           if (collision && !currentPlayer.isNoclip) {
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
+            
+            // Add idle animation based on last direction
+            switch (tempPosition.direction) {
+              case "down":
+                sendAnimation(ws, "player_idle_down.png");
+                break;
+              case "up":
+                sendAnimation(ws, "player_idle_up.png");
+                break;
+              case "left":
+                sendAnimation(ws, "player_idle_left.png");
+                break;
+              case "right":
+                sendAnimation(ws, "player_idle_right.png");
+                break;
+              case "upleft":
+              case "upright":
+                sendAnimation(ws, "player_idle_up.png");
+                break;
+              case "downleft":
+              case "downright":
+                sendAnimation(ws, "player_idle_down.png");
+                break;
+            }
             return;
           }
 
@@ -726,7 +806,7 @@ export default async function packetReceiver(
           };
           sendPacket(player.ws, packetManager.stealth(stealthData));
         });
-        // Send the player's new position to all players in the map when they toggle stealth mode off
+        // Send the player's new position and current animation to all players when unstealthing
         if (!isStealth) {
           playersInMap.forEach((player) => {
             const moveXYData = {
@@ -734,6 +814,13 @@ export default async function packetReceiver(
               _data: currentPlayer.location.position,
             };
             sendPacket(player.ws, packetManager.moveXY(moveXYData));
+            
+            // Send current animation based on direction
+            const animationPacketData = {
+              id: currentPlayer.id,
+              data: currentPlayer.animation?.frames || getAnimation(`player_idle_${currentPlayer.location.position.direction}.png`)?.data,
+            };
+            sendPacket(player.ws, packetManager.animation(animationPacketData));
           });
         }
         break;
@@ -1783,4 +1870,44 @@ function sendPacket(ws: any, packets: any[]) {
   packets.forEach((packet) => {
     ws.send(packet);
   });
+}
+
+function sendAnimation(ws: any, name: string) {
+  const currentPlayer = cache.get(ws.data.id);
+
+  const animationData = getAnimation(name);
+  if (!animationData) {
+    console.log("Animation not found");
+    return;
+  }
+  currentPlayer.animation = {
+    frames: animationData.data,
+    currentFrame: 0,
+    lastFrameTime: performance.now(),
+  };
+  const animationPacketData = {
+    id: currentPlayer.id,
+    data: animationData.data,
+  };
+  cache.set(currentPlayer.id, currentPlayer);
+  const playersInMap = filterPlayersByMap(currentPlayer.location.map);
+  const playersInMapAdmins = playersInMap.filter((p) => p.isAdmin);
+  if (currentPlayer.isStealth) {
+    playersInMapAdmins.forEach((player) => {
+      sendPacket(player.ws, packetManager.animation(animationPacketData));
+    });
+  } else {
+    playersInMap.forEach((player) => {
+      sendPacket(player.ws, packetManager.animation(animationPacketData));
+    });
+  }
+}
+
+function getAnimation(name: string) {
+  const animationData = assetCache.get("animations").find((a: any) => a.name === name);
+  if (!animationData) {
+    console.log("Animation not found");
+    return;
+  }
+  return animationData;
 }

@@ -331,43 +331,46 @@ const player = {
         return response;
     },
     checkIfWouldCollide: (map: string, position: PositionData) => {
+        // Retrieve collision data for the map
         const collisionData = assetCache.get(map.replace(".json", ""));
-        if (!collisionData) return false;
+        if (!collisionData) {
+            log.error(`Collision data for map ${map} not found`);
+            return false;
+        }
 
-        const data = collisionData.collision || collisionData;
-        if (!data || !Array.isArray(data)) return false;
+        const data = collisionData.collision || collisionData; // Use directly if collision is not a property
+        if (!data || !Array.isArray(data)) {
+            log.error(`Collision data for map ${map} is invalid`);
+            return false;
+        }
 
         const tileSize = 16;
         const gridWidth = data[0];
         const gridOffset = data[0] / 2;
-        const collision = data.slice(2);
-
-        // Pre-calculate Y position and offsets
-        const baseY = Math.floor(position.y / tileSize) + gridOffset;
-        const xOffsets = [-0.3, 0, 0.3];
-        const yOffsets = [0, 1];
-
-        // Check collision points
-        for (const yOff of yOffsets) {
-            const y = baseY + yOff;
-            const rowStart = y * gridWidth;
-            
-            for (const xOff of xOffsets) {
-                const x = Math.floor((position.x + xOff * tileSize) / tileSize) + gridOffset;
-                const targetIndex = rowStart + x;
-                
-                let currentIndex = 0;
-                for (let i = 0; i < collision.length; i += 2) {
-                    if (currentIndex + collision[i + 1] > targetIndex) {
-                        if (collision[i] !== 0) return true;
-                        break;
-                    }
-                    currentIndex += collision[i + 1];
-                }
+        const collision = data.slice(2) as any[];
+    
+        // Calculate the tile index based on position and tile size
+        const x = Math.floor(position.x / tileSize) + gridOffset;
+        const y = Math.floor(position.y / tileSize) + gridOffset;
+        const targetIndex = y * gridWidth + x;
+        
+        let currentIndex = 0;
+        let index = -1;
+        for (let i = 0; i < collision.length; i += 2) {
+            const value = collision[i];
+            const count = collision[i + 1];
+            if (currentIndex + count > targetIndex) {
+                index = value;
+                break;
             }
+            currentIndex += count;
         }
-
-        return false;
+    
+        if (index !== -1) {
+            return index != 0;
+        } else {
+            return false;
+        }
     },
     kick: async (username: string, ws: WebSocket) => {
         const response = await query("SELECT session_id FROM accounts WHERE username = ?", [username]) as any;

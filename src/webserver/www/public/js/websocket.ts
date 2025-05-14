@@ -5,6 +5,7 @@ const debugContainer = document.getElementById("debug-container") as HTMLDivElem
 const positionText = document.getElementById("position") as HTMLDivElement;
 const packetsSentReceived = document.getElementById("packets-sent-received") as HTMLDivElement;
 import * as pako from "../libs/pako.js";
+import parseAPNG from '../libs/apng_parser.js';
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
 const npcs = [] as any[];
@@ -376,6 +377,36 @@ socket.onmessage = async (event) => {
   const data = JSON.parse(packet.decode(event.data))["data"];
   const type = JSON.parse(packet.decode(event.data))["type"];
   switch (type) {
+    case "ANIMATION": {
+      try {
+        // @ts-expect-error - pako is not defined because it is loaded in the index.html
+        const inflatedData = pako.inflate(new Uint8Array(data.data.data));
+        const apng = parseAPNG(inflatedData.buffer);
+        if (!(apng instanceof Error) && players) {
+            const findPlayer = async () => {
+                const player = players.find(p => p.id === data.id);
+                if (player) {
+                    player.animation = {
+                        frames: apng.frames,
+                        currentFrame: 0,
+                        lastFrameTime: performance.now()
+                    };
+                    // Initialize the frames' images
+                    apng.frames.forEach(frame => frame.createImage());
+                } else {
+                    // Retry after a short delay
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await findPlayer();
+                }
+            };
+            
+            findPlayer().catch(err => console.error('Error in findPlayer:', err));
+        }
+      } catch (error) {
+        console.error('Failed to process animation data:', error);
+      }
+      break;
+    }
     case "PONG":
       sendRequest({
         type: "LOGIN",
@@ -1056,7 +1087,7 @@ const keyHandlers = {
   KeyX: () => sendRequest({ type: "STEALTH", data: null }),
   KeyZ: () => sendRequest({ type: "NOCLIP", data: null }),
   Enter: async () => handleEnterKey(),
-  Space: () => handleSpaceKey()
+  Space: () => handleSpaceKey(),
 } as const;
 
 // Movement keys configuration
@@ -1460,19 +1491,34 @@ function createNPC(data: any) {
   }
 }
 
-function createPlayer(data: any) {
-  // @ts-expect-error - pako is not defined because it is loaded in the index.html
-  const inflatedData = pako.inflate(new Uint8Array(data.sprite.data));
-  const base64Data = btoa(
-    Array.from(inflatedData as Uint8Array).map(byte => String.fromCharCode(byte)).join('')
-  );
-  const sprite_idle = new Image();
-  sprite_idle.src = `data:image/png;base64,${base64Data}`;
-
+async function createPlayer(data: any) {
   positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
+
+  // Add this helper function inside createPlayer
+  const initializeAnimation = async (animationData: any) => {
+    if (!animationData?.data?.data) return null;
+    try {
+      // @ts-expect-error - pako is loaded in index.html
+      const inflatedData = pako.inflate(new Uint8Array(animationData.data.data));
+      const apng = parseAPNG(inflatedData.buffer);
+      if (!(apng instanceof Error)) {
+        // Initialize the frames' images
+        apng.frames.forEach(frame => frame.createImage());
+        return {
+          frames: apng.frames,
+          currentFrame: 0,
+          lastFrameTime: performance.now()
+        };
+      }
+    } catch (error) {
+      console.error('Failed to initialize animation:', error);
+    }
+    return null;
+  };
 
   const player = {
     id: data.id,
+    animation: await initializeAnimation(data.animation),
     position: {
       x: canvas.width / 2 + data.location.x,
       y: canvas.height / 2 + data.location.y,
@@ -1481,11 +1527,33 @@ function createPlayer(data: any) {
     isStealth: data.isStealth,
     isAdmin: data.isAdmin,
     targeted: false,
-    sprite: sprite_idle,
     stats: data.stats,
     typing: false,
     typingTimeout: null as NodeJS.Timeout | null,
     typingImage: typingImage,
+    renderAnimation: function (context: CanvasRenderingContext2D) {
+      if (!this.animation?.frames?.length) {
+        return;
+      }
+
+      const now = performance.now();
+      const frame = this.animation.frames[this.animation.currentFrame];
+      
+      if (now - this.animation.lastFrameTime > frame.delay) {
+        this.animation.currentFrame = (this.animation.currentFrame + 1) % this.animation.frames.length;
+        this.animation.lastFrameTime = now;
+      }
+
+      if (frame.imageElement?.complete) {
+        context.drawImage(
+          frame.imageElement,
+          this.position.x + 16 - frame.width/2,
+          this.position.y + 24 - frame.height/2,
+          frame.width,
+          frame.height
+        );
+      }
+    },
     show: function (context: CanvasRenderingContext2D) {
       context.globalAlpha = 1;
       context.font = "14px 'Comic Relief'";
@@ -1632,11 +1700,7 @@ function createPlayer(data: any) {
         context.globalAlpha = 0.5;
       }
 
-      if (this.sprite) {
-        context.drawImage(this.sprite, this.position.x, this.position.y, 32, 48);
-      } else {
-        context.fillRect(this.position.x, this.position.y, 32, 48);
-      }
+      this.renderAnimation(context);
 
       if (this.typing && this.typingImage) {
         // Show typing image at top left, using image's natural dimensions

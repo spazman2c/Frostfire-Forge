@@ -22,6 +22,9 @@ const assetConfig = {
   sprites: {
     path: "../../assets/sprites/",
   },
+  animations: {
+    path: "../../assets/animations/",
+  },
 };
 
 const settings = {
