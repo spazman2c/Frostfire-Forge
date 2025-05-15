@@ -8,6 +8,7 @@ import * as settings from "../../config/settings.json";
 import path from "path";
 import fs from "fs";
 import docs_html from "./www/public/docs.html";
+import editor_html from "./www/public/editor.html";
 import benchmark_html from "./www/public/benchmark.html";
 import login_html from "./www/public/index.html";
 import register_html from "./www/public/register.html";
@@ -44,6 +45,7 @@ const routes = {
   "/": login_html,
   "/registration": register_html,
   "/game": game_html,
+  "/editor": editor_html,
   "/login": (req: Request, server: any) => login(req, server),
   "/verify": (req: Request, server: any) => authenticate(req, server),
   "/register": (req: Request, server: any) => register(req, server),
@@ -173,6 +175,7 @@ Bun.serve({
     "/registration": routes["/registration"],
     "/register": routes["/register"],
     "/game": routes["/game"],
+    "/editor": routes["/editor"],
     "/login": routes["/login"],
     "/verify": routes["/verify"],
     "/map/hash": routes["/map/hash"],
