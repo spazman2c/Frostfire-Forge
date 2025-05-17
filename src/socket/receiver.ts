@@ -1887,6 +1887,7 @@ function sendAnimation(ws: any, name: string) {
   };
   const animationPacketData = {
     id: currentPlayer.id,
+    name: name,
     data: animationData.data,
   };
   cache.set(currentPlayer.id, currentPlayer);

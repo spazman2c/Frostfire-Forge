@@ -371,6 +371,8 @@ socket.onerror = () => {
   showNotification("An error occurred while connecting to the server", false, true);
 };
 
+const animationCache = new Map<string, string>();
+
 socket.onmessage = async (event) => {
   receivedResponses++;
   if (!(event.data instanceof ArrayBuffer)) return;
@@ -378,32 +380,42 @@ socket.onmessage = async (event) => {
   const type = JSON.parse(packet.decode(event.data))["type"];
   switch (type) {
     case "ANIMATION": {
+      let apng: any;
       try {
-        // @ts-expect-error - pako is not defined because it is loaded in the index.html
-        const inflatedData = pako.inflate(new Uint8Array(data.data.data));
-        const apng = parseAPNG(inflatedData.buffer);
-        if (!(apng instanceof Error) && players) {
-            const findPlayer = async () => {
-                const player = players.find(p => p.id === data.id);
-                if (player) {
-                    player.animation = {
-                        frames: apng.frames,
-                        currentFrame: 0,
-                        lastFrameTime: performance.now()
-                    };
-                    // Initialize the frames' images
-                    apng.frames.forEach(frame => frame.createImage());
-                } else {
-                    // Retry after a short delay
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    await findPlayer();
-                }
-            };
-            
-            findPlayer().catch(err => console.error('Error in findPlayer:', err));
-        }
+          if (animationCache.has(data.name)) {
+              const inflatedData = animationCache.get(data.name)!;
+              apng = parseAPNG(inflatedData);
+              console.log("Using cached animation: " + data.name);
+          } else {
+              // @ts-expect-error - pako is not defined because it is loaded in the index.html
+              const inflatedData = pako.inflate(new Uint8Array(data.data.data));
+              apng = parseAPNG(inflatedData.buffer);
+              animationCache.set(data.name, inflatedData.buffer);
+              console.log("Cached animation: " + data.name);
+          }
+
+          if (!(apng instanceof Error) && players) {
+              const findPlayer = async () => {
+                  const player = players.find(p => p.id === data.id);
+                  if (player) {
+                      player.animation = {
+                          frames: apng.frames,
+                          currentFrame: 0,
+                          lastFrameTime: performance.now()
+                      };
+                      // Initialize the frames' images
+                      apng.frames.forEach((frame: any) => frame.createImage());
+                  } else {
+                      // Retry after a short delay
+                      await new Promise(resolve => setTimeout(resolve, 100));
+                      await findPlayer();
+                  }
+              };
+              
+              findPlayer().catch(err => console.error('Error in findPlayer:', err));
+          }
       } catch (error) {
-        console.error('Failed to process animation data:', error);
+          console.error('Failed to process animation data:', error);
       }
       break;
     }
