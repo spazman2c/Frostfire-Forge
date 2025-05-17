@@ -18,7 +18,7 @@ import * as settings from "../../config/settings.json";
 const defaultMap = settings.default_map?.replace(".json", "") || "main";
 
 let restartScheduled: boolean;
-let restartTimers: NodeJS.Timer[];
+let restartTimers: ReturnType<typeof setTimeout>[];
 
 // Create sprites from the spritesheets
 const spritePromises = spritesheets.map(async (spritesheet: any) => {

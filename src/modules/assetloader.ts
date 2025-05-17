@@ -41,6 +41,7 @@ function loadAnimations() {
         // Add raw compressed data to cache using zlib
         const buffer = fs.readFileSync(path.join(import.meta.dir, assetData.animations.path, file));
         const compressed = zlib.deflateSync(buffer);
+        log.debug(`Compressed animation: ${file}\n- ${buffer.length} (bytes) -> ${compressed.length} (bytes)\n- Compression Ratio: ${(buffer.length / compressed.length).toFixed(2)}% | Compression: ${(((buffer.length - compressed.length) / buffer.length) * 100).toFixed(2)}%`);
         animations.push({ name: file, data: compressed });
       }
     }
@@ -50,8 +51,6 @@ function loadAnimations() {
     console.log("No animations found");
   }
 }
-
-console.log("Animations", assetCache.get("animations"));
 
 loadAnimations();
 

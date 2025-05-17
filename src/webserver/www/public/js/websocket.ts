@@ -385,13 +385,11 @@ socket.onmessage = async (event) => {
           if (animationCache.has(data.name)) {
               const inflatedData = animationCache.get(data.name)!;
               apng = parseAPNG(inflatedData);
-              console.log("Using cached animation: " + data.name);
           } else {
               // @ts-expect-error - pako is not defined because it is loaded in the index.html
               const inflatedData = pako.inflate(new Uint8Array(data.data.data));
               apng = parseAPNG(inflatedData.buffer);
               animationCache.set(data.name, inflatedData.buffer);
-              console.log("Cached animation: " + data.name);
           }
 
           if (!(apng instanceof Error) && players) {
