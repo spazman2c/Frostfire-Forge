@@ -16,6 +16,7 @@ const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
 // Load settings
 import * as settings from "../../config/settings.json";
+import { randomBytes } from "../modules/hash";
 const defaultMap = settings.default_map?.replace(".json", "") || "main";
 
 let restartScheduled: boolean;
@@ -212,6 +213,7 @@ export default async function packetReceiver(
           movementInterval: null,
           pvp: false,
           last_attack: null,
+          invitations: [],
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -1785,36 +1787,115 @@ export default async function packetReceiver(
         const id = (data as any).id;
         if (!id) return;
 
-        const get_player_username = cache.get(ws.data.id);
-        if (!get_player_username) return;
-        const player_username = get_player_username.username;
+        if (!currentPlayer) return;
+        // Uppercase the first letter of the username
+        const player_username = currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1);
 
-        const get_friend_username = cache.get(id);
-        if (!get_friend_username) return;
-        const friend_username = get_friend_username.username;
+        const get_friend = cache.get(id);
+        if (!get_friend) return;
 
-        const updatedFriendsList = await friends.add(player_username, friend_username);
+        const invite_data = {
+          action: "FRIEND_REQUEST",
+          message: `${player_username} wants to add you as a friend`,
+          originator: currentPlayer.id.toString(),
+          authorization: randomBytes(16).toString(),
+        }
+        
+        // Add the invitation to the player's invitations
+        // This is used for authentication and verification for the friend request so that we can't force add friends
+        currentPlayer.invitations.push({
+          action: invite_data.action,
+          originator: invite_data.originator,
+          authorization: invite_data.authorization,
+        });
 
-        sendPacket(ws, packetManager.notify({ message: `Added ${friend_username} to your friends list` }));
-        sendPacket(ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+        cache.set(currentPlayer.id, currentPlayer);
+
+        // Send the invitation notification to the friend
+        sendPacket(get_friend.ws, packetManager.invitation(invite_data));
         break;
+      }
+      case "INVITATION_RESPONSE": {
+        const { action, originator, authorization, response } = data as any;
+        if (!action || !originator || !authorization || !response) return;
+
+        // Find the current player in the cache
+        const inviter = cache.get(originator);
+        
+        if (!inviter) {
+          // If the inviter is not found, we can't process the invitation because they might have disconnected
+          const notifyData = {
+            message: "Unable to process invitation - user not found or has disconnected",
+          };
+          sendPacket(ws, packetManager.notify(notifyData));
+          return;
+        }
+
+
+        // Find the invitation in the inviter's invitations
+        const inviteIndex = inviter.invitations.findIndex(
+          (invite: any) =>
+            invite.action === action &&
+            invite.originator === originator &&
+            invite.authorization === authorization
+        );
+
+        // If we found the invitation, we can process it
+        if (inviteIndex === -1) {
+          // If the invitation is not found, we can't process it
+          const notifyData = {
+            message: "Invitation not found or has already been processed",
+          };
+          sendPacket(ws, packetManager.notify(notifyData));
+          return;
+        }
+
+        // Remove the invitation from the inviter's invitations
+        inviter.invitations.splice(inviteIndex, 1);
+        cache.set(inviter.id, inviter);
+
+        switch (action.toUpperCase()) {
+          // Process friend request
+          case "FRIEND_REQUEST": {
+            if (response.toUpperCase() === "ACCEPT") {
+              // If the response is accept, we add the inviter to the current player's friends list
+              const updatedCurrentPlayersFriendsList = await friends.add(currentPlayer.username.toLowerCase(), inviter.username.toLowerCase());
+              const updatedFriendsList = await friends.add(inviter.username.toLowerCase(), currentPlayer.username.toLowerCase());
+
+              // Notify both players
+              sendPacket(inviter.ws, packetManager.notify({message: `You are now friends with ${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)}`}));
+              sendPacket(ws, packetManager.notify({message: `You are now friends with ${inviter.username.charAt(0).toUpperCase() + inviter.username.slice(1)}`}));
+
+              // Update both players' friends lists
+              sendPacket(inviter.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+              sendPacket(ws, packetManager.updateFriends({ friends: updatedCurrentPlayersFriendsList }));
+              break;
+            }
+          }
+          break;
+        }
+      break;
       }
       case "REMOVE_FRIEND": {
         const id = (data as any).id;
         if (!id) return;
 
-        const get_player_username = cache.get(ws.data.id);
-        if (!get_player_username) return;
-        const player_username = get_player_username.username;
+        if (!currentPlayer) return;
 
-        const get_friend_username = cache.get(id);
-        if (!get_friend_username) return;
-        const friend_username = get_friend_username.username;
+        const get_friend = cache.get(id);
+        // We can't remove a friend if they are not online
+        if (!get_friend) return;
 
-        const updatedFriendsList = await friends.remove(player_username, friend_username);
+        // Update the friends list for both players
+        const updatedCurrentPlayersFriendsList = await friends.remove(get_friend.username.toLowerCase(), currentPlayer.username.toLowerCase());
+        const updatedFriendsList = await friends.remove(currentPlayer.username.toLowerCase(), get_friend.username.toLowerCase());
 
-        sendPacket(ws, packetManager.notify({ message: `Removed ${friend_username} from your friends list` }));
-        sendPacket(ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+        // Notify only the player who initiated the removal
+        sendPacket(ws, packetManager.notify({ message: `You have removed ${get_friend.username.charAt(0).toUpperCase() + get_friend.username.slice(1)} from your friends list` }));
+        
+        // Update both players' friends lists
+        sendPacket(ws, packetManager.updateFriends({ friends: updatedCurrentPlayersFriendsList }));
+        sendPacket(get_friend.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
         break;
       }
       // Unknown packet type

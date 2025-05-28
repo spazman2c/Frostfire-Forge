@@ -995,3 +995,62 @@ input[type=range]:disabled {
 #context-menu li:hover {
   background: rgba(0, 0, 0, 0.1);
 }
+
+#invitation-popup {
+  position: fixed;
+  z-index: 1000;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  padding: 20px;
+}
+
+#invitation-popup button {
+  border-radius: 5px;
+  border: none;
+  outline: none;
+}
+
+#invitation-popup h2 {
+  margin: 0;
+  font-family: Comic Relief;
+  font-size: 1.2em;
+  color: #333;
+}
+
+#invitation-popup p {
+  margin: 10px 0;
+  font-family: Comic Relief;
+  font-size: 1em;
+  color: #555;
+}
+
+#accept-invitation {
+  width: 100px;
+  height: 32px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: #4CAF50;
+}
+
+#accept-invitation:hover {
+  background: #45a049;
+}
+
+#decline-invitation {
+  width: 100px;
+  height: 32px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: #f44336;
+}
+
+#decline-invitation:hover {
+  background: #e53935;
+}

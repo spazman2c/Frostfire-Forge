@@ -85,6 +85,7 @@ declare interface Player {
   last_attack?: number;
   animation?: string;
   friends?: string[];
+  invitiations?: string[];
 }
 
 declare interface QuestLogData {

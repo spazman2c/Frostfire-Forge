@@ -258,5 +258,10 @@ export const packetManager = {
     return [
       packet.encode(JSON.stringify({ type: "UPDATE_FRIENDS", data })),
     ] as any[];
+  },
+  invitation: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "INVITATION", data })),
+    ] as any[];
   }
 };

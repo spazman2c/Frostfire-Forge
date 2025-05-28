@@ -380,6 +380,11 @@ socket.onmessage = async (event) => {
   const data = JSON.parse(packet.decode(event.data))["data"];
   const type = JSON.parse(packet.decode(event.data))["type"];
   switch (type) {
+    case "INVITATION": {
+      // Show the invitation modal
+      createInvitationPopup(data);
+      break;
+    }
     case "UPDATE_FRIENDS": {
       // Update the friends list for the current player in cache
       const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
@@ -634,7 +639,7 @@ socket.onmessage = async (event) => {
               const ctx = layerCanvas.ctx;
               ctx.imageSmoothingEnabled = false;
               
-              const batchSize = 1;
+              const batchSize = 10;
               progress += step;
               progressBar.style.width = `${progress}%`;
               
@@ -2284,4 +2289,52 @@ function stopMovement() {
   pressedKeys.clear();
   isKeyPressed = false;
   isMoving = false;
+}
+
+// Create invitation popup model
+function createInvitationPopup(invitationData: any) {
+  const popup = document.createElement("div");
+  popup.id = "invitation-popup";
+  popup.className = "popup";
+  popup.innerHTML = `
+    <h2>Invitation</h2>
+    <p>${invitationData.message}</p>
+    <button id="accept-invitation">Accept</button>
+    <button id="decline-invitation">Decline</button>
+  `;
+
+  document.body.appendChild(popup);
+
+  const acceptButton = document.getElementById("accept-invitation");
+  const declineButton = document.getElementById("decline-invitation");
+  let data;
+
+  switch (invitationData.action.toUpperCase()) {
+    case "FRIEND_REQUEST": {
+      data = {
+        type: "INVITATION_RESPONSE",
+        data: {
+          authorization: invitationData.authorization,
+          originator: invitationData.originator,
+          action: "FRIEND_REQUEST",
+        },
+      }
+    }
+    break;
+  }
+
+  if (!data) return;
+
+  // Add event listeners for accept and decline buttons
+  acceptButton?.addEventListener("click", () => {
+    data.data.response = "ACCEPT";
+    sendRequest(data);
+    popup.remove();
+  });
+
+  declineButton?.addEventListener("click", () => {
+    data.data.response = "DECLINE";
+    sendRequest(data);
+    popup.remove();
+  });
 }
