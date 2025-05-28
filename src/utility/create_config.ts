@@ -25,6 +25,9 @@ const assetConfig = {
   animations: {
     path: "../../assets/animations/",
   },
+  icons: {
+    path: "../../assets/icons/",
+  }
 };
 
 const settings = {

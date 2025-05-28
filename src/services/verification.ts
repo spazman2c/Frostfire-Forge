@@ -1,4 +1,4 @@
-import * as email from "../services/email";
+import sendEmail from "../services/email";
 import log from "../modules/logger";
 import query from "../controllers/sqldatabase";
 
@@ -18,7 +18,7 @@ function verify(token: string, useremail: string, username: string): Promise<voi
                 const url = `${process.env.DOMAIN}/verify?email=${useremail}&token=${token}&code=${code}`;
                 const message = `<p style="font-size: 20px;"><a href="${url}">Verify account</a></p><br><p style="font-size:12px;">If you did not request this, please ignore this email.</p>`;
 
-                const emailResponse = await email.send(useremail, subject, message);
+                const emailResponse = await sendEmail(useremail, subject, message);
                 if (emailResponse !== "Email sent successfully") {
                     return reject(new Error("Failed to send email"));
                 }

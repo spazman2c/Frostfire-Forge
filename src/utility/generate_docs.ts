@@ -53,6 +53,6 @@ const html = path.join(import.meta.dir, '..', 'webserver', 'www', 'public', 'doc
 if (fs.existsSync(html)) fs.unlinkSync(html);
 const outputContent = fs.readFileSync(output, 'utf-8');
 const outputLines = outputContent.split('\n').filter(line => line !== '');
-const htmlContent = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Documentation</title><link rel="stylesheet" href="css/docs.css"></head><body><h1>Documentation</h1><ul>\n${outputLines.map(line => `<li>\n   ${line}\n</li>\n`).join('')}</ul></body></html>`;
+const htmlContent = `<!DOCTYPE html><html lang="en"><head><link rel="icon" type="image/ico" href="./img/icons/favicon.ico"><meta charset="UTF-8"><title>Documentation</title><link rel="stylesheet" href="css/docs.css"></head><body><h1>Documentation</h1><ul>\n${outputLines.map(line => `<li>\n   ${line}\n</li>\n`).join('')}</ul></body></html>`;
 fs.writeFileSync(html, htmlContent);
 fs.unlinkSync(output);

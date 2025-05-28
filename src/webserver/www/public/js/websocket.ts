@@ -1,6 +1,7 @@
 const socket = new WebSocket(`__VAR.WEBSOCKETURL__`);
 let sentRequests = 0;
 let receivedResponses = 0;
+const overlay = document.getElementById("overlay") as HTMLDivElement;
 const debugContainer = document.getElementById("debug-container") as HTMLDivElement;
 const positionText = document.getElementById("position") as HTMLDivElement;
 const packetsSentReceived = document.getElementById("packets-sent-received") as HTMLDivElement;
@@ -146,11 +147,11 @@ function animationLoop() {
   const now = performance.now();
 
   // Skip frame if not enough time has passed
+  const deltaTime = (now - lastFrameTime) / 1000; // seconds
   if (now - lastFrameTime < frameDuration) {
     window.requestAnimationFrame(animationLoop);
     return;
   }
-
   lastFrameTime = now;
 
   const currentPlayer = players.find(
@@ -255,7 +256,7 @@ function animationLoop() {
             32
           ) 
         )
-        .forEach((particle: any) => npc.updateParticle(particle, npc, ctx));
+        .forEach((particle: any) => npc.updateParticle(particle, npc, ctx, deltaTime));
     }
   });
 
@@ -379,6 +380,14 @@ socket.onmessage = async (event) => {
   const data = JSON.parse(packet.decode(event.data))["data"];
   const type = JSON.parse(packet.decode(event.data))["type"];
   switch (type) {
+    case "UPDATE_FRIENDS": {
+      // Update the friends list for the current player in cache
+      const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
+      if (currentPlayer) {
+        currentPlayer.friends = data.friends || [];
+      }
+      break;
+    }
     case "ANIMATION": {
       let apng: any;
       try {
@@ -625,7 +634,7 @@ socket.onmessage = async (event) => {
               const ctx = layerCanvas.ctx;
               ctx.imageSmoothingEnabled = false;
               
-              const batchSize = 10;
+              const batchSize = 1;
               progress += step;
               progressBar.style.width = `${progress}%`;
               
@@ -732,10 +741,29 @@ socket.onmessage = async (event) => {
             slot.classList.add("ui");
             const item = data[i];
             slot.classList.add(item.quality.toLowerCase() || "empty");
-            slot.innerHTML = `${item.item}${
-              item.quantity > 1 ? `<br>x${item.quantity}` : ""
-            }`;
-            inventoryGrid.appendChild(slot);
+
+            if (item.icon) {
+              // @ts-expect-error - pako is loaded in index.html
+              const inflatedData = pako.inflate(new Uint8Array(item.icon.data), { to: "string" });
+              const iconImage = new Image();
+              iconImage.src = `data:image/png;base64,${inflatedData}`;
+              iconImage.onload = () => {
+                slot.appendChild(iconImage);
+              };
+              // Overlay item quantity if greater than 1
+              if (item.quantity > 1) {
+                const quantityLabel = document.createElement("div");
+                quantityLabel.classList.add("quantity-label");
+                quantityLabel.innerText = `x${item.quantity}`;
+                slot.appendChild(quantityLabel);
+              }
+              inventoryGrid.appendChild(slot);
+            } else {
+              slot.innerHTML = `${item.item}${
+                item.quantity > 1 ? `<br>x${item.quantity}` : ""
+              }`;
+              inventoryGrid.appendChild(slot);
+            }
           }
         }
 
@@ -872,6 +900,13 @@ socket.onmessage = async (event) => {
       const currentPlayer = players.find(
         (player) => player.id === sessionStorage.getItem("connectionId")
       );
+
+      if (currentPlayer && data.id === currentPlayer.id) {
+        sendRequest({
+          type: "MOVEXY",
+          data: "ABORT",
+        });
+      }
 
       players.forEach((player) => {
         if (player.id === data.id) {
@@ -1282,7 +1317,7 @@ function createNPC(data: any) {
     particles: Particle[];
     quest: number | null;
     show: (context: CanvasRenderingContext2D) => void;
-    updateParticle: (particle: Particle, npc: any, context: CanvasRenderingContext2D) => void;
+    updateParticle: (particle: Particle, npc: any, context: CanvasRenderingContext2D, deltaTime: number) => void;
   } = {
     id: data.id,
     dialog: data.dialog || "",
@@ -1299,6 +1334,7 @@ function createNPC(data: any) {
         (player) => player.id === sessionStorage.getItem("connectionId")
       );
       if (data?.hidden && !currentPlayer?.isAdmin) return;
+      context.globalAlpha = 1;
       context.drawImage(npcImage, this.position.x, this.position.y, npcImage.width, npcImage.height);
 
       context.fillStyle = "black";
@@ -1317,7 +1353,7 @@ function createNPC(data: any) {
         }
       }
     },
-    updateParticle: async (particle: Particle, npc: any, context: CanvasRenderingContext2D) => {
+    updateParticle: async (particle: Particle, npc: any, context: CanvasRenderingContext2D, deltaTime: number) => {
       // Initialize particle arrays and timing for each type if they don't exist
       if (!npc.particleArrays) {
         npc.particleArrays = {};
@@ -1393,7 +1429,7 @@ function createNPC(data: any) {
         const p = particles[i];
         
         // Decrease lifetime
-        p.currentLife--;
+        p.currentLife -= deltaTime * 1000;
 
         // Remove dead particles
         if (p.currentLife <= 0) {
@@ -1421,8 +1457,8 @@ function createNPC(data: any) {
           }
 
           // Update velocity with gravity and wind
-          p.velocity.x += p.gravity.x * 0.01 + windForce.x;
-          p.velocity.y += p.gravity.y * 0.01 + windForce.y;
+          p.velocity.x += p.gravity.x * deltaTime + windForce.x;
+          p.velocity.y += p.gravity.y * deltaTime + windForce.y;
           
           // Cap velocity considering wind influence
           const maxVelocity = {
@@ -1434,8 +1470,8 @@ function createNPC(data: any) {
           p.velocity.y = Math.min(Math.max(p.velocity.y, -maxVelocity.y), maxVelocity.y);
           
           // Update position
-          p.localposition.x += p.velocity.x * 0.01;
-          p.localposition.y += p.velocity.y * 0.01;
+          p.localposition.x += p.velocity.x * deltaTime;
+          p.localposition.y += p.velocity.y * deltaTime;
         }
 
         // Calculate render position
@@ -1503,6 +1539,7 @@ function createNPC(data: any) {
 
 async function createPlayer(data: any) {
   positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
+  console.log("Creating player with data:", data);
 
   // Add this helper function inside createPlayer
   const initializeAnimation = async (animationData: any) => {
@@ -1528,7 +1565,9 @@ async function createPlayer(data: any) {
 
   const player = {
     id: data.id,
+    userid: data.userid,
     animation: await initializeAnimation(data.animation),
+    friends: data.friendsList || [],
     position: {
       x: canvas.width / 2 + data.location.x,
       y: canvas.height / 2 + data.location.y,
@@ -1723,10 +1762,14 @@ async function createPlayer(data: any) {
         context.shadowBlur = 2;
         context.shadowOffsetX = 0;
         context.shadowOffsetY = 0;
+        // Shrink the image in half
+        
         context.drawImage(
-          this.typingImage, 
-          this.position.x - this.typingImage.width, 
-          this.position.y - this.typingImage.height + 10
+          this.typingImage,
+          this.position.x - this.typingImage.width + 15, 
+          this.position.y - this.typingImage.height + 15,
+          this.typingImage.width / 1.5,
+          this.typingImage.height / 1.5
         );
         // Reset opacity
         context.globalAlpha = 1;
@@ -1779,6 +1822,10 @@ window.addEventListener("resize", () => {
     cameraX = currentPlayer.position.x - window.innerWidth / 2 + 8;
     cameraY = currentPlayer.position.y - window.innerHeight / 2 + 48;
     window.scrollTo(cameraX, cameraY);
+  }
+  // Remove the context menu on resize
+  if (document.getElementById("context-menu")) {
+    document.getElementById("context-menu")!.remove();
   }
 });
 
@@ -1952,6 +1999,131 @@ effectsSlider.addEventListener("input", () => {
   });
 });
 
+const contextActions: Record<string, { allowed_self: boolean, label: string, handler: (id: string) => void }> = {
+  'inspect-player': {
+    label: 'Inspect',
+    allowed_self: true,
+    handler: (id) => {
+      console.log(`Inspecting player ${id}`);
+    }
+  },
+  'send-message': {
+    label: 'Send Message',
+    allowed_self: false,
+    handler: (id) => {
+      console.log(`Sending message to ${id}`);
+    }
+  },
+  'invite-to-party': {
+    label: 'Invite to Party',
+    allowed_self: false,
+    handler: (id) => {
+      console.log(`Inviting ${id} to party`);
+    }
+  },
+  'add-friend': {
+    label: 'Add Friend',
+    allowed_self: false,
+    handler: (id) => {
+      sendRequest({
+        type: "ADD_FRIEND",
+        data: { id: id },
+      });
+    }
+  },
+  'remove-friend': {
+    label: 'Remove Friend',
+    allowed_self: false,
+    handler: (id) => {
+      sendRequest({
+        type: "REMOVE_FRIEND",
+        data: { id: id },
+      });
+    }
+  },
+  'invite-to-guild': {
+    label: 'Invite to Guild',
+    allowed_self: false,
+    handler: (id) => {
+      console.log(`Inviting ${id} to guild`);
+    }
+  },
+  'block-player': {
+    label: 'Block Player',
+    allowed_self: false,
+    handler: (id) => {
+      console.log(`Blocking player ${id}`);
+    }
+  },
+  'report-player': {
+    label: 'Report Player',
+    allowed_self: false,
+    handler: (id) => {
+      console.log(`Reporting player ${id}`);
+    }
+  },
+};
+
+function createContextMenu(event: MouseEvent, id: string) {
+  if (!loaded) return;
+  document.getElementById("context-menu")?.remove();
+
+  const contextMenu = document.createElement("div");
+  contextMenu.id = 'context-menu';
+  contextMenu.style.left = `${event.clientX}px`;
+  contextMenu.style.top = `${event.clientY}px`;
+  // If we are off the screen, adjust position
+  if (event.clientX + 200 > window.innerWidth) {
+    contextMenu.style.left = `${event.clientX - 200}px`;
+  }
+
+  if (event.clientX - 200 < 0) {
+    contextMenu.style.left = `${event.clientX + 50}px`;
+  }
+
+  if (event.clientY + 150 > window.innerHeight) {
+    contextMenu.style.top = `${event.clientY - 150}px`;
+  }
+
+  if (event.clientY - 150 < 0) {
+    contextMenu.style.top = `${event.clientY + 50}px`;
+  }
+  
+  contextMenu.dataset.id = id;
+
+  const ul = document.createElement("ul");
+  const isSelf = id === sessionStorage.getItem("connectionId");
+  const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
+  const targetedPlayer = players.find(player => player.id === id);
+  const isFriend = currentPlayer?.friends.includes(targetedPlayer.userid.toString()) || false;
+
+  Object.entries(contextActions).forEach(([action, { label, handler, allowed_self }]) => {
+    if (!allowed_self && isSelf) return;
+
+    if (action === 'add-friend' && isFriend) return;
+
+    // Skip "remove-friend" if not friends
+    if (action === 'remove-friend' && !isFriend) return;
+
+    const li = document.createElement("li");
+    li.id = `context-${action}`;
+    li.innerText = label;
+
+    li.onclick = (e) => {
+      e.stopPropagation();
+      handler(id);
+      contextMenu.remove();
+    };
+
+    ul.appendChild(li);
+  });
+
+  contextMenu.appendChild(ul);
+  overlay.appendChild(contextMenu);
+
+  document.addEventListener("click", () => contextMenu.remove(), { once: true });
+}
+
 // Capture click and get coordinates from canvas
 document.addEventListener("contextmenu", (event) => {
   if (!loaded) return;
@@ -1961,18 +2133,42 @@ document.addEventListener("contextmenu", (event) => {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
 
-  const moveX = Math.floor(x - canvas.width / 2 - 16);
-  const moveY = Math.floor(y - canvas.height / 2 - 24);
-  sendRequest({
-    type: "TELEPORTXY",
-        data: { x: moveX, y: moveY },
+  // Did we click on a player?
+  const clickedPlayer = players.find(player => {
+    const playerX = player.position.x + 16; // Center of the player
+    const playerY = player.position.y + 24; // Center of the player
+    return (
+      x >= playerX - 16 && x <= playerX + 16 &&
+      y >= playerY - 24 && y <= playerY + 24
+    );
   });
+
+  if (clickedPlayer) {
+    const id = clickedPlayer.id;
+    // Create context menu for the clicked player
+    createContextMenu(event, id);
+  } else {
+    // Remove any existing context menu
+    const existingMenu = document.getElementById("context-menu");
+    if (existingMenu) existingMenu.remove();
+    const moveX = Math.floor(x - canvas.width / 2 - 16);
+    const moveY = Math.floor(y - canvas.height / 2 - 24);
+    sendRequest({
+      type: "TELEPORTXY",
+          data: { x: moveX, y: moveY },
+    });
+  }
 });
 
 document.addEventListener("click", (event) => {
   // Check if we clicked on a player
   if (!loaded) return;
   if ((event.target as HTMLElement)?.classList.contains("ui")) return;
+  // If we don't click on the context menu, remove it
+  const contextMenu = document.getElementById("context-menu");
+  if (contextMenu && !contextMenu.contains(event.target as Node)) {
+    contextMenu.remove();
+  }
 
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
@@ -1982,7 +2178,7 @@ document.addEventListener("click", (event) => {
   const moveY = y - canvas.height / 2 - 24;
   sendRequest({
     type: "SELECTPLAYER",
-        data: { x: moveX, y: moveY },
+    data: { x: moveX, y: moveY },
   });
 });
 

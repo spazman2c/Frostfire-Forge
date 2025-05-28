@@ -1,8 +1,10 @@
 import '../utility/validate_config';
 const now = performance.now();
 import log from "../modules/logger";
+import sendEmail from "../services/email";
 import player from "../systems/player";
 import verify from "../services/verification";
+import { hash, randomBytes } from "../modules/hash";
 import query from "../controllers/sqldatabase";
 import * as settings from "../../config/settings.json";
 import path from "path";
@@ -13,6 +15,8 @@ import benchmark_html from "./www/public/benchmark.html";
 import login_html from "./www/public/index.html";
 import register_html from "./www/public/register.html";
 import game_html from "./www/public/game.html";
+import forgotpassword_html from "./www/public/forgot-password.html";
+import changepassword_html from "./www/public/change-password.html";
 
 // Load whitelisted and blacklisted IPs and functions
 import { w_ips, b_ips, blacklistAdd } from "../systems/security";
@@ -49,46 +53,40 @@ const routes = {
   "/login": (req: Request, server: any) => login(req, server),
   "/verify": (req: Request, server: any) => authenticate(req, server),
   "/register": (req: Request, server: any) => register(req, server),
-  "/map/hash": {
-    GET: async (req: Request) => {
-      const url = new URL(req.url);
-      const mapName = url.searchParams.get("name");
-      if (!mapName) {
-        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-      }
-
-      for (const key of Object.keys(maps)) {
-        if (maps[key].name === mapName) {
-          return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
-        }
-      }
-
-      return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
-    },
-    POST: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    PUT: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    DELETE: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    PATCH: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    OPTIONS: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
+  "/forgot-password": forgotpassword_html,
+  "/change-password": changepassword_html,
+  "/reset-password": async (req: Request, server: any) => {
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+    return await resetPassword(req, server);
   },
-  "/tileset/hash" : {
-    GET: async (req: Request) => {
-      if (req.method !== "GET") {
+  "/update-password": async (req: Request, server: any) => {
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+    return await updatePassword(req, server);
+  },
+  "/map/hash": async (req: Request) => {
+    if (req.method !== "GET") {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+    const url = new URL(req.url);
+    const mapName = url.searchParams.get("name");
+    if (!mapName) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
+
+    for (const key of Object.keys(maps)) {
+      if (maps[key].name === mapName) {
+        return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
+      }
+    }
+
+    return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
+  },
+  "/tileset/hash": async (req: Request) => {
+    if (req.method !== "GET") {
         return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
     }
     const url = new URL(req.url);
@@ -103,33 +101,11 @@ const routes = {
       }
     }
     return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
-    },
-    POST: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    PUT: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    DELETE: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    PATCH: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    OPTIONS: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
   },
-  "/tileset" : {
-    GET: async (req: Request) => {
-      if (req.method !== "GET") {
-        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-      }
+  "/tileset" : async (req: Request) => {
+    if (req.method !== "GET") {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+    }
     const url = new URL(req.url);
     const tilesetName = url.searchParams.get("name");
     if (!tilesetName) {
@@ -142,29 +118,8 @@ const routes = {
       }
     }
     return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
-    },
-    POST: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    PUT: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    DELETE: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },  
-    PATCH: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
-    OPTIONS: async () => {
-      // Return a 405
-      return new Response(JSON.stringify({ message: "Method not allowed" }), { status: 405 });
-    },
   },
-}
+} as Record<string, any>;
 
 Bun.serve({
   port: _https ? 443 : 80,
@@ -174,6 +129,10 @@ Bun.serve({
     "/": routes["/"],
     "/registration": routes["/registration"],
     "/register": routes["/register"],
+    "/forgot-password": routes["/forgot-password"],
+    "/change-password": routes["/change-password"],
+    "/reset-password": routes["/reset-password"],
+    "/update-password": routes["/update-password"],
     "/game": routes["/game"],
     "/editor": routes["/editor"],
     "/login": routes["/login"],
@@ -189,6 +148,7 @@ Bun.serve({
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
     }
     const ip = address.address;
+    log.debug(`Received request: ${req.method} ${req.url} from ${ip}`);
     // Check if the ip is blacklisted
     if (b_ips.includes(ip)) {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
@@ -201,7 +161,7 @@ Bun.serve({
         await blacklistAdd(ip);
         return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
       }
-    }    
+    }
 
     if (_https && url.protocol === "http:") {
       return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
@@ -263,17 +223,16 @@ async function register(req: Request, server: any) {
       return new Response(JSON.stringify({ message: "Passwords do not match" }), { status: 400 });
     }
 
-    if (username.length < 3 || username.length > 15 || password.length < 8 || password.length > 20) {
-      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+    if (!validateUsername(username)) {
+      return new Response(JSON.stringify({ message: "Invalid username" }), { status: 400 });
     }
 
-    if (email.length < 5 || email.length > 50 || !email.includes("@") || !email.includes(".")) {
-      return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
+    if (validatePasswordComplexity(password) === false) {
+      return new Response(JSON.stringify({ message: "Password must be between 8 and 20 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character." }), { status: 400 });
     }
 
-    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!regex.test(email)) {
-      return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 }); 
+    if (!validateEmail(email)) {
+      return new Response(JSON.stringify({ message: "Invalid email format" }), { status: 400 });
     }
 
     const user = await player.register(username.toLowerCase(), password, email.toLowerCase(), req) as any;
@@ -314,8 +273,13 @@ async function login(req: Request, server: any) {
     if (!username || !password) {
       return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
     }
-    if (username.length < 3 || username.length > 15 || password.length < 8 || password.length > 20) {
-      return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
+
+    if (!validateUsername(username)) {
+      return new Response(JSON.stringify({ message: "Invalid username" }), { status: 400 });
+    }
+
+    if (password.length < 8 || password.length > 20) {
+      return new Response(JSON.stringify({ message: "Password must be between 8 and 20 characters long" }), { status: 400 });
     }
 
     const token = await player.login(username.toLowerCase(), password);
@@ -349,6 +313,134 @@ async function login(req: Request, server: any) {
     log.error(`Failed to authenticate: ${error}`);
     return new Response(JSON.stringify({ message: "Failed to authenticate" }), { status: 500 });
   }
+}
+
+async function resetPassword(req: Request, server: any) {
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+  }
+  const responseMessage = `If the email you provided is registered, you will receive an email with instructions to reset your password.`;
+      // Check if ip banned
+    const ip = server.requestIP(req)?.address;
+    if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
+  const body = await req.json();
+
+  if (!body.email) { 
+    return new Response(JSON.stringify({ message: "Email is required" }), { status: 400 });
+  }
+
+  const email = body.email.toLowerCase();
+
+  if (!validateEmail(email)) {
+    return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
+  }
+
+
+  // Check if the email exists in the database
+  const result = await query("SELECT email FROM accounts WHERE email = ? LIMIT 1", [email]) as any;
+  // Don't tip off the user if the email does not exist
+  if (result.length === 0) {
+    return new Response(JSON.stringify({ message: responseMessage }), { status: 200 });
+  }
+
+  // Generate a random code to use for password reset verification
+  const code = randomBytes(8);
+
+  // Send the email with the reset link
+  const gameName = process.env.GAME_NAME || process.env.DOMAIN || "Game";
+  const subject = `${gameName} - Reset your password`;
+  const url = `${process.env.DOMAIN}/change-password?email=${email}&code=${code}`;
+  const message = `<p style="font-size: 20px;"><a href="${url}">Reset password</a></p><br><p style="font-size:12px;">If you did not request this, please ignore this email.</p>`;
+  const emailResponse = await sendEmail(email, subject, message);
+  if (emailResponse !== "Email sent successfully") {
+    log.error(`Failed to send reset password email: ${emailResponse}`);
+    // We can return a 500 error here because the email doesn't exist in general or the email service failed
+    return new Response(JSON.stringify({ message: "Failed to send reset password email" }), { status: 500 });
+  }
+
+  await query("UPDATE accounts SET reset_password_code = ? WHERE email = ?", [code, email]);
+
+  return new Response(JSON.stringify({ message: responseMessage }), { status: 200 });
+}
+
+async function updatePassword(req: Request, server: any) {
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
+  }
+  // Check if ip banned
+  const ip = server.requestIP(req)?.address;
+  if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+    return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+  }
+  const body = await req.json();
+
+  if (!body.email || !body.password || !body.password2 || !body.code) {
+    return new Response(JSON.stringify({ message: "All fields are required" }), { status: 400 });
+  }
+
+  if (!validateEmail(body.email)) {
+    return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
+  }
+
+  if (body.password !== body.password2) {
+    return new Response(JSON.stringify({ message: "Passwords do not match" }), { status: 400 });
+  }
+
+  if (!validatePasswordComplexity(body.password)) {
+    return new Response(JSON.stringify({ message: "Password must be between 8 and 20 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character." }), { status: 400 });
+  }
+  
+  // Check if the account exists
+  const account = await query("SELECT * FROM accounts WHERE email = ? LIMIT 1", [body.email.toLowerCase()]) as any;
+  if (account.length === 0) {
+    log.warn(`Attempt to update password for non-existent email: ${body.email.toLowerCase()}`);
+    return new Response(JSON.stringify({ message: "Failed to update password" }), { status: 500 });
+  }
+
+  // Check if the reset password code matches
+  const codeResult = await query("SELECT reset_password_code FROM accounts WHERE email = ? AND reset_password_code = ? LIMIT 1", [body.email.toLowerCase(), body.code]) as any;
+  if (codeResult.length === 0) {
+    log.warn(`Invalid reset password code for email: ${body.email.toLowerCase()}`);
+    return new Response(JSON.stringify({ message: "Invalid reset password code" }), { status: 403 });
+  }
+
+  // Update the password
+  const hashedPassword = hash(body.password);
+  const updateResult = await query("UPDATE accounts SET password_hash = ?, reset_password_code = NULL, verified = 0, verification_code = NULL WHERE email = ?", [hashedPassword, body.email.toLowerCase()]);
+  if (!updateResult) {
+    log.error(`Failed to update password for email: ${body.email.toLowerCase()}`);
+    return new Response(JSON.stringify({ message: "Failed to update password" }), { status: 500 });
+  }
+
+  log.debug(`Password updated successfully for email: ${body.email.toLowerCase()}`);
+
+  if (account.session_id) {
+    // If the user is logged in, we need to logout the user
+    player.logout(account.session_id);
+  }
+  
+  return new Response(JSON.stringify({ message: "Password updated successfully" }), { status: 200 });
+}
+
+function validatePasswordComplexity(password: string): boolean {
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const hasSpecialCharacter = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const isValidLength = password.length >= 8 && password.length <= 20;
+  return hasUpperCase && hasLowerCase && hasNumbers && hasSpecialCharacter && isValidLength;
+}
+
+function validateUsername(username: string): boolean {
+  const regex = /^[a-zA-Z0-9_]{3,15}$/; // Alphanumeric and underscores, 3-15 characters
+  return regex.test(username);
+}
+
+function validateEmail(email: string): boolean {
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,100}$/;
+  return regex.test(email);
 }
 
 log.success(`Webserver started in ${(performance.now() - now).toFixed(2)}ms`);

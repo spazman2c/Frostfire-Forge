@@ -29,7 +29,7 @@ const createAccountsTable = async () => {
         ip_address VARCHAR(255) DEFAULT NULL,
         geo_location VARCHAR(255) DEFAULT NULL,
         verification_code VARCHAR(100) DEFAULT NULL,
-        needs_password_reset INT DEFAULT 0 NOT NULL,
+        reset_password_code VARCHAR(100) DEFAULT NULL,
         map VARCHAR(255) DEFAULT 'main' NOT NULL,
         position VARCHAR(255) DEFAULT '0,0' NOT NULL,
         session_id VARCHAR(255) UNIQUE DEFAULT NULL,
@@ -107,7 +107,8 @@ const createItemsTable = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL UNIQUE,
         quality VARCHAR(255) NOT NULL,
-        description VARCHAR(255) DEFAULT NULL
+        description VARCHAR(255) DEFAULT NULL,
+        icon VARCHAR(1000) DEFAULT NULL,
     )
   `;
   await query(sql);
@@ -365,6 +366,19 @@ const createQuestLogTable = async () => {
   await query(sql);
 };
 
+const createFriendsListTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  log.info("Creating friends list table...");
+  await query(useDatabaseSql);
+  const sql = `
+    CREATE TABLE IF NOT EXISTS friendslist (
+      username VARCHAR(255) NOT NULL PRIMARY KEY UNIQUE,
+      friends TEXT NOT NULL
+    )
+  `;
+  await query(sql);
+};
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -388,6 +402,7 @@ const setupDatabase = async () => {
   await createDefaultWorld();
   await createQuestsTable();
   await createQuestLogTable();
+  await createFriendsListTable();
 };
 
 try {

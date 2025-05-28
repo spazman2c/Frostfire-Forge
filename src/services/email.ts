@@ -13,8 +13,42 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export function send(email: string, subject: string, message: string): Promise<string> {
+export default function sendEmail(email: string, subject: string, message: string): Promise<string> {
   return new Promise((resolve) => {
+
+    if (!email || !subject || !message) {
+      log.error("Email, subject, and message are required");
+      resolve("Email, subject, and message are required");
+      return;
+    }
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || !process.env.EMAIL_SERVICE) {
+      log.error("Email configuration is missing");
+      resolve("Email configuration is missing");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      log.error("Invalid email format");
+      resolve("Invalid email format");
+      return;
+    }
+
+    // Validate subject and message length
+    if (subject.length > 78) {
+      log.error("Subject exceeds maximum length of 78 characters");
+      resolve("Subject exceeds maximum length of 78 characters");
+      return;
+    }
+
+    if (message.length > 500) {
+      log.error("Message exceeds maximum length of 500 characters");
+      resolve("Message exceeds maximum length of 500 characters");
+      return;
+    }
+
     try {
       const mailOptions = {
         from: process.env.EMAIL_USER,

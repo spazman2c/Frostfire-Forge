@@ -140,6 +140,7 @@ export const packetManager = {
           type: "SPAWN_PLAYER",
           data: {
             id: data.id,
+            userid: data.userid,
             location: {
               map: data.location.map,
               x: data.location.x || 0,
@@ -151,6 +152,7 @@ export const packetManager = {
             isStealth: data.isStealth,
             stats: data.stats,
             sprite: data.sprite,
+            ...(data.friendsList ? { friendsList: data.friendsList } : {}),
           },
         })
       )
@@ -252,4 +254,9 @@ export const packetManager = {
       packet.encode(JSON.stringify({ type: "ANIMATION", data })),
     ] as any[];
   },
+  updateFriends: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "UPDATE_FRIENDS", data })),
+    ] as any[];
+  }
 };

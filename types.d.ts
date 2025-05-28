@@ -84,6 +84,7 @@ declare interface Player {
   pvp?: boolean;
   last_attack?: number;
   animation?: string;
+  friends?: string[];
 }
 
 declare interface QuestLogData {
@@ -104,6 +105,13 @@ declare interface Item {
   name: string;
   quality: string;
   description: string;
+  icon: Nullable<string>;
+}
+
+// Define icon data
+declare interface Icon {
+  name: string;
+  data: Buffer;
 }
 
 // Define npc data

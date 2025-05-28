@@ -5,8 +5,8 @@ const items = {
   async add(item: Item) {
     if (!item?.name || !item?.quality || !item?.description) return;
     return await query(
-      "INSERT IGNORE INTO items (name, quality, description) VALUES (?, ?, ?)",
-      [item.name, item.quality, item.description]
+      "INSERT IGNORE INTO items (name, quality, description, icon) VALUES (?, ?, ?, ?)",
+      [item.name, item.quality, item.description, item.icon || null]
     );
   },
   async remove(item: Item) {
@@ -26,8 +26,8 @@ const items = {
   async update(item: Item) {
     if (!item?.name || !item?.quality || !item?.description) return;
     const result = await query(
-      "UPDATE items SET quality = ?, description = ? WHERE name = ?",
-      [item.quality, item.description, item.name]
+      "UPDATE items SET quality = ?, description = ?, icon = ? WHERE name = ?",
+      [item.quality, item.description, item.name, item.icon || null]
     );
     if (result) {
       const items = assetCache.get("items") as Item[];

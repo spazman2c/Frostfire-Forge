@@ -43,4 +43,7 @@ export const packetTypes: PacketType = {
   41: "STOPTYPING",
   42: "UPDATE_XP",
   43: "ANIMATION",
+  44: "ADD_FRIEND",
+  45: "REMOVE_FRIEND",
+  46: "UPDATE_FRIENDS",
 };

@@ -10,6 +10,7 @@ import language from "../systems/language";
 import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
+import friends from "../systems/friends";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
@@ -101,6 +102,8 @@ export default async function packetReceiver(
         )) as any[];
 
         const username = getUsername[0]?.username as string;
+        const id = getUsername[0]?.id as string;
+
         // Get permissions for the player
         const access = (await permissions.get(username)) as string;
 
@@ -123,6 +126,10 @@ export default async function packetReceiver(
         // Get the player's stats
         const stats = await player.getStats(username);
         sendPacket(ws, packetManager.stats(stats));
+
+        // Get the player's friends list
+        const friendsList = await friends.list(username);
+        sendPacket(ws, packetManager.updateFriends(friendsList));
 
         // Get client configuration
         const clientConfig = (await player.getConfig(username)) as any[];
@@ -186,6 +193,7 @@ export default async function packetReceiver(
           isStealth,
           isNoclip,
           id: ws.data.id,
+          userid: id,
           location: {
             map: spawnLocation.map.replace(".json", ""),
             position: {
@@ -197,6 +205,7 @@ export default async function packetReceiver(
           language: parsedMessage?.language || "en",
           ws,
           stats,
+          friendsList,
           attackDelay: 0,
           lastMovementPacket: null,
           permissions: typeof access === "string" ? access.split(",") : [],
@@ -265,6 +274,7 @@ export default async function packetReceiver(
         players.forEach((player) => {
           const spawnData = {
             id: ws.data.id,
+            userid: id,
             location: {
               map: spawnLocation.map,
               x: position.x || 0,
@@ -277,17 +287,28 @@ export default async function packetReceiver(
             stats,
             animation: null,
           };
-          sendPacket(player.ws, packetManager.spawnPlayer(spawnData));
-          sendAnimation(player.ws, "player_idle_down.png");
 
-          const location = player.location;
+          if (player.ws === ws) {
+            sendPacket(player.ws, packetManager.spawnPlayer({
+              ...spawnData,
+              friendsList,
+            }));
+          } else {
+            sendPacket(player.ws, packetManager.spawnPlayer(spawnData));
+          }
+
+          if (spawnLocation.direction) {
+            sendPositionAnimation(player.ws, spawnLocation.direction, false);
+          }
+
           const data = {
             id: player.id,
+            userid: player.userid,
             location: {
-              map: location.map,
-              x: location.position.x || 0,
-              y: location.position.y || 0,
-              direction: location.position.direction,
+              map: player.location.map,
+              x: player.location.position.x || 0,
+              y: player.location.position.y || 0,
+              direction: player.location.position.direction,
             },
             username: player.username,
             isAdmin: player.isAdmin,
@@ -300,8 +321,14 @@ export default async function packetReceiver(
         });
 
         sendPacket(ws, packetManager.loadPlayers(playerData));
-
-        sendAnimation(ws, "player_idle_down.png");
+        // Send animations for all loadedPlayers
+        if (playerData.length > 0) {
+          playerData.forEach((player) => {
+            if (player.location.direction) {
+              sendAnimation(ws, getAnimationNameForDirection(player.location.direction, false), player.id);
+            }
+          });
+        }
         break;
       }
       // TODO:Move this to the logout packet
@@ -410,32 +437,7 @@ export default async function packetReceiver(
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
             if (lastDirection) {
-              switch (lastDirection) {
-                case "down":
-                  sendAnimation(ws, "player_idle_down.png");
-                  break;
-                case "up":
-                  sendAnimation(ws, "player_idle_up.png");
-                  break;
-                case "left":
-                  sendAnimation(ws, "player_idle_left.png");
-                  break;
-                case "right":
-                  sendAnimation(ws, "player_idle_right.png");
-                  break;
-                case "upleft":
-                  sendAnimation(ws, "player_idle_up.png");
-                  break;
-                case "upright":
-                  sendAnimation(ws, "player_idle_up.png");
-                  break;
-                case "downleft":
-                  sendAnimation(ws, "player_idle_down.png");
-                  break;
-                case "downright":
-                  sendAnimation(ws, "player_idle_down.png");
-                  break;
-              }
+              sendPositionAnimation(ws, lastDirection, false);
             }
           }
           return;
@@ -457,32 +459,7 @@ export default async function packetReceiver(
         ];
         if (!directions.includes(moveDirection)) return;
 
-        switch (moveDirection) {
-          case "down":
-            sendAnimation(ws, "player_walk_down.png");
-            break;
-          case "up":
-            sendAnimation(ws, "player_walk_up.png");
-            break;
-          case "left":
-            sendAnimation(ws, "player_walk_left.png");
-            break;
-          case "right":
-            sendAnimation(ws, "player_walk_right.png");
-            break;
-          case "upleft":
-            sendAnimation(ws, "player_walk_up.png");
-            break;
-          case "upright":
-            sendAnimation(ws, "player_walk_up.png");
-            break;
-          case "downleft":
-            sendAnimation(ws, "player_walk_down.png");
-            break;
-          case "downright":
-            sendAnimation(ws, "player_walk_down.png");
-            break;            
-        }
+        sendPositionAnimation(ws, moveDirection, true);
 
         // Clear any existing movement
         if (currentPlayer.movementInterval) {
@@ -525,27 +502,8 @@ export default async function packetReceiver(
             currentPlayer.movementInterval = null;
             
             // Add idle animation based on last direction
-            switch (tempPosition.direction) {
-              case "down":
-                sendAnimation(ws, "player_idle_down.png");
-                break;
-              case "up":
-                sendAnimation(ws, "player_idle_up.png");
-                break;
-              case "left":
-                sendAnimation(ws, "player_idle_left.png");
-                break;
-              case "right":
-                sendAnimation(ws, "player_idle_right.png");
-                break;
-              case "upleft":
-              case "upright":
-                sendAnimation(ws, "player_idle_up.png");
-                break;
-              case "downleft":
-              case "downright":
-                sendAnimation(ws, "player_idle_down.png");
-                break;
+            if (lastDirection) {
+              sendPositionAnimation(ws, lastDirection, false);
             }
             return;
           }
@@ -813,14 +771,11 @@ export default async function packetReceiver(
               id: ws.data.id,
               _data: currentPlayer.location.position,
             };
-            sendPacket(player.ws, packetManager.moveXY(moveXYData));
-            
-            // Send current animation based on direction
-            const animationPacketData = {
-              id: currentPlayer.id,
-              data: currentPlayer.animation?.frames || getAnimation(`player_idle_${currentPlayer.location.position.direction}.png`)?.data,
-            };
-            sendPacket(player.ws, packetManager.animation(animationPacketData));
+
+            if (currentPlayer.location.position.direction) {
+              sendPositionAnimation(ws, currentPlayer.location.position.direction, false);
+              sendPacket(player.ws, packetManager.moveXY(moveXYData));
+            }
           });
         }
         break;
@@ -1826,6 +1781,42 @@ export default async function packetReceiver(
         }
         break;
       }
+      case "ADD_FRIEND": {
+        const id = (data as any).id;
+        if (!id) return;
+
+        const get_player_username = cache.get(ws.data.id);
+        if (!get_player_username) return;
+        const player_username = get_player_username.username;
+
+        const get_friend_username = cache.get(id);
+        if (!get_friend_username) return;
+        const friend_username = get_friend_username.username;
+
+        const updatedFriendsList = await friends.add(player_username, friend_username);
+
+        sendPacket(ws, packetManager.notify({ message: `Added ${friend_username} to your friends list` }));
+        sendPacket(ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+        break;
+      }
+      case "REMOVE_FRIEND": {
+        const id = (data as any).id;
+        if (!id) return;
+
+        const get_player_username = cache.get(ws.data.id);
+        if (!get_player_username) return;
+        const player_username = get_player_username.username;
+
+        const get_friend_username = cache.get(id);
+        if (!get_friend_username) return;
+        const friend_username = get_friend_username.username;
+
+        const updatedFriendsList = await friends.remove(player_username, friend_username);
+
+        sendPacket(ws, packetManager.notify({ message: `Removed ${friend_username} from your friends list` }));
+        sendPacket(ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+        break;
+      }
       // Unknown packet type
       default: {
         break;
@@ -1872,27 +1863,32 @@ function sendPacket(ws: any, packets: any[]) {
   });
 }
 
-function sendAnimation(ws: any, name: string) {
-  const currentPlayer = cache.get(ws.data.id);
+function sendAnimation(ws: any, name: string, playerId?: string) {
+  const currentPlayer = cache.get(playerId || ws.data.id);
 
   const animationData = getAnimation(name);
   if (!animationData) {
     console.log("Animation not found");
     return;
   }
+
   currentPlayer.animation = {
     frames: animationData.data,
     currentFrame: 0,
     lastFrameTime: performance.now(),
   };
+
   const animationPacketData = {
     id: currentPlayer.id,
     name: name,
     data: animationData.data,
   };
+
   cache.set(currentPlayer.id, currentPlayer);
+
   const playersInMap = filterPlayersByMap(currentPlayer.location.map);
   const playersInMapAdmins = playersInMap.filter((p) => p.isAdmin);
+
   if (currentPlayer.isStealth) {
     playersInMapAdmins.forEach((player) => {
       sendPacket(player.ws, packetManager.animation(animationPacketData));
@@ -1911,4 +1907,34 @@ function getAnimation(name: string) {
     return;
   }
   return animationData;
+}
+
+function getAnimationNameForDirection(direction: string, walking: boolean): string {
+  const normalized = normalizeDirection(direction);
+  const action = walking ? "walk" : "idle";
+  return `player_${action}_${normalized}.png`;
+}
+
+function sendPositionAnimation(ws: WebSocket, direction: string, walking: boolean) {
+  const animation = getAnimationNameForDirection(direction, walking);
+  sendAnimation(ws, animation);
+}
+
+function normalizeDirection(direction: string): string {
+  switch (direction) {
+    case "down":
+    case "downleft":
+    case "downright":
+      return "down";
+    case "up":
+    case "upleft":
+    case "upright":
+      return "up";
+    case "left":
+      return "left";
+    case "right":
+      return "right";
+    default:
+      return "down"; // safe fallback
+  }
 }

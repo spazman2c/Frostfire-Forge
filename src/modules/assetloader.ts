@@ -54,6 +54,33 @@ function loadAnimations() {
 
 loadAnimations();
 
+function loadIcons() {
+  const now = performance.now();
+  const icons = [] as any[];
+  const iconDir = path.join(import.meta.dir, assetData.icons.path);
+  if (!fs.existsSync(iconDir)) {
+    throw new Error(`Icons directory not found at ${iconDir}`);
+  }
+  const iconFiles = fs.readdirSync(iconDir).filter((file) => file.endsWith(".png"));
+  iconFiles.forEach((file) => {
+    const name = file.replace(".png", "");
+    const data = fs.readFileSync(path.join(iconDir, file), "base64");
+    log.debug(`Loaded icon: ${name}`);
+    const iconHash = crypto
+      .createHash("sha256")
+      .update(data)
+      .digest("hex");
+    const compressedData = zlib.gzipSync(data);
+    icons.push({ name, data: compressedData, hash: iconHash });
+    assetCache.add(name, compressedData);
+    log.debug(`Compressed icon: ${name}\n- ${data.length} (bytes) -> ${compressedData.length} (bytes)\n- Compression Ratio: ${(data.length / compressedData.length).toFixed(2)}% | Compression: ${(((data.length - compressedData.length) / data.length) * 100).toFixed(2)}%`);
+  });
+  assetCache.add("icons", icons);
+  log.success(`Loaded ${icons.length} icon(s) in ${(performance.now() - now).toFixed(2)}ms`);
+}
+
+loadIcons();
+
 // Load world data
 const worldNow = performance.now();
 assetCache.add("worlds", await worlds.list());
@@ -71,7 +98,15 @@ if (!world.find((w) => w.name === worldName)) {
 // Load item data
 const itemnow = performance.now();
 assetCache.add("items", await item.list());
+// For each item, find the icon data and add the compressed data to the item object
+assetCache.get("items").forEach((item: any) => {
+  if (item.icon) {
+    const iconData = assetCache.get(item.icon);
+    item.icon = iconData || null; // Replace the icon with the compressed data if it exists
+  }
+});
 const items = assetCache.get("items") as Item[];
+
 log.success(`Loaded ${items.length} item(s) from the database in ${(performance.now() - itemnow).toFixed(2)}ms`);
 
 // Load spell data

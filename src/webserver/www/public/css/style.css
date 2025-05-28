@@ -90,7 +90,7 @@ body {
   /* animation: move_logo 2s infinite ease-in-out; */
 }
 
-#login, #register {
+#login, #register, #forgotpassword, #changepassword {
   width: 500px;
   height: auto;
   /* Position at top center */
@@ -111,7 +111,15 @@ body {
   content: url("../img/registration.png");
 }
 
-#login-container, #register-container {
+#forgotpassword {
+  content: url("../img/forgotpassword.png");
+}
+
+#changepassword {
+  content: url("../img/changepassword.png");
+}
+
+#login-container, #register-container, #forgotpassword-container, #changepassword-container {
   width: 315px;
   height: 205px;
   align-items: center;
@@ -131,6 +139,16 @@ body {
 }
 
 #register-container {
+  top: 525px;
+  animation: move_login_container 2s infinite ease-in-out;
+}
+
+#forgotpassword-container {
+  top: 525px;
+  animation: move_login_container 2s infinite ease-in-out;
+}
+
+#changepassword-container {
   top: 525px;
   animation: move_login_container 2s infinite ease-in-out;
 }
@@ -192,12 +210,16 @@ input[type="range"] {
   border: none;
 }
 
-#register-email, #register-username, #register-password, #register-confirm-password {
+#register-email, #register-username, #register-password, #register-confirm-password, #forgotpassword-email, #changepassword-email, #changepassword-password, #changepassword-confirm-password {
   position: absolute;
   background-color: transparent;
   left: 32px;
   right: 32px;
   width: unset;
+}
+
+#forgotpassword-email {
+  top: 98px;
 }
 
 #register-email{
@@ -216,7 +238,49 @@ input[type="range"] {
   top: 200px;
 }
 
+#changepassword-email {
+  top: 55px;
+}
+
+#changepassword-password {
+  top: 126px;
+}
+
+#changepassword-confirm-password {
+  top: 169px;
+}
+
 #register-button {
+  position: absolute;
+  margin-top: 143px;
+  background-color: transparent;
+  /* Center the button */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 175px;
+  height: 70px;
+  color: transparent;
+  cursor: pointer;
+  outline: none;
+  border: none;
+}
+
+#forgotpassword-button {
+  position: absolute;
+  margin-top: 143px;
+  background-color: transparent;
+  /* Center the button */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 175px;
+  height: 70px;
+  color: transparent;
+  cursor: pointer;
+  outline: none;
+  border: none;
+}
+
+#changepassword-button {
   position: absolute;
   margin-top: 143px;
   background-color: transparent;

@@ -1,11 +1,11 @@
 // Add type declaration at the top of the file
 declare global {
 	interface Window {
-		Notify: (type: string, message: string) => void;
+		Notify: (type: string, message: string, time?: number) => void;
 	}
 }
 
-function Notify(type: string, message: string) {
+function Notify(type: string, message: string, time?: number): void {
 	const notification = document.createElement("div") as HTMLDivElement;
 	notification.classList.add("notification");
 	notification.classList.add(`notification-${type}`);
@@ -25,7 +25,7 @@ function Notify(type: string, message: string) {
 			(notifications[i] as HTMLElement).style.marginBottom = `${80 * (i - 1)}px`;
 		}
 		notification.remove();
-	}, 5000);
+	}, time || 5000); // Default time is 5 seconds
 }
 
 // Assign the Notify function to the global window object
