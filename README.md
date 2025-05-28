@@ -243,12 +243,15 @@ export const packetTypes: PacketType = {
   35: "COMMAND",
   36: "NOTIFY",
   37: "NOCLIP",
-  38: "ANIMATION_SEQUENCE",
-  39: "QUESTLOG",
-  40: "QUESTDETAILS",
-  41: "TYPING",
-  42: "STOPTYPING",
-  43: "UPDATE_XP",
+  38: "QUESTLOG",
+  39: "QUESTDETAILS",
+  40: "TYPING",
+  41: "STOPTYPING",
+  42: "UPDATE_XP",
+  43: "ANIMATION",
+  44: "ADD_FRIEND",
+  45: "REMOVE_FRIEND",
+  46: "UPDATE_FRIENDS"
 };
 ```
 
