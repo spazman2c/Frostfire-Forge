@@ -33,52 +33,84 @@ const assetData = JSON.parse(asset);
 
 function loadAnimations() {
   const now = performance.now();
-  if (fs.existsSync(path.join(import.meta.dir, assetData.animations.path))) {
-    const animationFiles = parseAnimations();
-    const animations = [] as any[];
+
+  const animationPath = path.join(import.meta.dir, assetData.animations.path);
+  if (!fs.existsSync(animationPath)) {
+    console.log("No animations found");
+    return;
+  }
+
+  const animationFiles = parseAnimations();
+  const animations = [] as any[];
+
   for (const file of animationFiles) {
     if (validateAnimationFile(file)) {
-        // Add raw compressed data to cache using zlib
-        const buffer = fs.readFileSync(path.join(import.meta.dir, assetData.animations.path, file));
-        const compressed = zlib.deflateSync(buffer);
-        log.debug(`Compressed animation: ${file}\n- ${buffer.length} (bytes) -> ${compressed.length} (bytes)\n- Compression Ratio: ${(buffer.length / compressed.length).toFixed(2)}% | Compression: ${(((buffer.length - compressed.length) / buffer.length) * 100).toFixed(2)}%`);
-        animations.push({ name: file, data: compressed });
-      }
-    }
-    assetCache.add("animations", animations);
-    log.success(`Loaded ${animations.length} animation(s) in ${(performance.now() - now).toFixed(2)}ms`);
-  } else {
-    console.log("No animations found");
-  }
-}
+      const buffer = fs.readFileSync(path.join(animationPath, file));
+      const compressed = zlib.deflateSync(buffer);
 
+      const originalSize = buffer.length;
+      const compressedSize = compressed.length;
+      const ratio = (originalSize / compressedSize).toFixed(2);
+      const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
+      log.debug(`Compressed animation: ${file}
+  - Original: ${originalSize} bytes
+  - Compressed: ${compressedSize} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
+
+      animations.push({ name: file, data: compressed });
+    }
+  }
+
+  assetCache.add("animations", animations);
+  log.success(`Loaded ${animations.length} animation(s) in ${(performance.now() - now).toFixed(2)}ms`);
+}
 loadAnimations();
 
 function loadIcons() {
   const now = performance.now();
   const icons = [] as any[];
   const iconDir = path.join(import.meta.dir, assetData.icons.path);
+
   if (!fs.existsSync(iconDir)) {
     throw new Error(`Icons directory not found at ${iconDir}`);
   }
+
   const iconFiles = fs.readdirSync(iconDir).filter((file) => file.endsWith(".png"));
+
   iconFiles.forEach((file) => {
     const name = file.replace(".png", "");
-    const data = fs.readFileSync(path.join(iconDir, file), "base64");
+    const rawData = fs.readFileSync(path.join(iconDir, file));
+    const base64Data = rawData.toString("base64");
+
     log.debug(`Loaded icon: ${name}`);
+
     const iconHash = crypto
       .createHash("sha256")
-      .update(data)
+      .update(base64Data)
       .digest("hex");
-    const compressedData = zlib.gzipSync(data);
+
+    const compressedData = zlib.gzipSync(base64Data);
+
     icons.push({ name, data: compressedData, hash: iconHash });
     assetCache.add(name, compressedData);
-    log.debug(`Compressed icon: ${name}\n- ${data.length} (bytes) -> ${compressedData.length} (bytes)\n- Compression Ratio: ${(data.length / compressedData.length).toFixed(2)}% | Compression: ${(((data.length - compressedData.length) / data.length) * 100).toFixed(2)}%`);
+
+    const originalSize = base64Data.length;
+    const compressedSize = compressedData.length;
+    const ratio = (originalSize / compressedSize).toFixed(2);
+    const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
+    log.debug(`Compressed icon: ${name}
+  - Original: ${originalSize} bytes
+  - Compressed: ${compressedSize} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
   });
+
   assetCache.add("icons", icons);
   log.success(`Loaded ${icons.length} icon(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
-
 loadIcons();
 
 // Load world data
@@ -145,12 +177,13 @@ function loadMaps() {
   const maps = [] as MapData[];
   const failedMaps = [] as string[];
   const mapDir = path.join(import.meta.dir, assetData.maps.path);
+
   if (!fs.existsSync(mapDir)) {
     throw new Error(`Maps directory not found at ${mapDir}`);
   }
 
   const mapFiles = fs.readdirSync(mapDir);
-  // If no maps throw an error
+
   if (mapFiles.length === 0) {
     throw new Error("No maps found in the maps directory");
   }
@@ -159,19 +192,35 @@ function loadMaps() {
     if (!file.endsWith(".json")) return;
     const f = path.join(mapDir, file);
     const result = tryParse(fs.readFileSync(f, "utf-8")) || failedMaps.push(f);
-    // Compress the map data
-    const compressedData = zlib.gzipSync(JSON.stringify(result));
 
     if (result) {
+      const jsonString = JSON.stringify(result);
+      const compressedData = zlib.gzipSync(jsonString);
+
       const mapHash = crypto
         .createHash("sha256")
-        .update(JSON.stringify(result))
+        .update(jsonString)
         .digest("hex");
-      maps.push({ name: file, data: result, hash: mapHash, compressed: compressedData });
+
+      maps.push({
+        name: file,
+        data: result,
+        hash: mapHash,
+        compressed: compressedData,
+      });
+
+      const originalSize = jsonString.length;
+      const compressedSize = compressedData.length;
+      const ratio = (originalSize / compressedSize).toFixed(2);
+      const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
+      log.debug(`Loaded map: ${file}`);
+      log.debug(`Compressed map: ${file}
+  - Original: ${originalSize} bytes
+  - Compressed: ${compressedSize} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
     }
-    log.debug(`Loaded map: ${file}`);
-    // Same stats output as collision map compression
-    log.debug(`Compressed map: ${file}\n- ${JSON.stringify(result).length} (bytes) -> ${compressedData.length} (bytes)\n- Compression Ratio: ${(JSON.stringify(result).length / compressedData.length).toFixed(2)}% | Compression: ${(((JSON.stringify(result).length - compressedData.length) / JSON.stringify(result).length) * 100).toFixed(2)}%`);
   });
 
   if (failedMaps.length > 0) {
@@ -181,43 +230,36 @@ function loadMaps() {
   }
 
   // Store collision layers in asset cache
-
   maps.forEach((map) => {
     const collisions = [] as any[];
     map.data.layers.forEach((layer: any) => {
-      if (layer.properties) {
-        if (
-          layer.properties[0]?.name.toLowerCase() === "collision" &&
-          layer.properties[0]?.value === true
-        ) {
-          collisions.push(layer.data);
-        }
+      if (
+        layer.properties &&
+        layer.properties[0]?.name.toLowerCase() === "collision" &&
+        layer.properties[0]?.value === true
+      ) {
+        collisions.push(layer.data);
       }
     });
 
-    // Combine indexs of collision layers into a single array for each map
-    // 0's represent no collision, 1's represent collision
-    // Any index that is not 0 is considered a collision and can be marked as a 1
-    const collisionMap: number[][] = []; // Explicitly define type
+    const collisionMap: number[][] = [];
 
     collisions.forEach((collision: number[]) => {
       if (collisionMap.length === 0) {
-        // Initialize collisionMap[0] as an array of zeros or the same as the first collision array
-        collisionMap.push([...collision.map(() => 0)]); // Start with all zeros
+        collisionMap.push([...collision.map(() => 0)]);
       }
-
       collision.forEach((index: number, i: number) => {
         if (index !== 0) {
-          collisionMap[0][i] = 1; // Set the value to 1 for non-zero indices
+          collisionMap[0][i] = 1;
         }
       });
     });
 
     collisionMap.push(map.data.layers[0].width, map.data.layers[0].height);
-    // Compress the collision data by turning repeating 0's and 1's into a single number followed by the count
-    // This will reduce the size of the collision data
+
     const compressedCollisionMap = [] as any[];
     compressedCollisionMap.push(collisionMap[1], collisionMap[2]);
+
     let current = collisionMap[0][2];
     let count = 1;
     for (let i = 1; i < collisionMap[0].length; i++) {
@@ -230,31 +272,27 @@ function loadMaps() {
       }
     }
     compressedCollisionMap.push(current, count);
+
     const collisionBytes = new Uint8Array(collisionMap[0]).length;
     const compressedBytes = new Uint8Array(compressedCollisionMap).length;
+    const ratio = (collisionBytes / compressedBytes).toFixed(2);
+    const savings = (((collisionBytes - compressedBytes) / collisionBytes) * 100).toFixed(2);
+
     if (compressedBytes >= collisionBytes) {
-      log.error(
-        `Failed to compress collision map for ${
-          map.name
-        }\n- ${collisionBytes} (bytes) -> ${compressedBytes} (bytes)\n- Compression Ratio: ${(
-          collisionBytes / compressedBytes
-        ).toFixed(2)}% | Compression: ${(
-          ((collisionBytes - compressedBytes) / collisionBytes) *
-          100
-        ).toFixed(2)}%`
-      );
+      log.error(`Failed to compress collision map for ${map.name}
+    - Original: ${collisionBytes} bytes
+    - Compressed: ${compressedBytes} bytes
+    - Compression Ratio: ${ratio}x
+    - Compression Savings: ${savings}%`);
       throw new Error("Failed to compress collision map");
     }
-    log.debug(
-      `Generated compressed collision map for ${
-        map.name
-      }\n- ${collisionBytes} (bytes) -> ${compressedBytes} (bytes)\n- Compression Ratio: ${(
-        collisionBytes / compressedBytes
-      ).toFixed(2)}% | Compression: ${(
-        ((collisionBytes - compressedBytes) / collisionBytes) *
-        100
-      ).toFixed(2)}%`
-    );
+
+    log.debug(`Generated compressed collision map for ${map.name}
+  - Original: ${collisionBytes} bytes
+  - Compressed: ${compressedBytes} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
+
     assetCache.addNested(
       map.name.replace(".json", ""),
       "collision",
@@ -262,7 +300,6 @@ function loadMaps() {
     );
   });
 
-  // Check if main.json exists and if not throw an error
   const mainMap = maps.find((map) => map.name === "main.json");
   if (!mainMap) {
     throw new Error("Main map not found");
@@ -271,7 +308,6 @@ function loadMaps() {
   assetCache.add("maps", maps);
   log.success(`Loaded ${maps.length} map(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
-
 loadMaps();
 
 // Load tilesets
@@ -279,6 +315,7 @@ function loadTilesets() {
   const now = performance.now();
   const tilesets = [] as TilesetData[];
   const tilesetDir = path.join(import.meta.dir, assetData.tilesets.path);
+
   if (!fs.existsSync(tilesetDir)) {
     throw new Error(`Tilesets directory not found at ${tilesetDir}`);
   }
@@ -287,12 +324,24 @@ function loadTilesets() {
   tilesetFiles.forEach((file) => {
     const tilesetData = fs.readFileSync(path.join(tilesetDir, file), "base64");
     const compressedData = zlib.gzipSync(tilesetData);
+
+    const originalSize = tilesetData.length;
+    const compressedSize = compressedData.length;
+    const ratio = (originalSize / compressedSize).toFixed(2);
+    const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
     log.debug(`Loaded tileset: ${file}`);
-    log.debug(`Compressed tileset: ${file}\n- ${tilesetData.length} (bytes) -> ${compressedData.length} (bytes)\n- Compression Ratio: ${(tilesetData.length / compressedData.length).toFixed(2)}% | Compression: ${(((tilesetData.length - compressedData.length) / tilesetData.length) * 100).toFixed(2)}%`);
+    log.debug(`Compressed tileset: ${file}
+  - Original: ${originalSize} bytes
+  - Compressed: ${compressedSize} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
+
     const tilesetHash = crypto
       .createHash("sha256")
       .update(tilesetData)
       .digest("hex");
+
     tilesets.push({ name: file, data: compressedData, hash: tilesetHash });
   });
 
@@ -311,27 +360,40 @@ function tryParse(data: string): any {
 }
 
 
-function loadSoundEffects () {
+function loadSoundEffects() {
   const now = performance.now();
   const soundEffects = [] as SoundData[];
   const soundEffectDir = path.join(import.meta.dir, assetData.sfx.path);
+
   if (!fs.existsSync(soundEffectDir)) {
     throw new Error(`Sound effects directory not found at ${soundEffectDir}`);
   }
-  // MP3 files are used for sound effects
+
   const soundEffectFiles = fs.readdirSync(soundEffectDir).filter((file) => file.endsWith(".mp3"));
+
   soundEffectFiles.forEach((file) => {
     const name = file.replace(".mp3", "");
     const data = fs.readFileSync(path.join(soundEffectDir, file), "base64");
     const compressedData = zlib.gzipSync(data);
+
+    const originalSize = data.length;
+    const compressedSize = compressedData.length;
+    const ratio = (originalSize / compressedSize).toFixed(2);
+    const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
+
     log.debug(`Loaded sound effect: ${name}`);
-    log.debug(`Compressed sound effect: ${name}\n- ${data.length} (bytes) -> ${compressedData.length} (bytes)\n- Compression Ratio: ${(data.length / compressedData.length).toFixed(2)}% | Compression: ${(((data.length - compressedData.length) / data.length) * 100).toFixed(2)}%`);
+    log.debug(`Compressed sound effect: ${name}
+  - Original: ${originalSize} bytes
+  - Compressed: ${compressedSize} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
+
     soundEffects.push({ name, data: compressedData });
   });
+
   assetCache.add("audio", soundEffects);
   log.success(`Loaded ${soundEffects.length} sound effect(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
-
 loadSoundEffects();
 
 async function loadSpriteSheets() {

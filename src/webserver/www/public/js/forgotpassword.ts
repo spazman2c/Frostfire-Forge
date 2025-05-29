@@ -1,5 +1,12 @@
 const forgotPasswordButton = document.getElementById("forgotpassword-button") as HTMLButtonElement;
 const emailInput = document.getElementById("forgotpassword-email") as HTMLInputElement;
+const currentURL = new URL(window.location.href);
+const email = currentURL.searchParams.get("email") as string;
+
+// If an email is provided in the URL, set it in the input field
+if (email) {
+  emailInput.value = email;
+}
 
 forgotPasswordButton.addEventListener("click", async () => {
   const response = await fetch("/reset-password", {

@@ -13,12 +13,12 @@ function verify(token: string, useremail: string, username: string): Promise<voi
                 username = username.toLowerCase();
                 // Generate a random 2FA code
                 const gameName = process.env.GAME_NAME || process.env.DOMAIN || "Game";
-                const subject = `${gameName} - Verify your account`;
+                const subject = `Verify your account`;
                 const code = shuffle(token, 100);
                 const url = `${process.env.DOMAIN}/verify?email=${useremail}&token=${token}&code=${code}`;
-                const message = `<p style="font-size: 20px;"><a href="${url}">Verify account</a></p><br><p style="font-size:12px;">If you did not request this, please ignore this email.</p>`;
+                const message = `<p style="font-size: 20px;"><a href="${url}">Verify account</a></p><br><p style="font-size:12px;">If you did not request this, <b>change your password immediately</b>.</p><a href="${process.env.DOMAIN}/forgot-password?email=${useremail}">Reset Password</a>`;
 
-                const emailResponse = await sendEmail(useremail, subject, message);
+                const emailResponse = await sendEmail(useremail, subject, gameName, message);
                 if (emailResponse !== "Email sent successfully") {
                     return reject(new Error("Failed to send email"));
                 }

@@ -30,35 +30,36 @@ const log = {
       fs.writeFileSync(_file, "");
     }
 
-    fs.appendFileSync(_file, `${timestamp} ${message}\n`);
+    message = `\n${message}\n`;
+    fs.appendFileSync(_file, `${timestamp} ${message}`);
 
-    const _message = `${log.type(type)}${timestamp} ${message} ${log.type(
+    const _message = `${log.type(type)}- ${timestamp} - ${message} ${log.type(
       "clear"
     )}`;
     console.log(_message);
   },
   info: (msg: string) => {
-    log.createLogFile(`[INFO] ${msg}`, "info");
+    log.createLogFile(`${msg}`, "info");
   },
   error: (msg: string) => {
-    log.createLogFile(`[ERROR] ${msg}`, "error");
+    log.createLogFile(`❌  ${msg}`, "error");
   },
   warn: (msg: string) => {
-    log.createLogFile(`[WARN] ${msg}`, "warn");
+    log.createLogFile(`⚠  ${msg}`, "warn");
   },
   success: (msg: string) => {
-    log.createLogFile(`[SUCCESS] ${msg}`, "success");
+    log.createLogFile(`✔  ${msg}`, "success");
   },
   debug: (msg: string) => {
     if (settings.logging.level !== "debug" && settings.logging.level !== "trace") return;
-    log.createLogFile(`[DEBUG] ${msg}`, "debug");
+    log.createLogFile(`🛠  ${msg}`, "debug");
   },
   trace: (msg: string) => {
     if (settings.logging.level !== "trace") return;
-    log.createLogFile(`[TRACE] ${msg}`, "trace");
+    log.createLogFile(`🛠  ${msg}`, "trace");
   },
   object: (obj: any) => {
-    log.createLogFile(`[OBJECT] ${JSON.stringify(obj, null, 2)}`, "info");
+    log.createLogFile(`🛠  ${JSON.stringify(obj, null, 2)}`, "info");
   },
 };
 

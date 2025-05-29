@@ -353,7 +353,7 @@ async function resetPassword(req: Request, server: any) {
   const subject = `${gameName} - Reset your password`;
   const url = `${process.env.DOMAIN}/change-password?email=${email}&code=${code}`;
   const message = `<p style="font-size: 20px;"><a href="${url}">Reset password</a></p><br><p style="font-size:12px;">If you did not request this, please ignore this email.</p>`;
-  const emailResponse = await sendEmail(email, subject, message);
+  const emailResponse = await sendEmail(email, subject, gameName, message);
   if (emailResponse !== "Email sent successfully") {
     log.error(`Failed to send reset password email: ${emailResponse}`);
     // We can return a 500 error here because the email doesn't exist in general or the email service failed
