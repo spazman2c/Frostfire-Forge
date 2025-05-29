@@ -503,9 +503,9 @@ export default async function packetReceiver(
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
             
-            // Add idle animation based on last direction
-            if (lastDirection) {
-              sendPositionAnimation(ws, lastDirection, false);
+            // Add idle animation based on current direction
+            if (moveDirection) {
+              sendPositionAnimation(ws, moveDirection, false);
             }
             return;
           }
@@ -1858,17 +1858,16 @@ export default async function packetReceiver(
           // Process friend request
           case "FRIEND_REQUEST": {
             if (response.toUpperCase() === "ACCEPT") {
-              // If the response is accept, we add the inviter to the current player's friends list
+              // If the response is accept, we need to add each other as friends
               const updatedCurrentPlayersFriendsList = await friends.add(currentPlayer.username.toLowerCase(), inviter.username.toLowerCase());
-              const updatedFriendsList = await friends.add(inviter.username.toLowerCase(), currentPlayer.username.toLowerCase());
-
-              // Notify both players
-              sendPacket(inviter.ws, packetManager.notify({message: `You are now friends with ${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)}`}));
               sendPacket(ws, packetManager.notify({message: `You are now friends with ${inviter.username.charAt(0).toUpperCase() + inviter.username.slice(1)}`}));
-
-              // Update both players' friends lists
-              sendPacket(inviter.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
               sendPacket(ws, packetManager.updateFriends({ friends: updatedCurrentPlayersFriendsList }));
+
+              // Add the inviter to the current player's friends list as well
+              // This is done so that both players can see each other as friends
+              const updatedFriendsList = await friends.add(inviter.username.toLowerCase(), currentPlayer.username.toLowerCase());
+              sendPacket(inviter.ws, packetManager.notify({message: `You are now friends with ${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)}`}));
+              sendPacket(inviter.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
               break;
             }
           }
@@ -1886,16 +1885,14 @@ export default async function packetReceiver(
         // We can't remove a friend if they are not online
         if (!get_friend) return;
 
-        // Update the friends list for both players
-        const updatedCurrentPlayersFriendsList = await friends.remove(get_friend.username.toLowerCase(), currentPlayer.username.toLowerCase());
+        // Remove the friend from the current player's friends list
         const updatedFriendsList = await friends.remove(currentPlayer.username.toLowerCase(), get_friend.username.toLowerCase());
-
+        sendPacket(get_friend.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
         // Notify only the player who initiated the removal
         sendPacket(ws, packetManager.notify({ message: `You have removed ${get_friend.username.charAt(0).toUpperCase() + get_friend.username.slice(1)} from your friends list` }));
-        
-        // Update both players' friends lists
+        // Update the current player's friends list
+        const updatedCurrentPlayersFriendsList = await friends.remove(get_friend.username.toLowerCase(), currentPlayer.username.toLowerCase());
         sendPacket(ws, packetManager.updateFriends({ friends: updatedCurrentPlayersFriendsList }));
-        sendPacket(get_friend.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
         break;
       }
       // Unknown packet type

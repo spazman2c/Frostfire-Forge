@@ -2293,6 +2293,12 @@ function stopMovement() {
 
 // Create invitation popup model
 function createInvitationPopup(invitationData: any) {
+  // Check if the popup already exists
+  const existingPopup = document.getElementById("invitation-popup");
+  if (existingPopup) {
+    // If it exists, remove it
+    existingPopup.remove();
+  }
   const popup = document.createElement("div");
   popup.id = "invitation-popup";
   popup.className = "popup";
