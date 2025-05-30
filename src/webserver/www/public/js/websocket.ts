@@ -2431,12 +2431,25 @@ function updateFriendsList(data: any) {
             friendElement.appendChild(friendName);
 
             const friendStatus = document.createElement("div");
-            // Check if the friend is online
             const isOnline = players.some(player => player.username.toLowerCase() === friend.toLowerCase() && player.id !== connectionId);
             friendStatus.classList.add("friend-status", isOnline ? "online" : "offline");
             friendStatus.innerText = isOnline ? "Online" : "Offline";
             friendElement.appendChild(friendStatus);
 
+            // Create the remove button ("X")
+            const removeButton = document.createElement("button");
+            removeButton.innerText = "X";
+            removeButton.classList.add("remove-friend-button");
+
+            // Add the click event handler
+            removeButton.onclick = () => {
+                sendRequest({
+                    type: "REMOVE_FRIEND",
+                    data: { username: friend },
+                });
+            };
+
+            friendElement.appendChild(removeButton);
             friendsList.appendChild(friendElement);
         }
     });

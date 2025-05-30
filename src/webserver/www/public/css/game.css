@@ -118,14 +118,11 @@ body {
 }
 
 .friend-item {
+  position: relative; /* Enable relative positioning for child elements */
   border-bottom: 1px solid rgba(147, 111, 85, 0.73);
-  margin-left: 10px;
-  margin-right: 10px;
-  margin-top: 5px;
-  padding-left: 10px;
-  padding-right: 10px;
-  padding-bottom: 5px;
-  margin-bottom: 5px;
+  margin: 5px 10px;
+  padding: 5px 10px;
+  padding-right: 30px; /* Add space for the button on the right */
 }
 
 .friend-item .friend-name {
@@ -156,6 +153,23 @@ body {
 #friends-list::-webkit-scrollbar-thumb {
   background: #A57D60;
   border-radius: 2px;
+}
+
+.remove-friend-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: #ff4d4d;
+  font-weight: bold;
+  font-size: 1em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.remove-friend-button:hover {
+  color: #ff0000;
 }
 
 #spell-book-container {

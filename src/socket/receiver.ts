@@ -1909,24 +1909,44 @@ export default async function packetReceiver(
         }
       break;
       }
+      // Not working when freidn is onlien
       case "REMOVE_FRIEND": {
         const id = (data as any).id;
-        if (!id) return;
+        const username = (data as any).username;
 
         if (!currentPlayer) return;
-
-        const get_friend = cache.get(id);
-        // We can't remove a friend if they are not online
-        if (!get_friend) return;
+        // Only fetch from cache if ID is provided, otherwise use username
+        let get_friend;
+        if (id) {
+          get_friend = cache.get(id);
+        } else if (username) {
+          // Try to find in cache by username (case-insensitive)
+          get_friend = Object.values(cache.list()).find(
+            (p: any) => p.username.toLowerCase() === username.toLowerCase()
+          );
+          // If not found in cache, fallback to database
+          if (!get_friend) {
+            get_friend = await player.findPlayerInDatabase(username);
+            // If database returns array, get the first result
+            if (Array.isArray(get_friend) && get_friend.length > 0) {
+              get_friend = get_friend[0];
+            }
+          }
+        }
 
         // Remove the friend from the current player's friends list
-        const updatedFriendsList = await friends.remove(currentPlayer.username.toLowerCase(), get_friend.username.toLowerCase());
-        sendPacket(get_friend.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
-        // Notify only the player who initiated the removal
-        sendPacket(ws, packetManager.notify({ message: `You have removed ${get_friend.username.charAt(0).toUpperCase() + get_friend.username.slice(1)} from your friends list` }));
+        const updatedFriendsList = await friends.remove(currentPlayer.username.toLowerCase(), get_friend?.username?.toLowerCase() || username.toLowerCase());
+
+        // If the friend is online, notify them and update their friends list
+        if (get_friend?.ws) {
+          // Only send an update to the removed friend if they are online
+          sendPacket(get_friend.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
+        }
+
         // Update the current player's friends list
-        const updatedCurrentPlayersFriendsList = await friends.remove(get_friend.username.toLowerCase(), currentPlayer.username.toLowerCase());
+        const updatedCurrentPlayersFriendsList = await friends.remove(get_friend?.username?.toLowerCase() || username.toLowerCase(), currentPlayer.username.toLowerCase());
         sendPacket(ws, packetManager.updateFriends({ friends: updatedCurrentPlayersFriendsList }));
+        sendPacket(ws, packetManager.notify({ message: `You have removed ${get_friend.username.charAt(0).toUpperCase() + get_friend.username.slice(1)} from your friends list` }));
         break;
       }
       // Unknown packet type
