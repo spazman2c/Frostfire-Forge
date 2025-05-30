@@ -23,6 +23,8 @@ const progressBar = document.getElementById("progress-bar") as HTMLDivElement;
 const progressBarContainer = document.getElementById("progress-bar-container") as HTMLDivElement;
 const inventoryUI = document.getElementById("inventory") as HTMLDivElement;
 const spellBookUI = document.getElementById("spell-book-container") as HTMLDivElement;
+const friendsListUI = document.getElementById("friends-list-container") as HTMLDivElement;
+const friendsList = document.getElementById("friends-list-content") as HTMLDivElement;
 const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
 const statUI = document.getElementById("stat-screen") as HTMLDivElement;
 const chatInput = document.getElementById("chat-input") as HTMLInputElement;
@@ -89,6 +91,7 @@ const manaLabel = document.getElementById("stats-screen-mana-label") as HTMLDivE
 let loaded: boolean = false;
 let toggleInventory = false;
 let toggleSpellBook = false;
+let toggleFriendsList = false;
 const times = [] as number[];
 let lastFrameTime = 0; // Track the time of the last frame
 let controllerConnected = false;
@@ -386,11 +389,11 @@ socket.onmessage = async (event) => {
       break;
     }
     case "UPDATE_FRIENDS": {
-      // Update the friends list for the current player in cache
-      const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
-      if (currentPlayer) {
-        currentPlayer.friends = data.friends || [];
-      }
+        const currentPlayer = players.find((player) => player.id === sessionStorage.getItem("connectionId"));
+        if (currentPlayer) {
+          currentPlayer.friends = data.friends || [];
+          updateFriendsList(data);
+        }
       break;
     }
     case "ANIMATION": {
@@ -453,6 +456,7 @@ socket.onmessage = async (event) => {
     }
     case "SPAWN_PLAYER": {
       await isLoaded();
+      updateFriendOnlineStatus(data.username, true);
       createPlayer(data);
       break;
     }
@@ -477,6 +481,7 @@ socket.onmessage = async (event) => {
       // Remove the player from the players array
       players.forEach((player, index) => {
         if (player.id === data) {
+          updateFriendOnlineStatus(player.username, false);
           players.splice(index, 1);
           const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
           if (dot) {
@@ -1119,7 +1124,11 @@ chatInput.addEventListener("input", () => {
   }, 1000);
 });
 
+const cooldowns: { [key: string]: number } = {};
+const COOLDOWN_DURATION = 1000; // milliseconds
+
 // Keyboard event handler configuration
+
 const keyHandlers = {
   F2: () => toggleDebugContainer(),
   Escape: () => handleEscapeKey(),
@@ -1127,7 +1136,18 @@ const keyHandlers = {
     toggleInventory = toggleUI(inventoryUI, toggleInventory, -350);
   },
   KeyP: () => {
+    if (toggleFriendsList) {
+      toggleFriendsList = toggleUI(friendsListUI, toggleFriendsList, -425);
+    }
+
     toggleSpellBook = toggleUI(spellBookUI, toggleSpellBook, -425);
+  },
+  KeyO: () => {
+    if (toggleSpellBook) {
+      toggleSpellBook = toggleUI(spellBookUI, toggleSpellBook, -425);
+    }
+
+    toggleFriendsList = toggleUI(friendsListUI, toggleFriendsList, -425);
   },
   KeyC: () => handleStatsUI(),
   Tab: (e: KeyboardEvent) => {
@@ -1273,9 +1293,18 @@ window.addEventListener("keydown", async (e) => {
   }
 
   // Handle other mapped keys
+  const now = Date.now();
   const handler = keyHandlers[e.code as keyof typeof keyHandlers];
-  if (handler) {
-    handler(e);
+  if (!handler) return;
+  // Prevent repeated calls within cooldown
+  if (cooldowns[e.code] && now - cooldowns[e.code] < COOLDOWN_DURATION) return;
+
+  cooldowns[e.code] = now;
+
+  try {
+    await handler(e as KeyboardEvent);
+  } catch (err) {
+    console.error(`Error handling key ${e.code}:`, err);
   }
 
   // Prevent blacklisted keys
@@ -1545,6 +1574,7 @@ function createNPC(data: any) {
 async function createPlayer(data: any) {
   positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
   console.log("Creating player with data:", data);
+  updateFriendOnlineStatus(data.username, true);
 
   // Add this helper function inside createPlayer
   const initializeAnimation = async (animationData: any) => {
@@ -1570,9 +1600,10 @@ async function createPlayer(data: any) {
 
   const player = {
     id: data.id,
+    username: data.username,
     userid: data.userid,
     animation: await initializeAnimation(data.animation),
-    friends: data.friendsList || [],
+    friends: data.friends || [],
     position: {
       x: canvas.width / 2 + data.location.x,
       y: canvas.height / 2 + data.location.y,
@@ -1784,15 +1815,16 @@ async function createPlayer(data: any) {
     },
   };
 
+  players.push(player);
+
   // Current player
   if (data.id === sessionStorage.getItem("connectionId")) {
     // Initialize camera position immediately for the current player
     cameraX = player.position.x - window.innerWidth / 2 + 8;
     cameraY = player.position.y - window.innerHeight / 2 + 48;
     window.scrollTo(cameraX, cameraY);
+    updateFriendsList({friends: data.friends || []});
   }
-
-  players.push(player);
 
   // Update player dots on the full map if it is open
   // if (fullmap.style.display === "block") {
@@ -2100,7 +2132,8 @@ function createContextMenu(event: MouseEvent, id: string) {
   const isSelf = id === sessionStorage.getItem("connectionId");
   const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
   const targetedPlayer = players.find(player => player.id === id);
-  const isFriend = currentPlayer?.friends.includes(targetedPlayer.userid.toString()) || false;
+  console.log(currentPlayer, targetedPlayer);
+  const isFriend = currentPlayer?.friends?.includes(targetedPlayer?.username?.toString()) || false;
 
   Object.entries(contextActions).forEach(([action, { label, handler, allowed_self }]) => {
     if (!allowed_self && isSelf) return;
@@ -2343,4 +2376,58 @@ function createInvitationPopup(invitationData: any) {
     sendRequest(data);
     popup.remove();
   });
+}
+
+function updateFriendOnlineStatus(friendName: string, isOnline: boolean) {
+  const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
+  list.forEach((item: HTMLElement) => {
+    const name = item.innerText.toLowerCase();
+    if (name === friendName.toLowerCase()) {
+      const statusElement = item.nextElementSibling as HTMLElement;
+      if (statusElement) {
+        statusElement.classList.toggle("online", isOnline);
+        statusElement.classList.toggle("offline", !isOnline);
+        statusElement.innerText = isOnline ? "Online" : "Offline";
+      }
+    }
+  });
+}
+
+function updateFriendsList(data: any) {
+    const connectionId = sessionStorage.getItem("connectionId");
+    const currentPlayer = players.find(player => player.id === connectionId);
+    if (!currentPlayer || !data?.friends) return;
+
+    const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
+
+    // Step 1: Remove friends from UI that are no longer in data.friends
+    list.forEach((item: HTMLElement) => {
+        const name = item.innerText.toLowerCase();
+        if (!data.friends.map((f: string) => f.toLowerCase()).includes(name)) {
+            item.parentElement?.remove(); // Remove the whole friend-item div
+        }
+    });
+
+    // Step 2: Add new friends from data.friends if they don't exist in UI
+    data.friends.forEach((friend: string) => {
+        const exists = list.some(item => item.innerText.toLowerCase() === friend.toLowerCase());
+        if (!exists) {
+            const friendElement = document.createElement("div");
+            friendElement.classList.add("friend-item", "ui");
+
+            const friendName = document.createElement("div");
+            friendName.classList.add("friend-name");
+            friendName.innerText = friend.charAt(0).toUpperCase() + friend.slice(1);
+            friendElement.appendChild(friendName);
+
+            const friendStatus = document.createElement("div");
+            // Check if the friend is online
+            const isOnline = players.some(player => player.username.toLowerCase() === friend.toLowerCase() && player.id !== connectionId);
+            friendStatus.classList.add("friend-status", isOnline ? "online" : "offline");
+            friendStatus.innerText = isOnline ? "Online" : "Offline";
+            friendElement.appendChild(friendStatus);
+
+            friendsList.appendChild(friendElement);
+        }
+    });
 }

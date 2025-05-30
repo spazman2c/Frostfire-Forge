@@ -130,7 +130,6 @@ export default async function packetReceiver(
 
         // Get the player's friends list
         const friendsList = await friends.list(username);
-        sendPacket(ws, packetManager.updateFriends(friendsList));
 
         // Get client configuration
         const clientConfig = (await player.getConfig(username)) as any[];
@@ -206,7 +205,7 @@ export default async function packetReceiver(
           language: parsedMessage?.language || "en",
           ws,
           stats,
-          friendsList,
+          friends: friendsList,
           attackDelay: 0,
           lastMovementPacket: null,
           permissions: typeof access === "string" ? access.split(",") : [],
@@ -293,7 +292,7 @@ export default async function packetReceiver(
           if (player.ws === ws) {
             sendPacket(player.ws, packetManager.spawnPlayer({
               ...spawnData,
-              friendsList,
+              friends: friendsList,
             }));
           } else {
             sendPacket(player.ws, packetManager.spawnPlayer(spawnData));

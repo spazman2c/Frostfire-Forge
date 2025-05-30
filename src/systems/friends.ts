@@ -26,20 +26,18 @@ const friends = {
 
     try {
       const queryResult = (await query(
-        "SELECT id FROM accounts WHERE username = ?",
+        "SELECT username FROM accounts WHERE username = ?",
         [friend_username]
       )) as any;
-      const id = queryResult[0]?.id;
-      if (!id) return await this.list(username); // Friend not found
-
-      const friendId = id.toString();
+      const user = queryResult[0]?.username;
+      if (!user) return await this.list(username); // Friend not found
       const currentFriends = await this.list(username);
 
-      if (currentFriends.includes(friendId)) {
+      if (currentFriends.includes(user.toString())) {
         return currentFriends; // Already a friend
       }
 
-      currentFriends.push(friendId);
+      currentFriends.push(user.toString());
       const friendsString = currentFriends.join(",");
 
       const result = (await query(
@@ -60,16 +58,22 @@ const friends = {
   },
   async remove(username: string, friend_username: string) {
     if (!username || !friend_username) return [];
+
     try {
+      // Check if the friend exists
       const queryResult = (await query(
-        "SELECT id FROM accounts WHERE username = ?",
+        "SELECT username FROM accounts WHERE username = ?",
         [friend_username]
       )) as any;
-      const id = queryResult[0]?.id;
-      if (!id) return [];
 
+      const user = queryResult[0]?.username;
+      if (!user) return [];
+
+      // Get current friends list
       const currentFriends = await this.list(username);
-      const friendIndex = currentFriends.indexOf(id.toString());
+
+      // Find and remove the friend
+      const friendIndex = currentFriends.indexOf(friend_username.toString());
       if (friendIndex === -1) {
         return currentFriends; // Friend not found, return current list
       }
@@ -77,10 +81,12 @@ const friends = {
       currentFriends.splice(friendIndex, 1); // Remove friend
       const friendsString = currentFriends.join(",");
 
+      // Update the database
       const result = (await query(
         "UPDATE friendslist SET friends = ? WHERE username = ?",
         [friendsString, username]
       )) as any;
+
       if (result.affectedRows > 0) {
         return currentFriends; // Return updated friends list
       } else {
@@ -91,7 +97,7 @@ const friends = {
       log.error(`Error removing friend for ${username}: ${error}`);
       return [];
     }
-  },
+  }
 };
 
 export default friends;

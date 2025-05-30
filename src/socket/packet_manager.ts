@@ -152,7 +152,7 @@ export const packetManager = {
             isStealth: data.isStealth,
             stats: data.stats,
             sprite: data.sprite,
-            ...(data.friendsList ? { friendsList: data.friendsList } : {}),
+            ...(data.friends ? { friends: data.friends } : {}),
           },
         })
       )
