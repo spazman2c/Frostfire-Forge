@@ -275,6 +275,11 @@ export default async function packetReceiver(
         // Notify all *existing* players about the new player's online status
         for (const [, player] of Object.entries(allPlayers)) {
           if (player.ws !== ws) {
+            // Check if they are even friends
+            const isFriend = currentPlayerData.friends.some(
+              (friend: any) => friend.username === player.username
+            );
+            if (!isFriend) continue;
             sendPacket(player.ws, packetManager.updateOnlineStatus({
               online: true,
               username: currentPlayerData.username,
@@ -285,6 +290,11 @@ export default async function packetReceiver(
         // Notify the *new* player about all existing players who are already online
         for (const [, player] of Object.entries(allPlayers)) {
           if (player.ws !== ws) {
+            // Check if they are even friends
+            const isFriend = currentPlayerData.friends.some(
+              (friend: any) => friend.username === player.username
+            );
+            if (!isFriend) continue;
             sendPacket(ws, packetManager.updateOnlineStatus({
               online: true,
               username: player.username,
@@ -350,7 +360,7 @@ export default async function packetReceiver(
         // Send animations for all loadedPlayers
         if (playerData.length > 0) {
           playerData.forEach((player) => {
-            if (player.location.direction) {
+            if (player.id !== ws.data.id && player.location.direction) {
               sendAnimation(ws, getAnimationNameForDirection(player.location.direction, false), player.id);
             }
           });

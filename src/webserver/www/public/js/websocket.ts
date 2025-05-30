@@ -460,7 +460,6 @@ socket.onmessage = async (event) => {
     }
     case "SPAWN_PLAYER": {
       await isLoaded();
-      // updateFriendOnlineStatus(data.username, true);
       createPlayer(data);
       break;
     }
@@ -1579,8 +1578,7 @@ function createNPC(data: any) {
 
 async function createPlayer(data: any) {
   positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
-  console.log("Creating player with data:", data);
-  // updateFriendOnlineStatus(data.username, true);
+  updateFriendOnlineStatus(data.username, true);
 
   // Add this helper function inside createPlayer
   const initializeAnimation = async (animationData: any) => {
