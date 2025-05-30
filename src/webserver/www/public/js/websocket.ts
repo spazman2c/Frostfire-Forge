@@ -10,6 +10,14 @@ import parseAPNG from '../libs/apng_parser.js';
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
 const npcs = [] as any[];
+
+// Extend the Window interface for mapLayerCanvases
+declare global {
+  interface Window {
+    mapLayerCanvases?: Array<{ canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, zIndex: number }>;
+    playerZIndex?: number;
+  }
+}
 // const mapScale = 0.1;
 const audioCache = new Map<string, string>();
 const npcImage = new Image();
@@ -25,6 +33,7 @@ const inventoryUI = document.getElementById("inventory") as HTMLDivElement;
 const spellBookUI = document.getElementById("spell-book-container") as HTMLDivElement;
 const friendsListUI = document.getElementById("friends-list-container") as HTMLDivElement;
 const friendsList = document.getElementById("friends-list-content") as HTMLDivElement;
+const friendsListSearch = document.getElementById("friends-list-search") as HTMLInputElement;
 const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
 const statUI = document.getElementById("stat-screen") as HTMLDivElement;
 const chatInput = document.getElementById("chat-input") as HTMLInputElement;
@@ -150,7 +159,7 @@ function animationLoop() {
   const now = performance.now();
 
   // Skip frame if not enough time has passed
-  const deltaTime = (now - lastFrameTime) / 1000; // seconds
+  const deltaTime = (now - lastFrameTime) / 1000;
   if (now - lastFrameTime < frameDuration) {
     window.requestAnimationFrame(animationLoop);
     return;
@@ -174,6 +183,12 @@ function animationLoop() {
     const currentKeys = new Set([...pressedKeys]);
     let currentDirection = "";
     
+    if (document.activeElement === chatInput || document.activeElement === friendsListSearch) {
+      isMoving = false;
+      lastDirection = "";
+      return;
+    }
+
     if (currentKeys.has("KeyW") && currentKeys.has("KeyA")) currentDirection = "UPLEFT";
     else if (currentKeys.has("KeyW") && currentKeys.has("KeyD")) currentDirection = "UPRIGHT";
     else if (currentKeys.has("KeyS") && currentKeys.has("KeyA")) currentDirection = "DOWNLEFT";
@@ -196,7 +211,6 @@ function animationLoop() {
       }, 50);
     }
   } else if (isMoving && !isKeyPressed) {
-    // Handle movement stop
     if (lastDirection !== "") {
       sendRequest({
         type: "MOVEXY",
@@ -207,7 +221,7 @@ function animationLoop() {
     lastDirection = "";
   }
 
-  // Calculate visible area once
+  // Calculate visible area
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const scrollX = window.scrollX;
@@ -216,7 +230,7 @@ function animationLoop() {
   // Clear entire visible viewport
   ctx.clearRect(scrollX, scrollY, viewportWidth, viewportHeight);
 
-  // Filter visible entities with extended viewport
+  // Filter visible entities
   const visiblePlayers = players.filter(player => 
     isInViewport(
       player.position.x, 
@@ -239,29 +253,55 @@ function animationLoop() {
     )
   );
 
-  // Render visible entities
-  visiblePlayers.forEach(player => player.show(ctx));
-  
-  visibleNpcs.forEach(npc => {
-    npc.show(ctx);
-    // Only process particles for visible NPCs
-    if (npc.particles) {
-      npc.particles
-        .filter((particle: any) => 
-          particle.visible && 
-          isInViewport(
-            particle.x,
-            particle.y,
-            scrollX - 64,
-            scrollY - 64,
-            viewportWidth + 128,
-            viewportHeight + 128,
-            32
-          ) 
-        )
-        .forEach((particle: any) => npc.updateParticle(particle, npc, ctx, deltaTime));
-    }
-  });
+  // Render all layers and entities in proper z-order
+  if (window.mapLayerCanvases) {
+    const playerZIndex = 6; // Assuming players render at z-index 6
+    
+    // Render background layers (z-index < playerZIndex)
+    window.mapLayerCanvases
+      .filter(layer => layer.zIndex < playerZIndex)
+      .forEach(layer => {
+        ctx.drawImage(
+          layer.canvas,
+          scrollX, scrollY, viewportWidth, viewportHeight,
+          scrollX, scrollY, viewportWidth, viewportHeight
+        );
+      });
+    
+    // Render players and NPCs
+    visiblePlayers.forEach(player => player.show(ctx));
+    
+    visibleNpcs.forEach(npc => {
+      npc.show(ctx);
+      if (npc.particles) {
+        npc.particles
+          .filter((particle: any) => 
+            particle.visible && 
+            isInViewport(
+              particle.x,
+              particle.y,
+              scrollX - 64,
+              scrollY - 64,
+              viewportWidth + 128,
+              viewportHeight + 128,
+              32
+            ) 
+          )
+          .forEach((particle: any) => npc.updateParticle(particle, npc, ctx, deltaTime));
+      }
+    });
+    
+    // Render foreground layers (z-index >= playerZIndex)
+    window.mapLayerCanvases
+      .filter(layer => layer.zIndex >= playerZIndex)
+      .forEach(layer => {
+        ctx.drawImage(
+          layer.canvas,
+          scrollX, scrollY, viewportWidth, viewportHeight,
+          scrollX, scrollY, viewportWidth, viewportHeight
+        );
+      });
+  }
 
   // Update FPS counter
   if (times.length > 60) times.shift();
@@ -270,7 +310,7 @@ function animationLoop() {
   window.requestAnimationFrame(animationLoop);
 }
 
-const cameraSmoothing = 0.08;
+const cameraSmoothing = 0.05;
 function updateCamera(currentPlayer: any) {
   if (!loaded) return;
   
@@ -613,33 +653,27 @@ socket.onmessage = async (event) => {
             const mapWidth = mapData.width * mapData.tilewidth;
             const mapHeight = mapData.height * mapData.tileheight;
             
-            // Create canvas for each layer
+            // Create off-screen canvases for each layer (not added to DOM)
             const layerCanvases = mapData.layers.map((_layer: any, index: number) => {
               const layerCanvas = document.createElement('canvas');
-              // Set dimensions
               layerCanvas.width = mapWidth;
               layerCanvas.height = mapHeight;
-              // Set styles
-              layerCanvas.style.position = 'absolute';
-              layerCanvas.style.zIndex = (_layer.zIndex || index < 6 ? index : index + 1).toString();
-              layerCanvas.style.width = `${mapWidth}px`;
-              layerCanvas.style.height = `${mapHeight}px`;
               
-              document.body.appendChild(layerCanvas);
               return {
-                  canvas: layerCanvas,
-                  ctx: layerCanvas.getContext('2d', { willReadFrequently: false })!
+                canvas: layerCanvas,
+                ctx: layerCanvas.getContext('2d', { willReadFrequently: false })!,
+                zIndex: _layer.zIndex || index
               };
             });
             
-            // Match game canvas dimensions
+            // Set main canvas dimensions
             canvas.width = mapWidth;
             canvas.height = mapHeight;
             canvas.style.width = mapWidth + "px";
             canvas.style.height = mapHeight + "px";
-            canvas.style.zIndex = '7';
+            canvas.style.display = "block";
             
-            // Sort layers by zIndex
+            // Sort layers by zIndex for proper rendering order
             const sortedLayers = [...mapData.layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
             let currentLayer = 0;
             let progress = 0;
@@ -698,14 +732,19 @@ socket.onmessage = async (event) => {
             async function renderLayers(): Promise<void> {
               while (currentLayer < sortedLayers.length) {
                 const layer = sortedLayers[currentLayer];
-                await processLayer(layer, layerCanvases[currentLayer]);
+                const layerCanvas = layerCanvases.find((lc: any) => lc.zIndex === (layer.zIndex || currentLayer));
+                if (layerCanvas) {
+                  await processLayer(layer, layerCanvas);
+                }
                 currentLayer++;
                 await new Promise(resolve => requestAnimationFrame(resolve));
               }
               
-              canvas.style.display = "block";
               startGameButton.style.display = "block";
               progressBarContainer.style.display = "none";
+              
+              // Store layer canvases globally for use in animation loop
+              window.mapLayerCanvases = layerCanvases.sort((a: any, b: any) => a.zIndex - b.zIndex);
               
               resolve();
             }
@@ -713,7 +752,7 @@ socket.onmessage = async (event) => {
             loaded = true;
             renderLayers();
           });
-        }        
+        }
       }
       break;
     case "LOGIN_SUCCESS":
@@ -1166,7 +1205,7 @@ const keyHandlers = {
 } as const;
 
 // Movement keys configuration
-const blacklistedKeys = new Set(['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight']);
+const blacklistedKeys = new Set(['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'F1', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'Tab']);
 
 // Helper functions
 function toggleDebugContainer() {
@@ -1206,6 +1245,8 @@ function handleEscapeKey() {
 }
 
 async function handleEnterKey() {
+  // Check if friendslist search is focused
+  if (friendsListSearch === document.activeElement) return;
   const isTyping = chatInput === document.activeElement;
   
   if (!isTyping) {
@@ -1283,8 +1324,13 @@ function handleSpaceKey() {
 
 // Main keyboard event handlers
 window.addEventListener("keydown", async (e) => {
+  // Prevent blacklisted keys
+  if (blacklistedKeys.has(e.code)) {
+    e.preventDefault();
+    return;
+  }
   if (!loaded || (pauseMenu.style.display === "block" && e.code !== "Escape")) return;
-  if (chatInput === document.activeElement && !["Enter", "Escape"].includes(e.code)) return;
+  if ((chatInput === document.activeElement || document.activeElement == friendsListSearch) && !["Enter", "Escape"].includes(e.code)) return;
 
   // Handle movement keys
   if (movementKeys.has(e.code)) {
@@ -1310,11 +1356,6 @@ window.addEventListener("keydown", async (e) => {
     await handler(e as KeyboardEvent);
   } catch (err) {
     console.error(`Error handling key ${e.code}:`, err);
-  }
-
-  // Prevent blacklisted keys
-  if (blacklistedKeys.has(e.code)) {
-    e.preventDefault();
   }
 });
 
@@ -2292,6 +2333,10 @@ chatInput.addEventListener("focus", () => {
   stopMovement();
 });
 
+friendsListSearch.addEventListener("focus", () => {
+  stopMovement();
+});
+
 chatInput.addEventListener("blur", () => {
   // Send abort packet when chat is closed
   sendRequest({
@@ -2454,3 +2499,24 @@ function updateFriendsList(data: any) {
         }
     });
 }
+
+friendsListSearch.addEventListener("input", () => {
+  const searchTerm = friendsListSearch.value.toLowerCase();
+  const friendItems = Array.from(friendsList.querySelectorAll('.friend-item')) as HTMLElement[];
+  if (!searchTerm) {
+    // If search term is empty, show all items
+    friendItems.forEach(item => {
+      item.style.display = 'block'; // Reset display to default
+    });
+    return;
+  }
+
+  friendItems.forEach(item => {
+    const friendName = item.querySelector('.friend-name')?.textContent?.toLowerCase() || '';
+    if (friendName.includes(searchTerm)) {
+      item.style.display = 'block'; // Show matching items
+    } else {
+      item.style.display = 'none'; // Hide non-matching items
+    }
+  });
+});

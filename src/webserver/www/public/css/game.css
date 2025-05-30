@@ -109,12 +109,29 @@ body {
 #friends-list {
   font-size: 0.8em;
   position: absolute;
-  top: 60px;
+  top: 100px;
   left: 30px;
   right: 30px;
   bottom: 40px;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+#friends-list-search {
+  position: absolute;
+  top: 65px;
+  left: 40px;
+  right: 40px;
+  padding: 5px;
+  box-sizing: border-box;
+  background: #ffffffc7; /* Semi-transparent white background */
+  color: #813700;
+  font-size: 0.8em;
+  font-weight: bold;
+  border: none;
+  outline: none;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
 .friend-item {
