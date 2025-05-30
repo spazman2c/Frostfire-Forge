@@ -1,4 +1,5 @@
 import packet from "../modules/packet";
+import log from "../modules/logger";
 
 export const packetManager = {
   ping: (data: any) => {
@@ -43,6 +44,7 @@ export const packetManager = {
     const latency = performance.now() - Number(data) - 5000;
     const ServerTime = performance.now();
     if (latency >= 3000) {
+      log.error(`${ws.data.username} has high latency: ${latency}ms - closing connection`);
       ws.close(1001, "High latency");
     }
     return [
