@@ -103,6 +103,7 @@ export default async function packetReceiver(
         )) as any[];
 
         const username = getUsername[0]?.username as string;
+        ws.data.username = username;
         const id = getUsername[0]?.id as string;
 
         // Get permissions for the player
@@ -268,6 +269,30 @@ export default async function packetReceiver(
 
         sendPacket(ws, npcPackets);
 
+        const allPlayers = cache.list() as Record<string, any>; // Make it clear it's a dictionary
+        const currentPlayerData = allPlayers[ws.data.id];
+
+        // Notify all *existing* players about the new player's online status
+        for (const [, player] of Object.entries(allPlayers)) {
+          if (player.ws !== ws) {
+            sendPacket(player.ws, packetManager.updateOnlineStatus({
+              online: true,
+              username: currentPlayerData.username,
+            }));
+          }
+        }
+
+        // Notify the *new* player about all existing players who are already online
+        for (const [, player] of Object.entries(allPlayers)) {
+          if (player.ws !== ws) {
+            sendPacket(ws, packetManager.updateOnlineStatus({
+              online: true,
+              username: player.username,
+            }));
+          }
+        }
+
+        // Filter players by the current map
         const players = filterPlayersByMap(spawnLocation.map);
 
         const playerData = [] as any[];
@@ -320,7 +345,7 @@ export default async function packetReceiver(
 
           playerData.push(data);
         });
-
+      
         sendPacket(ws, packetManager.loadPlayers(playerData));
         // Send animations for all loadedPlayers
         if (playerData.length > 0) {

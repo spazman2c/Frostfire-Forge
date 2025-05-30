@@ -396,6 +396,10 @@ socket.onmessage = async (event) => {
         }
       break;
     }
+    case "UPDATE_ONLINE_STATUS": {
+      updateFriendOnlineStatus(data.username, data.online);
+      break;
+    }
     case "ANIMATION": {
       let apng: any;
       try {
@@ -456,7 +460,7 @@ socket.onmessage = async (event) => {
     }
     case "SPAWN_PLAYER": {
       await isLoaded();
-      updateFriendOnlineStatus(data.username, true);
+      // updateFriendOnlineStatus(data.username, true);
       createPlayer(data);
       break;
     }
@@ -477,11 +481,13 @@ socket.onmessage = async (event) => {
       break;
     }
     case "DISCONNECT_PLAYER": {
-      console.log("Player disconnected: " + data);
+      // If there is no username, it means the player is not logged in
+      if (!data || !data.id || !data.username) return;
+      console.log(`Player (${data.username}) ${data.id} disconnected`);
+      updateFriendOnlineStatus(data.username, false);
       // Remove the player from the players array
       players.forEach((player, index) => {
-        if (player.id === data) {
-          updateFriendOnlineStatus(player.username, false);
+        if (player.id === data.id) {
           players.splice(index, 1);
           const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
           if (dot) {
@@ -1574,7 +1580,7 @@ function createNPC(data: any) {
 async function createPlayer(data: any) {
   positionText.innerText = `Position: ${data.location.x}, ${data.location.y}`;
   console.log("Creating player with data:", data);
-  updateFriendOnlineStatus(data.username, true);
+  // updateFriendOnlineStatus(data.username, true);
 
   // Add this helper function inside createPlayer
   const initializeAnimation = async (animationData: any) => {
@@ -2379,18 +2385,24 @@ function createInvitationPopup(invitationData: any) {
 }
 
 function updateFriendOnlineStatus(friendName: string, isOnline: boolean) {
-  const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
-  list.forEach((item: HTMLElement) => {
-    const name = item.innerText.toLowerCase();
-    if (name === friendName.toLowerCase()) {
-      const statusElement = item.nextElementSibling as HTMLElement;
-      if (statusElement) {
-        statusElement.classList.toggle("online", isOnline);
-        statusElement.classList.toggle("offline", !isOnline);
-        statusElement.innerText = isOnline ? "Online" : "Offline";
-      }
+  setTimeout(() => {
+    const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
+    if (!list.length) {
+      return;
     }
-  });
+    list.forEach((item: HTMLElement) => {
+      const name = item.innerText.toLowerCase();
+      if (name === friendName.toLowerCase()) {
+        const statusElement = item.nextElementSibling as HTMLElement;
+        if (statusElement) {
+          console.log(`Updating status for ${friendName}: ${isOnline ? 'Online' : 'Offline'}`);
+          statusElement.classList.toggle("online", isOnline);
+          statusElement.classList.toggle("offline", !isOnline);
+          statusElement.innerText = isOnline ? "Online" : "Offline";
+        }
+      }
+    });
+    }, 2000); // Delay to ensure the friends list is fully loaded
 }
 
 function updateFriendsList(data: any) {

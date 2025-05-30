@@ -263,5 +263,10 @@ export const packetManager = {
     return [
       packet.encode(JSON.stringify({ type: "INVITATION", data })),
     ] as any[];
+  },
+  updateOnlineStatus: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "UPDATE_ONLINE_STATUS", data })),
+    ] as any[];
   }
 };

@@ -179,7 +179,10 @@ const Server = Bun.serve<Packet, any>({
           packet.encode(
             JSON.stringify({
               type: "DISCONNECT_PLAYER",
-              data: ws.data.id,
+              data: {
+                id: ws.data.id,
+                username: ws.data.username || null,
+              },
             })
           )
         );
@@ -325,10 +328,7 @@ listener.on("onDisconnect", async (data) => {
   if (!data) return;
 
   const playerData = cache.get(data.id);
-  if (!playerData) {
-    log.debug(`Disconnected: ${data.id}`);
-    return;
-  }
+  if (!playerData) return;
 
   await player.setLocation(playerData.id, playerData.location.map, playerData.location.position);
   cache.remove(playerData.id);

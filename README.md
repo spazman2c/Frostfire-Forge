@@ -253,7 +253,8 @@ export const packetTypes: PacketType = {
   45: "REMOVE_FRIEND",
   46: "UPDATE_FRIENDS",
   47: "ON_SCREEN_POPUP",
-  48: "INVITATION_RESPONSE"
+  48: "INVITATION_RESPONSE",
+  49: "UPDATE_ONLINE_STATUS",
 };
 ```
 
