@@ -1290,7 +1290,7 @@ async function handleEnterKey() {
   }
 
   if (message.startsWith("/")) {
-    handleCommand(message);
+    await handleCommand(message);
   } else {
     await handleChatMessage(message);
   }
@@ -1299,18 +1299,23 @@ async function handleEnterKey() {
   chatInput.blur();
 }
 
-function handleCommand(message: string) {
+async function handleCommand(message: string) {
   const command = message.substring(1);
-  const commandParts = command.match(/[^\s"]+|"([^"]*)"/g) || [];
-  const commandName = commandParts[0];
-  const commandArgs = commandParts.slice(1).map(arg => 
-    arg.startsWith('"') ? arg.slice(1, -1) : arg
-  );
-
-  sendRequest({
-    type: "COMMAND",
-    data: { command: commandName, args: commandArgs }
-  });
+  if (window?.crypto?.subtle) {
+    const chatDecryptionKey = sessionStorage.getItem("chatDecryptionKey");
+    if (!chatDecryptionKey) return;
+    const encryptedMessage = await encryptRsa(chatDecryptionKey, command || " ");
+    sendRequest({
+      type: "COMMAND",
+      data: { command: encryptedMessage, mode: "decrypt" }
+    });
+  } else {
+    sentRequests++;
+    sendRequest({
+      type: "COMMAND",
+      data: { command: command || " ", }
+    });
+  }
 }
 
 async function handleChatMessage(message: string) {

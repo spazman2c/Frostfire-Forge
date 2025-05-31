@@ -974,9 +974,34 @@ export default async function packetReceiver(
       case "COMMAND": {
         if (!currentPlayer) return;
         const _data = data as any;
-        const command = _data?.command?.toUpperCase();
-        const args = _data?.args;
-        switch (command) {
+        const command = _data?.command;
+        const mode = _data?.mode;
+
+        let decryptedMessage;
+        if (mode && mode == "decrypt") {
+          const encryptedMessage = Buffer.from(
+            Object.values(command) as number[]
+          );
+
+          const privateKey = _privateKey;
+          if (!privateKey) return;
+          const decryptedPrivateKey = decryptPrivateKey(
+            privateKey,
+            process.env.RSA_PASSPHRASE || ""
+          ).toString();
+          decryptedMessage =
+            decryptRsa(encryptedMessage, decryptedPrivateKey) || "";
+        } else {
+          decryptedMessage = command;
+        }
+
+        const commandParts = decryptedMessage.match(/[^\s"]+|"([^"]*)"/g) || [];
+        const commandName = commandParts[0]?.toUpperCase();
+        const args = commandParts.slice(1).map((arg: any) => 
+          arg.startsWith('"') ? arg.slice(1, -1) : arg
+        );        
+
+        switch (commandName) {
           // Whisper a player that is online
           case "W":
           case "WHISPER": {
