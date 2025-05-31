@@ -448,5 +448,6 @@ function validateEmail(email: string): boolean {
   return regex.test(email);
 }
 
-log.success(`Webserver started in ${(performance.now() - now).toFixed(2)}ms`);
+const readyTimeMs = performance.now() - now;
+log.success(`Webserver started on port ${_https ? "443 (HTTPS)" : "80 (HTTP)"} - Ready in ${(readyTimeMs / 1000).toFixed(3)}s (${readyTimeMs.toFixed(0)}ms)`);
 await import("../socket/server");

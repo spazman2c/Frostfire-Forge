@@ -6,7 +6,8 @@ const now = performance.now();
 
 // Online runs once the Server is online
 event.on("online", (data) => {
-  log.success(`TCP server is listening on localhost:${data.port} - Ready in ${(performance.now() - now).toFixed(2)}ms`);
+  const readyTimeMs = performance.now() - now;
+  log.success(`TCP server is listening on port ${data.port} - Ready in ${(readyTimeMs / 1000).toFixed(3)}s (${readyTimeMs.toFixed(0)}ms)`);
   // Emit awake event
   listener.emit("onAwake");
   // Emit start event
