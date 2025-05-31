@@ -1209,7 +1209,7 @@ export default async function packetReceiver(
 
             player.kick(targetPlayer.username, targetPlayer.ws);
             const notifyData = {
-              message: `Disconnected ${targetPlayer.username} from the server`,
+              message: `Disconnected ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)} from the server`,
             };
             sendPacket(ws, packetManager.notify(notifyData));
             break;
@@ -1357,7 +1357,7 @@ export default async function packetReceiver(
             // Check if the player is already banned
             if (targetPlayer.banned) {
               const notifyData = {
-                message: `${targetPlayer.username} is already banned`,
+                message: `${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)} is already banned`,
               };
               sendPacket(ws, packetManager.notify(notifyData));
               break;
@@ -1366,7 +1366,7 @@ export default async function packetReceiver(
             // Ban the player
             await player.ban(targetPlayer.username, targetPlayer.ws);
             const notifyData = {
-              message: `Banned ${targetPlayer.username} from the server`,
+              message: `Banned ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)} from the server`,
             };
             sendPacket(ws, packetManager.notify(notifyData));
             break;
@@ -1486,7 +1486,7 @@ export default async function packetReceiver(
               cache.set(targetPlayer.id, targetPlayer);
             }
             const notifyData = {
-              message: `${targetPlayer.username} admin status has been updated to ${admin}`,
+              message: `${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)} is now ${admin ? "an admin" : "not an admin"}`,
             };
             sendPacket(ws, packetManager.notify(notifyData));
             break;
@@ -1718,7 +1718,7 @@ export default async function packetReceiver(
             }
 
             const notifyData = {
-              message: `Respawned ${targetPlayer.username}`,
+              message: `Respawned ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`,
             };
             sendPacket(ws, packetManager.notify(notifyData));
             break;
@@ -1846,7 +1846,7 @@ export default async function packetReceiver(
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
                 const notifyData = {
-                  message: `Permissions added to ${targetPlayer.username}`,
+                  message: `Permissions added to ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`,
                 };
                 sendPacket(ws, packetManager.notify(notifyData));
                 break;
@@ -1880,7 +1880,7 @@ export default async function packetReceiver(
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
                 const notifyData = {
-                  message: `Permissions removed from ${targetPlayer.username}`,
+                  message: `Permissions removed from ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`,
                 };
                 sendPacket(ws, packetManager.notify(notifyData));
                 break;
@@ -1911,7 +1911,7 @@ export default async function packetReceiver(
                 targetPlayer.permissions = permissionsArray;
                 cache.set(targetPlayer.id, targetPlayer);
                 const notifyData = {
-                  message: `Permissions set for ${targetPlayer.username}`,
+                  message: `Permissions set for ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`,
                 };
                 sendPacket(ws, packetManager.notify(notifyData));
                 break;
@@ -1942,7 +1942,7 @@ export default async function packetReceiver(
                 targetPlayer.permissions = [];
                 cache.set(targetPlayer.id, targetPlayer);
                 const notifyData = {
-                  message: `Permissions cleared for ${targetPlayer.username}`,
+                  message: `Permissions cleared for ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`,
                 };
                 sendPacket(ws, packetManager.notify(notifyData));
                 break;
@@ -1965,7 +1965,7 @@ export default async function packetReceiver(
                   "No permissions found";
                 const notifyData = {
                   message: `Permissions for ${
-                    targetPlayer.username
+                    targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)
                   }: ${response.replaceAll(",", ", ")}`,
                 };
                 sendPacket(ws, packetManager.notify(notifyData));
