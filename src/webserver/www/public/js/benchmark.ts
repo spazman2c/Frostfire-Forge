@@ -191,23 +191,23 @@ start.addEventListener('click', async () => {
                 const dataPerMessage = formatDataSize(calculateDataArrayBytes(Number(data.value), bytesPerElement));
                 const totalDataBytes = formatDataSize(calculateDataArrayBytes(Number(data.value), bytesPerElement) * iterationsValue);
                 if (stopped) {
-                    result.innerHTML = 'Benchmark aborted';
+                    result.textContent = 'Benchmark aborted';
                     setTimeout(() => {
                         result.style.display = 'none';
-                        result.innerHTML = '';
+                        result.textContent = '';
                         reset();
                     }, 3000);
                 } else {
-                    result.innerHTML = `
-                        <p>Processed ${total} / ${iterationsValue * clientsValue} messages</p>
-                        <p>Clients: ${clientsValue}</p>
-                        <p>Interval: ${interval.value} ms</p>
-                        <p>Iterations: ${iterationsValue}</p>
-                        <p>Total data sent: ${totalDataBytes}</p>
-                    <p>Data per message: ${dataPerMessage}</p>
-                    <p>Total time elapsed: ${totalTime} s</p>
-                    <p>Average time per message: ${Math.round(averageTimePerMessage * 1000)} ms</p>
-                `;
+                    result.textContent = `
+Processed ${total} / ${iterationsValue * clientsValue} messages
+Clients: ${clientsValue}
+Interval: ${interval.value} ms
+Iterations: ${iterationsValue}
+Total data sent: ${totalDataBytes}
+Data per message: ${dataPerMessage}
+Total time elapsed: ${totalTime} s
+Average time per message: ${Math.round(averageTimePerMessage * 1000)} ms
+`;
                 reset();
                 }
             }
