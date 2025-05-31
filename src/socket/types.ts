@@ -49,4 +49,5 @@ export const packetTypes: PacketType = {
   47: "ON_SCREEN_POPUP",
   48: "INVITATION_RESPONSE",
   49: "UPDATE_ONLINE_STATUS",
+  50: "WHISPER",
 };

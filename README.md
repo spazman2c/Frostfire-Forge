@@ -188,6 +188,17 @@ Permission: permission.list | permission.*
 
 <hr>
 
+<h3>Player Commands</h3>
+
+<h4>Whisper</h4>
+
+```
+/whisper [username] [message]
+Aliases: w
+```
+
+<hr>
+
 <h3>Client Identity</h3>
 
 <h5>Structure</h5>
@@ -255,6 +266,7 @@ export const packetTypes: PacketType = {
   47: "ON_SCREEN_POPUP",
   48: "INVITATION_RESPONSE",
   49: "UPDATE_ONLINE_STATUS",
+  50: "WHISPER",
 };
 ```
 

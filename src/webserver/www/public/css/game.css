@@ -402,6 +402,18 @@ body {
     word-break: break-all;
 }
 
+.whisper-username {
+    color: #d670e4;
+    font-weight: 600;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+}
+
+.whisper-message {
+    color: #d670e4;
+    font-weight: 600;
+    text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+}
+
 #chat {
   padding: 10px;
   overflow-y: auto;

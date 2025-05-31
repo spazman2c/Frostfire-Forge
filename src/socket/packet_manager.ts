@@ -190,6 +190,16 @@ export const packetManager = {
       )
     ] as any[];
   },
+  whisper: (data: any) => {
+    return [
+      packet.encode(
+        JSON.stringify({
+          type: "WHISPER",
+          data,
+        })
+      )
+    ] as any[];
+  },
   selectPlayer: (data: any) => {
     return [
       packet.encode(JSON.stringify({ type: "SELECTPLAYER", data })),

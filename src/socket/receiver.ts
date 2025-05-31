@@ -977,6 +977,48 @@ export default async function packetReceiver(
         const command = _data?.command?.toUpperCase();
         const args = _data?.args;
         switch (command) {
+          // Whisper a player that is online
+          case "W":
+          case "WHISPER": {
+            const username = args[0]?.toLowerCase() || null;
+            if (!username) {
+              const notifyData = {
+                message: "Please provide a username",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Find player by username
+            // Search by username
+            const players = Object.values(cache.list());
+            const targetPlayer = players.find(
+              (p) => p.username.toLowerCase() === username.toLowerCase()
+            );
+
+            if (!targetPlayer) {
+              const notifyData = {
+                message: "Player not found or is not online",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            sendPacket(targetPlayer.ws, packetManager.whisper({
+              id: ws.data.id,
+              message: args.slice(1).join(" "),
+              // Uppercase the first letter of the username
+              username: `<- ${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)}`
+            }));
+
+            sendPacket(ws, packetManager.whisper({
+              id: targetPlayer.id,
+              message: args.slice(1).join(" "),
+              username: `-> ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`
+            }));
+
+            break;
+          }
           // Kick a player
           case "KICK":
           case "DISCONNECT": {

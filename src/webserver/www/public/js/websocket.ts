@@ -1058,6 +1058,25 @@ socket.onmessage = async (event) => {
       showNotification(data.message, true, false);
       break;
     }
+    case "WHISPER": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      // Escape HTML tags before setting chat message
+      const escapedMessage = data.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const timestamp = new Date().toLocaleTimeString();
+      // Update chat box
+      if (data.message?.trim() !== "" && data.username) {
+        const message = document.createElement("div");
+        message.classList.add("message");
+        message.style.userSelect = "text";
+        // Username with first letter uppercase
+        const username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
+        message.innerHTML = `${timestamp} <span class="whisper-username">${username}:</span> <span class="whisper-message">${escapedMessage}</span>`;
+        chatMessages.appendChild(message);
+        // Scroll to the bottom of the chat messages
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      break;
+    }
     default:
       break;
   }
