@@ -1019,6 +1019,106 @@ export default async function packetReceiver(
 
             break;
           }
+          // Summon a player
+          case "SUMMON": {
+            // admin.summon or admin.*
+            if (!currentPlayer.permissions.some(
+              (p: string) => p === "admin.summon" || p === "admin.*"
+            )) {
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            const identifier = args[0]?.toLowerCase() || null;
+            if (!identifier) {
+              const notifyData = {
+                message: "Please provide a username or ID",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Find player by ID or username
+            let targetPlayer;
+            if (isNaN(Number(identifier))) {
+              // Search by username
+              const players = Object.values(cache.list());
+              targetPlayer = players.find(
+                (p) => p.username.toLowerCase() === identifier.toLowerCase()
+              );
+            } else {
+              // Search by ID
+              targetPlayer = cache.get(identifier);
+            }
+
+            if (!targetPlayer) {
+              const notifyData = {
+                message: "Player not found or is not online",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Prevent summoning yourself
+            if (targetPlayer.id === currentPlayer.id) {
+              const notifyData = {
+                message: "You cannot summon yourself",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Prevent summoning admins
+            if (targetPlayer.isAdmin) {
+              const notifyData = {
+                message: "You cannot summon other admins",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Must be in the same map
+            if (targetPlayer.location.map !== currentPlayer.location.map) {
+              const notifyData = {
+                message: "You can only summon players in the same map",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Move the target player to the current player's position
+            targetPlayer.location.position = {
+              x: currentPlayer.location.position.x,
+              y: currentPlayer.location.position.y,
+              direction: targetPlayer.location.position.direction,
+            };
+
+            // Update the target player's position in the cache
+            cache.set(targetPlayer.id, targetPlayer);
+
+            // Broadcast the movement to all players in the map
+            const playersInMap = filterPlayersByMap(
+              currentPlayer.location.map
+            );
+
+            playersInMap.forEach((player) => {
+              const moveXYData = {
+                id: targetPlayer.id,
+                _data: targetPlayer.location.position,
+              };
+              sendPacket(player.ws, packetManager.moveXY(moveXYData));
+            });
+
+            // Notify the target player
+            sendPacket(targetPlayer.ws, packetManager.notify({message: `You have been summoned by an admin`}));
+
+            // Notify the admin
+            sendPacket(ws, packetManager.notify({message: `Summoned ${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)}`}));
+            break;
+          }
           // Kick a player
           case "KICK":
           case "DISCONNECT": {

@@ -166,6 +166,14 @@ Aliases: respawn
 Permission: admin.respawn | admin.*
 ```
 
+<h4>Summon Player</h4>
+
+```
+/summon [username | id]
+Aliases: summon
+Permissions: admin.summon | admin.*
+```
+
 <h4>Update Player Permissions</h4>
 
 ```
