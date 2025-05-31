@@ -1230,7 +1230,25 @@ const keyHandlers = {
 } as const;
 
 // Movement keys configuration
-const blacklistedKeys = new Set(['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'F1', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'Tab']);
+const blacklistedKeys = new Set([
+  'ContextMenu',
+  'AltLeft',
+  'AltRight',
+  'ControlLeft',
+  'ControlRight',
+  'ShiftLeft',
+  'ShiftRight',
+  'F1',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'Tab'
+]);
 
 // Helper functions
 function toggleDebugContainer() {
@@ -1352,8 +1370,12 @@ function handleSpaceKey() {
   }
 }
 
+let contextMenuKeyTriggered = false;
 // Main keyboard event handlers
 window.addEventListener("keydown", async (e) => {
+  if (e.key === 'ContextMenu' || e.code === 'ContextMenu') {
+    contextMenuKeyTriggered = true;
+  }
   // Prevent blacklisted keys
   if (blacklistedKeys.has(e.code)) {
     e.preventDefault();
@@ -2237,6 +2259,11 @@ function createContextMenu(event: MouseEvent, id: string) {
 // Capture click and get coordinates from canvas
 document.addEventListener("contextmenu", (event) => {
   if (!loaded) return;
+  if (contextMenuKeyTriggered) {
+    event.preventDefault();
+    contextMenuKeyTriggered = false;
+    return;
+  }
   if ((event.target as HTMLElement)?.classList.contains("ui")) return;
   // Check where we clicked on the canvas
   const rect = canvas.getBoundingClientRect();
