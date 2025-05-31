@@ -163,6 +163,11 @@ Bun.serve({
       }
     }
 
+    // Restrict direct ip access to the webserver
+    if (process.env.DOMAIN?.replace(/https?:\/\//, "") !== url.host) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
+
     if (_https && url.protocol === "http:") {
       return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
     }
