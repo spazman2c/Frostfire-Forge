@@ -168,9 +168,6 @@ Bun.serve({
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
     }
 
-    if (_https && url.protocol === "http:") {
-      return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
-    }
     const route = routes[url.pathname as keyof typeof routes];
     if (!route) {
       return Response.redirect("/", 301);
