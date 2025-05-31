@@ -421,7 +421,7 @@ async function updatePassword(req: Request, server: any) {
   }
 
   // Update the password
-  const hashedPassword = hash(body.password);
+  const hashedPassword = await hash(body.password);
   const updateResult = await query("UPDATE accounts SET password_hash = ?, reset_password_code = NULL, verified = 0, verification_code = NULL WHERE email = ?", [hashedPassword, body.email.toLowerCase()]);
   if (!updateResult) {
     log.error(`Failed to update password for email: ${body.email.toLowerCase()}`);

@@ -1,5 +1,5 @@
 import query from "../controllers/sqldatabase";
-import { hash, randomBytes } from "../modules/hash";
+import { hash, randomBytes, verify } from "../modules/hash";
 import log from "../modules/logger";
 import assetCache from "../services/assetCache";
 
@@ -27,7 +27,7 @@ const player = {
               email,
               username,
               "", // empty token
-              hash(password),
+              await hash(password),
               req.ip,
               req.headers["cf-ipcountry"],
               "main",
@@ -130,8 +130,15 @@ const player = {
         if (!username || !password) return;
         username = username.toLowerCase();
         // Validate credentials
-        const response = await query("SELECT username, banned, token FROM accounts WHERE username = ? AND password_hash = ?", [username, hash(password)]) as { username: string, banned: number, token: string }[];
+        const response = await query("SELECT username, banned, token, password_hash FROM accounts WHERE username = ?", [username]) as { username: string, banned: number, token: string, password_hash: string }[];
         if (response.length === 0 || response[0].banned === 1) {
+            log.debug(`User ${username} failed to login`);
+            return;
+        }
+
+        // Verify password
+        const isValid = await verify(password, response[0].password_hash);
+        if (!isValid) {
             log.debug(`User ${username} failed to login`);
             return;
         }

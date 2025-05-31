@@ -1,20 +1,30 @@
 import crypto from "crypto";
 
-export function hash(password: string) {
-  const [hashedPassword, numberValue, sum] = getHash(password);
-  const hash = crypto
-    .createHash("sha512")
-    .update(`${sum}${hashedPassword}`)
-    .digest("hex");
-  const middle = Math.ceil(hash.length / 2);
-  const prefix = hash.slice(0, middle);
-  const suffix = hash.slice(middle);
-  const salt = crypto
-    .createHash("sha512")
-    .update(`${prefix}${numberValue}`)
-    .digest("hex");
-  const result = `L${salt}A${prefix}P${hashedPassword}Y${suffix}X`;
+// export function hash(password: string) {
+//   const [hashedPassword, numberValue, sum] = getHash(password);
+//   const hash = crypto
+//     .createHash("sha512")
+//     .update(`${sum}${hashedPassword}`)
+//     .digest("hex");
+//   const middle = Math.ceil(hash.length / 2);
+//   const prefix = hash.slice(0, middle);
+//   const suffix = hash.slice(middle);
+//   const salt = crypto
+//     .createHash("sha512")
+//     .update(`${prefix}${numberValue}`)
+//     .digest("hex");
+//   const result = `L${salt}A${prefix}P${hashedPassword}Y${suffix}X`;
+//   return result;
+// }
+
+export async function hash(password: string) {
+  const result = await Bun.password.hash(password);
   return result;
+}
+
+export async function verify(password: string, hash: string) {
+  const isValid = await Bun.password.verify(password, hash);
+  return isValid;
 }
 
 export function getHash(password: string) {
