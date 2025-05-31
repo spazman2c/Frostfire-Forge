@@ -184,6 +184,18 @@ Bun.serve({
   : {}),
 });
 
+// If HTTPS is enabled, also start an HTTP server that redirects to HTTPS
+if (_https) {
+  Bun.serve({
+    port: 80,
+    fetch(req: Request) {
+      const url = new URL(req.url);
+      // Always redirect to https with same host/path/query
+      return Response.redirect(`https://${url.host}${url.pathname}${url.search}`, 301);
+    }
+  });
+}
+
 async function authenticate(req: Request, server: any) {
   // Check if ip banned
   const ip = server.requestIP(req)?.address;

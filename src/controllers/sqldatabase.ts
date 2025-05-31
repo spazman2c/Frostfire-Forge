@@ -8,7 +8,7 @@ const _databaseEngine = process.env.DATABASE_ENGINE || "mysql"
 
 function getSqlCert() {
   if (process.env.SQL_SSL_MODE === "DISABLED") {
-    return false;
+    return undefined;
   }
   return {
     cert: fs.readFileSync(

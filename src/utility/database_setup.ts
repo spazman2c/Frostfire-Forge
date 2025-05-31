@@ -108,7 +108,7 @@ const createItemsTable = async () => {
         name VARCHAR(255) NOT NULL UNIQUE,
         quality VARCHAR(255) NOT NULL,
         description VARCHAR(255) DEFAULT NULL,
-        icon VARCHAR(1000) DEFAULT NULL,
+        icon VARCHAR(1000) DEFAULT NULL
     )
   `;
   await query(sql);
