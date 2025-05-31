@@ -289,6 +289,7 @@ function animationLoop() {
           )
           .forEach((particle: any) => npc.updateParticle(particle, npc, ctx, deltaTime));
       }
+      npc.dialogue(ctx);
     });
     
     // Render foreground layers (z-index >= playerZIndex)
@@ -301,6 +302,11 @@ function animationLoop() {
           scrollX, scrollY, viewportWidth, viewportHeight
         );
       });
+
+    // Render player chat on top of everything
+    visiblePlayers.forEach(player => {
+      player.showChat(ctx);
+    });
   }
 
   // Update FPS counter
@@ -1394,10 +1400,12 @@ function createNPC(data: any) {
     id: string;
     position: { x: number; y: number };
     dialog: string;
-    particles: Particle[];
+    particles?: Particle[];
+    hidden?: boolean;
     quest: number | null;
     show: (context: CanvasRenderingContext2D) => void;
     updateParticle: (particle: Particle, npc: any, context: CanvasRenderingContext2D, deltaTime: number) => void;
+    dialogue: (context: CanvasRenderingContext2D) => void;
   } = {
     id: data.id,
     dialog: data.dialog || "",
@@ -1407,22 +1415,14 @@ function createNPC(data: any) {
     },
     particles: data.particles || [],
     quest: data.quest || null,
-    show: function (this: typeof npc, context: CanvasRenderingContext2D) {
-      if (!npcImage || !context) return;
-      // Get current players admin status
-      const currentPlayer = players.find(
-        (player) => player.id === sessionStorage.getItem("connectionId")
-      );
-      if (data?.hidden && !currentPlayer?.isAdmin) return;
-      context.globalAlpha = 1;
-      context.drawImage(npcImage, this.position.x, this.position.y, npcImage.width, npcImage.height);
-
-      context.fillStyle = "black";
-      context.fillStyle = "white";
-      context.font = "14px 'Comic Relief'";
-      context.textAlign = "center";
+    dialogue: function (this: typeof npc, context: CanvasRenderingContext2D) {
       if (this.dialog) {
         if (this.dialog.trim() !== "") {
+          context.fillStyle = "black";
+          context.fillStyle = "white";
+          context.font = "14px 'Comic Relief'";
+          context.textAlign = "center";
+          
           const lines = getLines(context, this.dialog, 500).reverse();
           let startingPosition = this.position.y;
 
@@ -1431,6 +1431,15 @@ function createNPC(data: any) {
             context.fillText(lines[i], this.position.x + 16, startingPosition);
           }
         }
+      }
+    },
+    show: function (this: typeof npc, context: CanvasRenderingContext2D) {
+      if (!npcImage || !context) return;
+
+      context.globalAlpha = 1;
+
+      if (!data?.hidden) {
+        context.drawImage(npcImage, this.position.x, this.position.y, npcImage.width, npcImage.height);
       }
     },
     updateParticle: async (particle: Particle, npc: any, context: CanvasRenderingContext2D, deltaTime: number) => {
@@ -1591,30 +1600,18 @@ function createNPC(data: any) {
   };
 
   npcs.push(npc);
-
-  // Make a copy of the npc object to prevent the original object from being modified
-  const _npc = Object.assign({}, npc) as any;
-  // Delete unnecessary properties from the copied npc object
-  delete _npc.show;
   
-  Object.defineProperties(_npc, {
-    id: { writable: false, configurable: false },
-    position: { writable: false, configurable: false },
-    dialog: { writable: false, configurable: false },
-    quest: { writable: false, configurable: false },
-  });
-
   // Execute the npc script in a sandboxed environment where "this" refers to the npc object
-  try {
-    (async function () {
+  (async function () {
+    try {
       await isLoaded();
       new Function(
         "with(this) { " + decodeURIComponent(data.script) + " }"
-      ).call(_npc);
-    }).call(_npc);
-  } catch (e) {
-    console.error(e);
-  }
+      ).call(npc);
+    } catch (e) {
+      console.error(`NPC script error (ID: ${npc.id}):`, e);
+    }
+  }).call(npc);
 }
 
 async function createPlayer(data: any) {
@@ -1661,6 +1658,70 @@ async function createPlayer(data: any) {
     typing: false,
     typingTimeout: null as NodeJS.Timeout | null,
     typingImage: typingImage,
+    showChat: function (context: CanvasRenderingContext2D) {
+      if (this.chat) {
+        if (this.chat.trim() !== "") {
+          // Draw the player's chat message
+          context.fillStyle = "black";
+          context.fillStyle = "white";
+          context.textAlign = "center";
+          context.shadowBlur = 1;
+          context.shadowColor = "black";
+          context.shadowOffsetX = 1;
+          context.shadowOffsetY = 1;
+          const lines = getLines(context, this.chat, 500).reverse();
+          let startingPosition = this.position.y;
+
+          for (let i = 0; i < lines.length; i++) {
+            startingPosition -= 20;
+            // Draw background
+            const textWidth = context.measureText(lines[i]).width;
+            context.fillStyle = "rgba(0, 0, 0, 0.2)";
+            context.fillRect(
+              this.position.x + 16 - textWidth/2 - 5, // Center background
+              startingPosition - 17, // Slightly above text
+              textWidth + 10, // Add padding
+              20 // Height of background
+            );
+            // Draw text
+            context.fillStyle = "white";
+            context.fillText(lines[i], this.position.x + 16, startingPosition);
+          }
+        }
+      }
+
+      if (this.typing && this.typingImage) {
+        // Show typing image at top left, using image's natural dimensions
+        // Update opacity to 0.5 if the player is in stealth mode
+        if (this.isStealth) {
+          context.globalAlpha = 0.8;
+        }
+        // Add a shadow to the typing image
+        context.shadowColor = "black";
+        context.shadowBlur = 2;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
+        // Shrink the image in half
+        
+        context.drawImage(
+          this.typingImage,
+          this.position.x - this.typingImage.width + 15, 
+          this.position.y - this.typingImage.height + 15,
+          this.typingImage.width / 1.5,
+          this.typingImage.height / 1.5
+        );
+        // Reset opacity
+        context.globalAlpha = 1;
+        context.shadowColor = "transparent";
+        context.shadowBlur = 0;
+      }
+
+      // Reset shadow settings
+      context.shadowColor = "transparent";
+      context.shadowBlur = 0;
+      context.shadowOffsetX = 0;
+      context.shadowOffsetY = 0;
+    },
     renderAnimation: function (context: CanvasRenderingContext2D) {
       if (!this.animation?.frames?.length) {
         return;
@@ -1746,38 +1807,6 @@ async function createPlayer(data: any) {
         );
       }
 
-      // Draw the player's chat message
-      context.fillStyle = "black";
-      context.fillStyle = "white";
-      context.textAlign = "center";
-      context.shadowBlur = 1;
-      context.shadowColor = "black";
-      context.shadowOffsetX = 1;
-      context.shadowOffsetY = 1;
-      
-      if (this.chat) {
-        if (this.chat.trim() !== "") {
-          const lines = getLines(context, this.chat, 500).reverse();
-          let startingPosition = this.position.y;
-
-          for (let i = 0; i < lines.length; i++) {
-            startingPosition -= 20;
-            // Draw background
-            const textWidth = context.measureText(lines[i]).width;
-            context.fillStyle = "rgba(0, 0, 0, 0.2)";
-            context.fillRect(
-              this.position.x + 16 - textWidth/2 - 5, // Center background
-              startingPosition - 17, // Slightly above text
-              textWidth + 10, // Add padding
-              20 // Height of background
-            );
-            // Draw text
-            context.fillStyle = "white";
-            context.fillText(lines[i], this.position.x + 16, startingPosition);
-          }
-        }
-      }
-
       // Draw the player's health bar below the player's name with a width of 100px, centered below the player name
       if (!this.isStealth) {
         if (data.id === sessionStorage.getItem("connectionId") || this.targeted) {
@@ -1831,32 +1860,6 @@ async function createPlayer(data: any) {
       }
 
       this.renderAnimation(context);
-
-      if (this.typing && this.typingImage) {
-        // Show typing image at top left, using image's natural dimensions
-        // Update opacity to 0.5 if the player is in stealth mode
-        if (this.isStealth) {
-          context.globalAlpha = 0.8;
-        }
-        // Add a shadow to the typing image
-        context.shadowColor = "black";
-        context.shadowBlur = 2;
-        context.shadowOffsetX = 0;
-        context.shadowOffsetY = 0;
-        // Shrink the image in half
-        
-        context.drawImage(
-          this.typingImage,
-          this.position.x - this.typingImage.width + 15, 
-          this.position.y - this.typingImage.height + 15,
-          this.typingImage.width / 1.5,
-          this.typingImage.height / 1.5
-        );
-        // Reset opacity
-        context.globalAlpha = 1;
-        context.shadowColor = "transparent";
-        context.shadowBlur = 0;
-      }
     },
   };
 
