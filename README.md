@@ -271,10 +271,13 @@ export const packetTypes: PacketType = {
   44: "ADD_FRIEND",
   45: "REMOVE_FRIEND",
   46: "UPDATE_FRIENDS",
-  47: "ON_SCREEN_POPUP",
-  48: "INVITATION_RESPONSE",
-  49: "UPDATE_ONLINE_STATUS",
-  50: "WHISPER",
+  47: "INVITATION_RESPONSE",
+  48: "UPDATE_ONLINE_STATUS",
+  49: "WHISPER",
+  50: "INVITE_PARTY",
+  51: "REMOVE_PARTY",
+  52: "UPDATE_PARTY",
+  53: "PARTY_CHAT",
 };
 ```
 
@@ -1331,4 +1334,109 @@ await questlog.completeQuest(username, id);
 
 ```ts
 await questlog.updateQuestLog(username, questLog);
+```
+
+<hr>
+<h3>Friend Management</h3>
+
+```ts
+import friends from "../systems/friends";
+```
+
+<h5>friends.list();</h5>
+<p style="font-size:0.75em;">Lists a players friends</p>
+
+```ts
+await friends.list(username);
+```
+
+<h5>friends.add();</h5>
+<p style="font-size:0.75em;">Adds a friend to the players friends list</p>
+
+```ts
+await friends.add(username, friend_username);
+```
+
+<h5>friends.remove();</h5>
+<p style="font-size:0.75em;">Remove a friend to the players friends list</p>
+
+```ts
+await friends.remove(username, friend_username);
+```
+
+<hr>
+<h3>Party Management</h3>
+
+```ts
+import parties from "../systems/parties";
+```
+
+<h5>parties.isInParty();</h5>
+<p style="font-size:0.75em;">Checks if a player is in a party</p>
+
+```ts
+await parties.isInParty(username);
+```
+
+<h5>parties.isPartyLeader();</h5>
+<p style="font-size:0.75em;">Checks if a player is a party leader</p>
+
+```ts
+await parties.isPartyLeader(username);
+```
+
+<h5>parties.getPartyId();</h5>
+<p style="font-size:0.75em;">Fetches the players party id</p>
+
+```ts
+await parties.getPartyId(username);
+```
+
+<h5>parties.getPartyMembers();</h5>
+<p style="font-size:0.75em;">Fetches party members</p>
+
+```ts
+await parties.getPartyMembers(party_id);
+```
+
+<h5>parties.getPartyLeader();</h5>
+<p style="font-size:0.75em;">Fetches the party leader</p>
+
+```ts
+await parties.getPartyLeader(party_id);
+```
+
+<h5>parties.add();</h5>
+<p style="font-size:0.75em;">Adds a player to a party</p>
+
+```ts
+await parties.add(username, party_id);
+```
+
+<h5>parties.remove();</h5>
+<p style="font-size:0.75em;">Removes a player from a party</p>
+
+```ts
+await parties.remove(username);
+```
+
+<h5>parties.delete();</h5>
+<p style="font-size:0.75em;">Deletes a party</p>
+
+```ts
+await parties.delete(party_id);
+```
+
+<h5>parties.create();</h5>
+<p style="font-size:0.75em;">Creates an initial party with a leader and another player</p>
+
+```ts
+await parties.create(leader, member);
+```
+
+<h5>parties.leave();</h5>
+<p style="font-size:0.75em;">Forces a player to leave their party</p>
+
+```ts
+await parties.leave(username);
 ```
