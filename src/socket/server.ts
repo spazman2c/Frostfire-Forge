@@ -1,8 +1,8 @@
 const MAX_BUFFER_SIZE = 1024 * 1024 * 16; // 16MB
 const packetQueue = new Map<string, (() => void)[]>();
 import crypto from "crypto";
-import { packetManager } from "./packet_manager";
-import packetReceiver from "./receiver";
+import { packetManager } from "./packet_manager.ts";
+import packetReceiver from "./receiver.ts";
 export const listener = new eventEmitter();
 import { event } from "../systems/events";
 import eventEmitter from "node:events";

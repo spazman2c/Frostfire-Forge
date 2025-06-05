@@ -36,7 +36,8 @@ const createAccountsTable = async () => {
         stealth INT DEFAULT 0 NOT NULL,
         direction VARCHAR(10) DEFAULT 'down' NOT NULL,
         verified INT DEFAULT 0 NOT NULL,
-        noclip INT DEFAULT 0 NOT NULL
+        noclip INT DEFAULT 0 NOT NULL,
+        party_id INT DEFAULT NULL
       );
   `;
   await query(sql);
@@ -379,6 +380,20 @@ const createFriendsListTable = async () => {
   await query(sql);
 };
 
+const createPartiesTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  log.info("Creating parties table...");
+  await query(useDatabaseSql);
+  const sql = `
+    CREATE TABLE IF NOT EXISTS parties (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY UNIQUE,
+      leader VARCHAR(255) NOT NULL,
+      members TEXT DEFAULT NULL
+    )
+  `;
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -403,6 +418,7 @@ const setupDatabase = async () => {
   await createQuestsTable();
   await createQuestLogTable();
   await createFriendsListTable();
+  await createPartiesTable();
 };
 
 try {

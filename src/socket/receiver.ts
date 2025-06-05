@@ -11,6 +11,7 @@ import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
 import friends from "../systems/friends";
+import parties from "../systems/parties";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
@@ -132,6 +133,10 @@ export default async function packetReceiver(
         // Get the player's friends list
         const friendsList = await friends.list(username);
 
+        // Check if the player has a party
+        const party = await parties.getPartyId(username);
+        const partyMembers = await parties.getPartyMembers(party) || [];
+
         // Get client configuration
         const clientConfig = (await player.getConfig(username)) as any[];
         sendPacket(ws, packetManager.clientConfig(clientConfig));
@@ -214,6 +219,7 @@ export default async function packetReceiver(
           pvp: false,
           last_attack: null,
           invitations: [],
+          party: partyMembers,
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -328,6 +334,7 @@ export default async function packetReceiver(
             sendPacket(player.ws, packetManager.spawnPlayer({
               ...spawnData,
               friends: friendsList,
+              party: partyMembers,
             }));
           } else {
             sendPacket(player.ws, packetManager.spawnPlayer(spawnData));
@@ -997,11 +1004,53 @@ export default async function packetReceiver(
 
         const commandParts = decryptedMessage.match(/[^\s"]+|"([^"]*)"/g) || [];
         const commandName = commandParts[0]?.toUpperCase();
+
         const args = commandParts.slice(1).map((arg: any) => 
           arg.startsWith('"') ? arg.slice(1, -1) : arg
-        );        
+        );
 
         switch (commandName) {
+          // Party chat
+          case "P":
+          case "PARTY": {
+            if (!currentPlayer) return;
+            const message = args.join(" ");
+            if (!message) {
+              sendPacket(ws, packetManager.notify({message: "Please provide a message"}));
+              break;
+            }
+
+            // Get the party members
+            const partyId = await player.getPartyIdByUsername(currentPlayer.username);
+            if (!partyId) {
+              sendPacket(ws, packetManager.notify({message: "You are not in a party"}));
+              break;
+            }
+
+            const partyMembers = await parties.getPartyMembers(partyId);
+            if (partyMembers.length === 0 || !partyMembers) {
+              sendPacket(ws, packetManager.notify({message: "You are not in a party"}));
+              break;
+            }
+
+            partyMembers.forEach(async (member: any) => {
+              const session_id = await player.getSessionIdByUsername(member);
+              const memberPlayer = cache.get(session_id);
+              if (memberPlayer) {
+                sendPacket(memberPlayer.ws, packetManager.partyChat({
+                  id: ws.data.id,
+                  message,
+                  username: currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1),
+                }));
+              } else {
+                sendPacket(ws, packetManager.notify({
+                  message: `Player ${member.username} is not online`
+                }));
+              }
+            });
+
+            break;
+          }
           // Whisper a player that is online
           case "W":
           case "WHISPER": {
@@ -1984,6 +2033,63 @@ export default async function packetReceiver(
         }
         break;
       }
+      case "INVITE_PARTY": {
+        const invited_user = (data as any).id;
+        if (!currentPlayer || !invited_user) return;
+
+        // Get the leaders party ID
+        const partyId = await parties.getPartyId(currentPlayer.username);
+        if (partyId) {
+          // Check if they are the leader
+          const isLeader = await parties.isPartyLeader(currentPlayer.username);
+          if (!isLeader) {
+            sendPacket(ws, packetManager.notify({ message: "You are not the party leader" }));
+            return;
+          }
+        }
+
+        // Check if the invited user is already in a party
+        const invitedUserPartyId = await parties.getPartyId(invited_user);
+
+        if (invitedUserPartyId) {
+          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is already in a party` }));
+          return;
+        }
+
+        // Check if the invited user is a party leader
+        const invitedUserLeader = await parties.isPartyLeader(invited_user);
+        if (invitedUserLeader) {
+          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is already in a party` }));
+          return;
+        }
+
+        const player_username = currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1);
+
+        const invite_data = {
+          action: "INVITE_PARTY",
+          message: `${player_username} wants to invite you to their party`,
+          originator: currentPlayer.id.toString(),
+          authorization: randomBytes(16).toString(),
+        }
+        
+        const invitedUser = cache.get(invited_user);
+
+        if (!invitedUser) {
+          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is not online` }));
+          return;
+        }
+
+        currentPlayer.invitations.push({
+          action: invite_data.action,
+          originator: invite_data.originator,
+          authorization: invite_data.authorization,
+        });
+
+        cache.set(currentPlayer.id, currentPlayer);
+        // Send the invitation notification to the invited user
+        sendPacket(invitedUser.ws, packetManager.invitation(invite_data));
+      break;
+      }
       case "ADD_FRIEND": {
         const id = (data as any).id;
         if (!id) return;
@@ -2020,18 +2126,15 @@ export default async function packetReceiver(
         const { action, originator, authorization, response } = data as any;
         if (!action || !originator || !authorization || !response) return;
 
+        log.info(`Invitation response received: ${action}, ${originator}, ${authorization}, ${response}`);
         // Find the current player in the cache
         const inviter = cache.get(originator);
         
         if (!inviter) {
           // If the inviter is not found, we can't process the invitation because they might have disconnected
-          const notifyData = {
-            message: "Unable to process invitation - user not found or has disconnected",
-          };
-          sendPacket(ws, packetManager.notify(notifyData));
+          sendPacket(ws, packetManager.notify({message: "Unable to process invitation - user not found or has disconnected"}));
           return;
         }
-
 
         // Find the invitation in the inviter's invitations
         const inviteIndex = inviter.invitations.findIndex(
@@ -2069,10 +2172,44 @@ export default async function packetReceiver(
               const updatedFriendsList = await friends.add(inviter.username.toLowerCase(), currentPlayer.username.toLowerCase());
               sendPacket(inviter.ws, packetManager.notify({message: `You are now friends with ${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)}`}));
               sendPacket(inviter.ws, packetManager.updateFriends({ friends: updatedFriendsList }));
-              break;
             }
+            break;
           }
-          break;
+          case "INVITE_PARTY": {
+            // Check if the the party exists
+            const partyId = await parties.getPartyId(inviter.username);
+            if (response.toUpperCase() === "ACCEPT") {
+              // Party already exists, add the player to the party
+              if (partyId) {
+                // If the party exists, add the player to the party
+                const updatedPartyMembers = await parties.add(currentPlayer.username.toLowerCase(), partyId);
+                if (!updatedPartyMembers) {
+                  sendPacket(ws, packetManager.notify({ message: "Failed to join party" }));
+                  return;
+                }
+                sendPacket(ws, packetManager.notify({ message: `You have joined ${inviter.username.charAt(0).toUpperCase() + inviter.username.slice(1)}'s party` }));
+                sendPacket(inviter.ws, packetManager.notify({ message: `${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)} has joined your party` }));
+                // Send the updated party members to all party members
+                updatedPartyMembers.forEach(async (member: string) => {
+                  const session_id = await player.getSessionIdByUsername(member);
+                  const p = session_id && cache.get(session_id);
+                  if (p) sendPacket(p.ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                });
+              } else {
+                // If the party does not exist, create a new one
+                const updatedPartyMembers = await parties.create(inviter.username.toLowerCase(), currentPlayer.username.toLowerCase());
+                if (!updatedPartyMembers) {
+                  sendPacket(ws, packetManager.notify({ message: "Failed to create party" }));
+                  return;
+                }
+                sendPacket(ws, packetManager.notify({ message: `You have joined ${inviter.username.charAt(0).toUpperCase() + inviter.username.slice(1)}'s party` }));
+                sendPacket(inviter.ws, packetManager.notify({ message: `${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)} has joined your party` }));
+                sendPacket(inviter.ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                sendPacket(ws, packetManager.updateParty({ members: updatedPartyMembers }));
+              }
+            }
+            break;
+          }
         }
       break;
       }

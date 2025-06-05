@@ -446,6 +446,14 @@ socket.onmessage = async (event) => {
       updateFriendOnlineStatus(data.username, data.online);
       break;
     }
+    case "UPDATE_PARTY": {
+      const currentPlayer = players.find((player) => player.id === sessionStorage.getItem("connectionId"));
+      if (currentPlayer) {
+        currentPlayer.party = data.members || [];
+        createPartyUI(currentPlayer.party);
+      }
+      break;
+    }
     case "ANIMATION": {
       let apng: any;
       try {
@@ -506,6 +514,7 @@ socket.onmessage = async (event) => {
     }
     case "SPAWN_PLAYER": {
       await isLoaded();
+      console.log(data);
       createPlayer(data);
       break;
     }
@@ -1071,6 +1080,25 @@ socket.onmessage = async (event) => {
         // Username with first letter uppercase
         const username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
         message.innerHTML = `${timestamp} <span class="whisper-username">${username}:</span> <span class="whisper-message">${escapedMessage}</span>`;
+        chatMessages.appendChild(message);
+        // Scroll to the bottom of the chat messages
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      break;
+    }
+    case "PARTY_CHAT": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      // Escape HTML tags before setting chat message
+      const escapedMessage = data.message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const timestamp = new Date().toLocaleTimeString();
+      // Update chat box
+      if (data.message?.trim() !== "" && data.username) {
+        const message = document.createElement("div");
+        message.classList.add("message");
+        message.style.userSelect = "text";
+        // Username with first letter uppercase
+        const username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
+        message.innerHTML = `${timestamp} <span class="party-username">${username}:</span> <span class="party-message">${escapedMessage}</span>`;
         chatMessages.appendChild(message);
         // Scroll to the bottom of the chat messages
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1704,6 +1732,7 @@ async function createPlayer(data: any) {
     typing: false,
     typingTimeout: null as NodeJS.Timeout | null,
     typingImage: typingImage,
+    party: data.party || null,
     showChat: function (context: CanvasRenderingContext2D) {
       if (this.chat) {
         if (this.chat.trim() !== "") {
@@ -1918,6 +1947,7 @@ async function createPlayer(data: any) {
     cameraY = player.position.y - window.innerHeight / 2 + 48;
     window.scrollTo(cameraX, cameraY);
     updateFriendsList({friends: data.friends || []});
+    createPartyUI(data.party || []);
   }
 
   // Update player dots on the full map if it is open
@@ -2149,7 +2179,10 @@ const contextActions: Record<string, { allowed_self: boolean, label: string, han
     label: 'Invite to Party',
     allowed_self: false,
     handler: (id) => {
-      console.log(`Inviting ${id} to party`);
+      sendRequest({
+        type: "INVITE_PARTY",
+        data: { id: id },
+      });
     }
   },
   'add-friend': {
@@ -2463,6 +2496,17 @@ function createInvitationPopup(invitationData: any) {
       }
     }
     break;
+    case "INVITE_PARTY": {
+      data = {
+        type: "INVITATION_RESPONSE",
+        data: {
+          authorization: invitationData.authorization,
+          originator: invitationData.originator,
+          action: "INVITE_PARTY",
+        },
+      }
+    }
+    break;  
   }
 
   if (!data) return;
@@ -2492,7 +2536,6 @@ function updateFriendOnlineStatus(friendName: string, isOnline: boolean) {
       if (name === friendName.toLowerCase()) {
         const statusElement = item.nextElementSibling as HTMLElement;
         if (statusElement) {
-          console.log(`Updating status for ${friendName}: ${isOnline ? 'Online' : 'Offline'}`);
           statusElement.classList.toggle("online", isOnline);
           statusElement.classList.toggle("offline", !isOnline);
           statusElement.innerText = isOnline ? "Online" : "Offline";
@@ -2574,3 +2617,59 @@ friendsListSearch.addEventListener("input", () => {
     }
   });
 });
+
+// Create party UI
+function createPartyUI(partyMembers: string[]) {
+  const partyContainer = document.getElementById("party-container");
+  if (!partyContainer) return;
+
+  // If no party members, remove all current ones and exit
+  if (partyMembers.length === 0) {
+    const existingMembers = partyContainer.querySelectorAll(".party-member");
+    existingMembers.forEach(member => partyContainer.removeChild(member));
+    return;
+  }
+
+  const existingElements = Array.from(
+    partyContainer.querySelectorAll(".party-member-username")
+  );
+
+  const existingNames = new Map<string, HTMLElement>();
+  existingElements.forEach(el => {
+    const name = el.textContent?.toLowerCase();
+    if (name) {
+      const container = el.closest(".party-member") as HTMLElement;
+      if (container) {
+        existingNames.set(name, container);
+      }
+    }
+  });
+
+  const desiredNames = new Set(partyMembers.map(name => name.toLowerCase()));
+
+  // Remove members no longer in the list
+  for (const [name, el] of existingNames.entries()) {
+    if (!desiredNames.has(name)) {
+      partyContainer.removeChild(el);
+    }
+  }
+
+  // Sort alphabetically by username
+  partyMembers.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  // Add new members
+  for (const member of partyMembers) {
+    const lowerName = member.toLowerCase();
+    if (!existingNames.has(lowerName)) {
+      const memberElement = document.createElement("div");
+      memberElement.className = "party-member ui";
+
+      const usernameElement = document.createElement("div");
+      usernameElement.className = "party-member-username ui";
+      usernameElement.innerText = member.charAt(0).toUpperCase() + member.slice(1);
+
+      memberElement.appendChild(usernameElement);
+      partyContainer.appendChild(memberElement);
+    }
+  }
+}

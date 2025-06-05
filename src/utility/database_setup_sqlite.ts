@@ -26,7 +26,8 @@ const createAccountsTable = async () => {
         stealth INTEGER DEFAULT 0 NOT NULL,
         direction TEXT DEFAULT 'down' NOT NULL,
         verified INTEGER DEFAULT 0 NOT NULL,
-        noclip INTEGER DEFAULT 0 NOT NULL
+        noclip INTEGER DEFAULT 0 NOT NULL,
+        party_id INTEGER DEFAULT NULL
       );
   `;
   await query(sql);
@@ -75,15 +76,13 @@ const insertDemoAccount = async () => {
       password_hash,
       online,
       role,
-      banned,
-      stealth
+      banned
     ) VALUES (
       'demo@example.com',
       'demo_user',
-      'Lb2e9d35b2720ec87198b38fee811cc386fe909aa03786085960b269d7089cd02bc8f85f7bee2e3d565341dee70e9d9a9de2b971eef84c43f04d987414b4cf6c7Aed1d913ef3afd0f87b5127e14016aa50f6053e26527cf82b091b4d0a567151c0Pfa585d89c851dd338a70dcf535aa2a92fee7836dd6aff1226583e88e0996293f16bc009c652826e0fc5c706695a03cddce372f139eff4d13959da6f1f5d3eabeY63395358fb084a3ef48a0d5d153d6476fb5f9a0b57ad09252cbec05c9067d45bX',
+      '$argon2id$v=19$m=65536,t=2,p=1$t10G4CvyWPSnL53oJjhAeUwxVn3npXudy6CN41Z8JZE$/Rz8vPge3ECpIeYqJ2XbmBsrXipWuVPLmEGFyQfliWM',
       0,
       1,
-      0,
       0
     );
     `;
@@ -416,6 +415,18 @@ const createFriendsListTable = async () => {
   await query(sql);
 }
 
+const createPartiesTable = async () => {
+  log.info("Creating parties table...");
+  const sql = `
+    CREATE TABLE IF NOT EXISTS parties (
+      id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL,
+      leader TEXT NOT NULL,
+      members TEXT DEFAULT NULL
+    );
+  `;
+  await query(sql);
+}
+
 // Run the database setup
 const setupDatabase = async () => {
   await createAccountsTable();
@@ -440,6 +451,7 @@ const setupDatabase = async () => {
   await createQuestsTable();
   await createQuestLogTable();
   await createFriendsListTable();
+  await createPartiesTable();
 };
 
 try {

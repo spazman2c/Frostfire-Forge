@@ -402,14 +402,14 @@ body {
     word-break: break-all;
 }
 
-.whisper-username {
+.whisper-username, .whisper-message {
     color: #d670e4;
     font-weight: 600;
     text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
 }
 
-.whisper-message {
-    color: #d670e4;
+.party-username, .party-message {
+    color: #5389ff;
     font-weight: 600;
     text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
 }
@@ -1160,4 +1160,47 @@ input[type=range]:disabled {
 
 #decline-invitation:hover {
   background: #e53935;
+}
+
+/* Bottom center with row grid of 5 items */
+#party-container {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  border-radius: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  width: 500px;
+  height: 100px;
+  bottom: 250px;
+  left: 15px;
+}
+
+.party-member {
+  position: relative;
+  backdrop-filter: blur(1px);
+  background: #ffffff20;
+  width: 100px;
+  height: 50px;
+  margin: 5px;
+  padding: 5px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px #0000004d;
+}
+
+.party-member-username {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-family: "Comic Relief";
+  font-size: 0.8em;
+  color: #FFF1DA;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: none;
 }

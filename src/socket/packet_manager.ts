@@ -155,6 +155,7 @@ export const packetManager = {
             stats: data.stats,
             sprite: data.sprite,
             ...(data.friends ? { friends: data.friends } : {}),
+            ...(data.party ? { party: data.party } : {}),
           },
         })
       )
@@ -195,6 +196,16 @@ export const packetManager = {
       packet.encode(
         JSON.stringify({
           type: "WHISPER",
+          data,
+        })
+      )
+    ] as any[];
+  },
+  partyChat: (data: any) => {
+    return [
+      packet.encode(
+        JSON.stringify({
+          type: "PARTY_CHAT",
           data,
         })
       )
@@ -279,6 +290,11 @@ export const packetManager = {
   updateOnlineStatus: (data: any) => {
     return [
       packet.encode(JSON.stringify({ type: "UPDATE_ONLINE_STATUS", data })),
+    ] as any[];
+  },
+  updateParty: (data: any) => {
+    return [
+      packet.encode(JSON.stringify({ type: "UPDATE_PARTY", data })),
     ] as any[];
   }
 };

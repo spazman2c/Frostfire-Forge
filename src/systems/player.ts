@@ -6,7 +6,13 @@ import assetCache from "../services/assetCache";
 const player = {
     clear: async () => {
         // Clear all session_ids, set online to 0, and clear all tokens
-        await query("UPDATE accounts SET session_id = NULL, online = 0, token = NULL, verified = 0, verification_code = NULL");
+        await query("UPDATE accounts SET session_id = NULL, online = 0, token = NULL, verified = 0, verification_code = NULL, party_id = NULL");
+        // Truncate the parties table
+        if (process.env.DATABASE_ENGINE === "sqlite") {
+            await query("DELETE FROM parties");
+        } else {
+            await query("TRUNCATE TABLE parties");
+        }
     },    
     register: async (username: string, password: string, email: string, req: any) => {
         if (!username || !password || !email) return { error: "Missing fields" };
@@ -155,6 +161,18 @@ const player = {
         if (!session_id) return;
         const response = await query("SELECT username, id FROM accounts WHERE session_id = ?", [session_id]);
         return response;
+    },
+    getSessionIdByUsername: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("SELECT session_id FROM accounts WHERE username = ?", [username]) as any;
+        return response[0]?.session_id;
+    },
+    getPartyIdByUsername: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("SELECT party_id FROM accounts WHERE username = ?", [username]) as any;
+        return response[0]?.party_id;
     },
     getUsernameByToken: async (token: string) => {
         if (!token) return;
