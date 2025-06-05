@@ -256,7 +256,6 @@ function animationLoop() {
   // Render all layers and entities in proper z-order
   if (window.mapLayerCanvases) {
     const playerZIndex = 6; // Assuming players render at z-index 6
-    
     // Render background layers (z-index < playerZIndex)
     window.mapLayerCanvases
       .filter(layer => layer.zIndex < playerZIndex)
@@ -1771,6 +1770,7 @@ async function createPlayer(data: any) {
         if (this.isStealth) {
           context.globalAlpha = 0.8;
         }
+
         // Add a shadow to the typing image
         context.shadowColor = "black";
         context.shadowBlur = 2;
@@ -1785,6 +1785,7 @@ async function createPlayer(data: any) {
           this.typingImage.width / 1.5,
           this.typingImage.height / 1.5
         );
+        
         // Reset opacity
         context.globalAlpha = 1;
         context.shadowColor = "transparent";
@@ -1798,6 +1799,12 @@ async function createPlayer(data: any) {
       context.shadowOffsetY = 0;
     },
     renderAnimation: function (context: CanvasRenderingContext2D) {
+        if (this.isStealth) {
+        context.globalAlpha = 0.5;
+      } else {
+        context.globalAlpha = 1;
+      }
+
       if (!this.animation?.frames?.length) {
         return;
       }
@@ -1819,6 +1826,9 @@ async function createPlayer(data: any) {
           frame.height
         );
       }
+
+      // Reset global alpha for other rendering
+      context.globalAlpha = 1;
     },
     show: function (context: CanvasRenderingContext2D) {
       context.globalAlpha = 1;
@@ -1929,10 +1939,6 @@ async function createPlayer(data: any) {
       // Reset shadow settings
       context.shadowColor = "transparent";
       context.shadowBlur = 0;
-
-      if (this.isStealth) {
-        context.globalAlpha = 0.5;
-      }
 
       this.renderAnimation(context);
     },
