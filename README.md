@@ -41,7 +41,7 @@ bun development
 
 ```
 Username: demo_user
-Password: 12345678
+Password: Changeme123!
 ```
 
 <hr>
