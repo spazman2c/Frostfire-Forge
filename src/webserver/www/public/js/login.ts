@@ -18,14 +18,12 @@ login.addEventListener('click', async () => {
         }),
     });
     if (response.status === 200) {
-        // @ts-expect-error Notify is not defined
         window.Notify('success', 'Email sent successfully');
     } else if (response.status === 301) {
         // Player is already verified and logged in
         window.location.href = '/game';
     } else {
         const body = await response.json();
-        // @ts-expect-error Notify is not defined
         window.Notify('error', body.message);
     }
 });

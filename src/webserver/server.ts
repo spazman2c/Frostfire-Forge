@@ -249,7 +249,9 @@ async function register(req: Request, server: any) {
       return new Response(JSON.stringify({ message: "Invalid email format" }), { status: 400 });
     }
 
-    const user = await player.register(username.toLowerCase(), password, email.toLowerCase(), req) as any;
+    const password_hash = await hash(password);
+
+    const user = await player.register(username.toLowerCase(), password_hash, email.toLowerCase(), req) as any;
     if (!user) {
       return new Response(JSON.stringify({ message: "Failed to register" }), { status: 400 });
     }
@@ -263,13 +265,16 @@ async function register(req: Request, server: any) {
       return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
     }
 
-    const result = await verify(token, email.toLowerCase(), username.toLowerCase()) as any;
-    if (result instanceof Error) {
-      return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
+    if (settings['2fa'].enabled) {
+      const result = await verify(token, email.toLowerCase(), username.toLowerCase()) as any;
+      
+      if (result instanceof Error) {
+        return new Response(JSON.stringify({ message: "Failed to send verification email" }), { status: 500 });
+      }
+      return new Response(JSON.stringify({ message: "Verification email sent" }), { status: 200 });
+    } else {
+      return new Response(JSON.stringify({ message: "Logged in successfully"}), { status: 301, headers: { "Set-Cookie": `token=${token}; Path=/;` } });
     }
-
-    return new Response(JSON.stringify({ message: "Verification email sent" }), { status: 200 });
-
   } catch (error) {
     return new Response(JSON.stringify({ message: "Failed to register", error: error instanceof Error ? error.message : "Unknown error" }), { status: 500 });
   }
@@ -306,7 +311,7 @@ async function login(req: Request, server: any) {
       return new Response(JSON.stringify({ message: "Invalid credentials" }), { status: 400 });
     }
 
-    if (!settings["2fa"].enabled || !process.env.EMAIL_SERVICE || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    if (!settings["2fa"].enabled) {
       // Update the account to verified
       await query("UPDATE accounts SET verified = 1 WHERE token = ?", [token]);
 
@@ -350,7 +355,6 @@ async function resetPassword(req: Request, server: any) {
   if (!validateEmail(email)) {
     return new Response(JSON.stringify({ message: "Invalid email" }), { status: 400 });
   }
-
 
   // Check if the email exists in the database
   const result = await query("SELECT email FROM accounts WHERE email = ? LIMIT 1", [email]) as any;

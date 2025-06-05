@@ -25,6 +25,8 @@ register.addEventListener('click', async () => {
 
   if (response.status === 200) {
       window.Notify('success', 'Email sent successfully');
+  } else if (response.status === 301) {
+    window.location.href = '/game';
   } else {
       const body = await response.json();
       window.Notify('error', body.message);

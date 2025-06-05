@@ -1,5 +1,5 @@
 import query from "../controllers/sqldatabase";
-import { hash, randomBytes, verify } from "../modules/hash";
+import { randomBytes, verify } from "../modules/hash";
 import log from "../modules/logger";
 import assetCache from "../services/assetCache";
 
@@ -13,9 +13,9 @@ const player = {
         } else {
             await query("TRUNCATE TABLE parties");
         }
-    },    
-    register: async (username: string, password: string, email: string, req: any) => {
-        if (!username || !password || !email) return { error: "Missing fields" };
+    },
+    register: async (username: string, password_hash: string, email: string, req: any) => {
+        if (!username || !password_hash || !email) return { error: "Missing fields" };
         username = username.toLowerCase();
         email = email.toLowerCase();
 
@@ -33,7 +33,7 @@ const player = {
               email,
               username,
               "", // empty token
-              await hash(password),
+              password_hash,
               req.ip,
               req.headers["cf-ipcountry"],
               "main",
@@ -46,11 +46,11 @@ const player = {
           if (!response) return { error: "An unexpected error occurred" };
 
         // Create stats
-        await query("INSERT IGNORE INTO stats (username, health, max_health, stamina, max_stamina) VALUES (?, ?, ?, ?, ?)", [username, 100, 100, 100, 100]);
+        await query("INSERT INTO stats (username, health, max_health, stamina, max_stamina, xp, max_xp, level) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [username, 100, 100, 100, 100, 0, 100, 1]);
         // Create client config
-        await query("INSERT IGNORE INTO clientconfig (username, fps, music_volume, effects_volume, muted) VALUES (?, ?, ?, ?, ?)", [username, 60, 50, 50, 0]);
+        await query("INSERT INTO clientconfig (username, fps, music_volume, effects_volume, muted) VALUES (?, ?, ?, ?, ?)", [username, 60, 50, 50, 0]);
         // Create quest log
-        await query("INSERT IGNORE INTO quest_log (username) VALUES (?)", [username]);
+        await query("INSERT INTO quest_log (username) VALUES (?)", [username]);
         return username;
     },
     verify: async (session_id: string) => {
