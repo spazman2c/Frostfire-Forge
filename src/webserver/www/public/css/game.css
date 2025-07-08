@@ -931,7 +931,7 @@ input::placeholder {
   left: 50%;
   transform: translateX(-50%);
   width: 100vw;
-  height: 1.8vh;
+  height: 2em;
   z-index: 1006;
   background: linear-gradient(
     to right,
@@ -970,7 +970,8 @@ input::placeholder {
 #game-notification-message {
   position: absolute;
   width: 100%;
-  font-size: 1.2vh;
+  font-size: 1em;
+  font-family: 'Comic Relief';
   font-weight: 600;
   text-align: center;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
@@ -1165,7 +1166,7 @@ input[type=range]:disabled {
 /* Bottom center with row grid of 5 items */
 #party-container {
   position: fixed;
-  z-index: 100;
+  z-index: 101;
   display: flex;
   border-radius: 5px;
   flex-wrap: wrap;
@@ -1180,7 +1181,7 @@ input[type=range]:disabled {
 .party-member {
   position: relative;
   backdrop-filter: blur(1px);
-  background: #ffffff20;
+  background:  #ffffff0d;
   width: 100px;
   height: 50px;
   margin: 5px;

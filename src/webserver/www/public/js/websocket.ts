@@ -2166,6 +2166,31 @@ effectsSlider.addEventListener("input", () => {
   });
 });
 
+const partyContextActions: Record<string, { only_self: boolean, allowed_self: boolean, label: string, handler: (username: string) => void }> = {
+  'kick-player': {
+    label: 'Kick',
+    allowed_self: false,
+    only_self: false,
+    handler: (username) => {
+      sendRequest({
+        type: "KICK_PARTY_MEMBER",
+        data: { username: username },
+      });
+    }
+  },
+  'leave-party': {
+    label: 'Leave Party',
+    allowed_self: true,
+    only_self: true,
+    handler: (username) => {
+      sendRequest({
+        type: "LEAVE_PARTY",
+        data: { username: username },
+      });
+    }
+  },
+}
+
 const contextActions: Record<string, { allowed_self: boolean, label: string, handler: (id: string) => void }> = {
   'inspect-player': {
     label: 'Inspect',
@@ -2178,7 +2203,12 @@ const contextActions: Record<string, { allowed_self: boolean, label: string, han
     label: 'Send Message',
     allowed_self: false,
     handler: (id) => {
-      console.log(`Sending message to ${id}`);
+      // Update the document to add /w and the player's username
+      const chatInput = document.getElementById("chat-input") as HTMLInputElement;
+      const username = players.find(player => player.id === id)?.username || null;
+      if (!username) return;
+      chatInput.value = `/w ${username} `;
+      chatInput.focus();
     }
   },
   'invite-to-party': {
@@ -2234,6 +2264,59 @@ const contextActions: Record<string, { allowed_self: boolean, label: string, han
   },
 };
 
+
+function createPartyContextMenu(event: MouseEvent, username: string) {
+  if (!loaded) return;
+  document.getElementById("context-menu")?.remove();
+
+  const contextMenu = document.createElement("div");
+  contextMenu.id = 'context-menu';
+  contextMenu.style.left = `${event.clientX}px`;
+  contextMenu.style.top = `${event.clientY}px`;
+
+  // If we are off the screen, adjust position
+  if (event.clientX + 200 > window.innerWidth) {
+    contextMenu.style.left = `${event.clientX - 200}px`;
+  }
+
+  if (event.clientX - 200 < 0) {
+    contextMenu.style.left = `${event.clientX + 50}px`;
+  }
+
+  if (event.clientY + 150 > window.innerHeight) {
+    contextMenu.style.top = `${event.clientY - 150}px`;
+  }
+
+  if (event.clientY - 150 < 0) {
+    contextMenu.style.top = `${event.clientY + 50}px`;
+  }
+
+  contextMenu.dataset.username = username.toLowerCase();
+  const ul = document.createElement("ul");
+  const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
+  const isSelf = currentPlayer?.username.toLowerCase() === username.toLowerCase();
+  Object.entries(partyContextActions).forEach(([action, { label, handler, only_self, allowed_self }]) => {
+    if (only_self && !isSelf) return; // Skip actions that are only for self
+    if (!allowed_self && isSelf) return; // Skip actions that are not allowed for self
+
+    const li = document.createElement("li");
+    li.id = `context-${action}`;
+    li.innerText = label;
+
+    li.onclick = (e) => {
+      e.stopPropagation();
+      handler(username);
+      contextMenu.remove();
+    };
+
+    ul.appendChild(li);
+  });
+
+  contextMenu.appendChild(ul);
+  overlay.appendChild(contextMenu);
+  document.addEventListener("click", () => contextMenu.remove(), { once: true });
+}
+
 function createContextMenu(event: MouseEvent, id: string) {
   if (!loaded) return;
   document.getElementById("context-menu")?.remove();
@@ -2265,12 +2348,16 @@ function createContextMenu(event: MouseEvent, id: string) {
   const isSelf = id === sessionStorage.getItem("connectionId");
   const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
   const targetedPlayer = players.find(player => player.id === id);
-  console.log(currentPlayer, targetedPlayer);
   const isFriend = currentPlayer?.friends?.includes(targetedPlayer?.username?.toString()) || false;
+  const isInParty = currentPlayer?.party?.includes(targetedPlayer?.username?.toString()) || false;
 
   Object.entries(contextActions).forEach(([action, { label, handler, allowed_self }]) => {
     if (!allowed_self && isSelf) return;
 
+    // Skip "invite-to-party" if already in party
+    if (action === 'invite-to-party' && isInParty) return;
+
+    // Skip "add-friend" if already friends
     if (action === 'add-friend' && isFriend) return;
 
     // Skip "remove-friend" if not friends
@@ -2303,7 +2390,20 @@ document.addEventListener("contextmenu", (event) => {
     contextMenuKeyTriggered = false;
     return;
   }
-  if ((event.target as HTMLElement)?.classList.contains("ui")) return;
+  // Handle right-click on the UI
+  if ((event.target as HTMLElement)?.classList.contains("ui")) {
+    // Check if we clicked on a party member
+    const partyMember = (event.target as HTMLElement).closest(".party-member") as HTMLElement;
+    if (partyMember) {
+      const username = partyMember.dataset.username;
+      if (username) {
+        createPartyContextMenu(event, username);
+      }
+      event.preventDefault();
+      return;
+    }
+    return;
+  }
   // Check where we clicked on the canvas
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX - rect.left;
@@ -2323,17 +2423,18 @@ document.addEventListener("contextmenu", (event) => {
     const id = clickedPlayer.id;
     // Create context menu for the clicked player
     createContextMenu(event, id);
-  } else {
-    // Remove any existing context menu
-    const existingMenu = document.getElementById("context-menu");
-    if (existingMenu) existingMenu.remove();
-    const moveX = Math.floor(x - canvas.width / 2 - 16);
-    const moveY = Math.floor(y - canvas.height / 2 - 24);
-    sendRequest({
-      type: "TELEPORTXY",
-          data: { x: moveX, y: moveY },
-    });
+    return; // Stop further processing
   }
+
+  // Remove any existing context menu
+  const existingMenu = document.getElementById("context-menu");
+  if (existingMenu) existingMenu.remove();
+  const moveX = Math.floor(x - canvas.width / 2 - 16);
+  const moveY = Math.floor(y - canvas.height / 2 - 24);
+  sendRequest({
+    type: "TELEPORTXY",
+        data: { x: moveX, y: moveY },
+  });
 });
 
 document.addEventListener("click", (event) => {
@@ -2669,6 +2770,7 @@ function createPartyUI(partyMembers: string[]) {
     if (!existingNames.has(lowerName)) {
       const memberElement = document.createElement("div");
       memberElement.className = "party-member ui";
+      memberElement.dataset.username = lowerName;
 
       const usernameElement = document.createElement("div");
       usernameElement.className = "party-member-username ui";

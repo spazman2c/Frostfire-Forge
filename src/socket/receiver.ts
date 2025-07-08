@@ -11,7 +11,7 @@ import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
 import friends from "../systems/friends";
-import parties from "../systems/parties";
+import parties from "../systems/parties.ts";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
 import { decryptPrivateKey, decryptRsa, _privateKey } from "../modules/cipher";
@@ -134,8 +134,13 @@ export default async function packetReceiver(
         const friendsList = await friends.list(username);
 
         // Check if the player has a party
-        const party = await parties.getPartyId(username);
-        const partyMembers = await parties.getPartyMembers(party) || [];
+        const partyId = await parties.getPartyId(username);
+        const partyMembers: string[] = [];
+
+        if (partyId) {
+            const members = await parties.getPartyMembers(partyId);
+            partyMembers.push(...members);
+        }
 
         // Get client configuration
         const clientConfig = (await player.getConfig(username)) as any[];
@@ -2033,9 +2038,152 @@ export default async function packetReceiver(
         }
         break;
       }
+      case "KICK_PARTY_MEMBER": {
+        if (!currentPlayer) return;
+        // Get the player's party ID
+        const partyId = await parties.getPartyId(currentPlayer.username);
+        if (!partyId) {
+          sendPacket(ws, packetManager.notify({ message: "You are not in a party" }));
+          return;
+        }
+
+        const isLeader = await parties.isPartyLeader(currentPlayer.username);
+        if (!isLeader) {
+          sendPacket(ws, packetManager.notify({ message: "You are not the party leader" }));
+          return;
+        }
+
+        const member = (data as any)?.username;
+        if (!member) {
+          sendPacket(ws, packetManager.notify({ message: "Please provide a username" }));
+          return;
+        }
+
+        // Check if the member is in the party
+        const members = await parties.getPartyMembers(partyId);
+        if (!members || members?.length === 0) {
+          sendPacket(ws, packetManager.notify({ message: "You are not in a party" }));
+          return;
+        }
+
+        if (!members.includes(member)) {
+          sendPacket(ws, packetManager.notify({ message: `${member.charAt(0).toUpperCase() + member.slice(1)} is not in your party` }));
+          return;
+        }
+
+        // Kick the member from the party
+        const result = await parties.remove(member);
+
+        if (typeof result === "boolean" && !result) {
+          sendPacket(ws, packetManager.notify({ message: `Failed to kick ${member.charAt(0).toUpperCase() + member.slice(1)} from the party` }));
+          return;
+        }
+
+        if (typeof result === "boolean" && result) {
+          // Party was disbanded
+          members.forEach(async (m: string) => {
+            const session_id = await player.getSessionIdByUsername(m);
+            const p = session_id && cache.get(session_id);
+            if (p) {
+              sendPacket(p.ws, packetManager.updateParty({ members: [] }));
+              sendPacket(p.ws, packetManager.notify({ message: "The party has been disbanded" }));
+              p.party = [];
+              cache.set(p.id, p);
+            }
+          });
+          return;
+        }
+        
+        if (Array.isArray(result) && result.length > 0) {
+          sendPacket(ws, packetManager.notify({ message: `${member.charAt(0).toUpperCase() + member.slice(1)} has been kicked from the party` }));
+          currentPlayer.party = [];
+          cache.set(currentPlayer.id, currentPlayer);
+          sendPacket(ws, packetManager.updateParty({ members: [] }));
+
+          // Send the updated party members to all party members
+          result.forEach(async (m: string) => {
+            const session_id = await player.getSessionIdByUsername(m);
+            const p = session_id && cache.get(session_id);
+            if (p) {
+              if (m !== member) {
+                sendPacket(p.ws, packetManager.updateParty({ members: result }));
+                sendPacket(p.ws, packetManager.notify({ message: `${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)} has kicked ${member.charAt(0).toUpperCase() + member.slice(1)} from the party` }));
+                p.party = result;
+              } else {
+                sendPacket(p.ws, packetManager.updateParty({ members: [] }));
+                sendPacket(p.ws, packetManager.notify({ message: `You have been kicked from the party` }));
+                p.party = [];
+              }
+              cache.set(p.id, p);
+            }
+          });
+        }
+
+        break;
+      }
+      case "LEAVE_PARTY": {
+        if (!currentPlayer) return;
+        // Get the player's party ID
+        const partyId = await parties.getPartyId(currentPlayer.username);
+        if (!partyId) {
+          sendPacket(ws, packetManager.notify({ message: "You are not in a party" }));
+          return;
+        }
+
+        const members = await parties.getPartyMembers(partyId);
+        if (!members || members?.length === 0) {
+          sendPacket(ws, packetManager.notify({ message: "You are not in a party" }));
+          return;
+        }
+
+        const result = await parties.leave(currentPlayer.username);
+
+        const type = typeof result;
+        if (type === "boolean" && !result) {
+          sendPacket(ws, packetManager.notify({ message: "Failed to leave party" }));
+          return;
+        }
+
+        // Party was deleted
+        if (type === "boolean" && result) {
+          members.forEach(async (member: string) => {
+            const session_id = await player.getSessionIdByUsername(member);
+            const p = session_id && cache.get(session_id);
+            if (p) {
+              sendPacket(p.ws, packetManager.updateParty({ members: [] }));
+              sendPacket(p.ws, packetManager.notify({ message: "The party has been disbanded" }));
+              p.party = [];
+              cache.set(p.id, p);
+            }
+          });
+          return;
+        }
+
+        if (type === "object" && (result as string[]).length > 0) {
+          sendPacket(ws, packetManager.notify({ message: "You have left the party" }));
+          currentPlayer.party = [];
+          cache.set(currentPlayer.id, currentPlayer);
+          sendPacket(ws, packetManager.updateParty({ members: [] }));
+
+          // Send the updated party members to all party members
+          (result as string[]).forEach(async (member: string) => {
+            const session_id = await player.getSessionIdByUsername(member);
+            const p = session_id && cache.get(session_id);
+            if (p) {
+              sendPacket(p.ws, packetManager.updateParty({ members: result }));
+              sendPacket(p.ws, packetManager.notify({ message: `${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)} has left the party` }));
+              p.party = result;
+              cache.set(p.id, p);
+            }
+          });
+        }
+        break;
+      }
       case "INVITE_PARTY": {
         const invited_user = (data as any).id;
-        if (!currentPlayer || !invited_user) return;
+        const invitedUser = cache.get(invited_user);
+        const invitedUserUsername = invitedUser?.username || invited_user;
+        if (!currentPlayer || !invited_user || !invitedUserUsername) return;
 
         // Get the leaders party ID
         const partyId = await parties.getPartyId(currentPlayer.username);
@@ -2049,17 +2197,17 @@ export default async function packetReceiver(
         }
 
         // Check if the invited user is already in a party
-        const invitedUserPartyId = await parties.getPartyId(invited_user);
+        const invitedUserPartyId = await parties.getPartyId(invitedUserUsername);
 
         if (invitedUserPartyId) {
-          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is already in a party` }));
+          sendPacket(ws, packetManager.notify({ message: `${invitedUserUsername.charAt(0).toUpperCase() + invitedUserUsername.slice(1)} is already in a party` }));
           return;
         }
 
         // Check if the invited user is a party leader
-        const invitedUserLeader = await parties.isPartyLeader(invited_user);
+        const invitedUserLeader = await parties.isPartyLeader(invitedUserUsername);
         if (invitedUserLeader) {
-          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is already in a party` }));
+          sendPacket(ws, packetManager.notify({ message: `${invitedUserUsername.charAt(0).toUpperCase() + invitedUserUsername.slice(1)} is already in a party` }));
           return;
         }
 
@@ -2071,11 +2219,10 @@ export default async function packetReceiver(
           originator: currentPlayer.id.toString(),
           authorization: randomBytes(16).toString(),
         }
-        
-        const invitedUser = cache.get(invited_user);
+      
 
         if (!invitedUser) {
-          sendPacket(ws, packetManager.notify({ message: `${invited_user.charAt(0).toUpperCase() + invited_user.slice(1)} is not online` }));
+          sendPacket(ws, packetManager.notify({ message: `${invitedUserUsername.charAt(0).toUpperCase() + invitedUserUsername.slice(1)} is not online` }));
           return;
         }
 
@@ -2088,6 +2235,7 @@ export default async function packetReceiver(
         cache.set(currentPlayer.id, currentPlayer);
         // Send the invitation notification to the invited user
         sendPacket(invitedUser.ws, packetManager.invitation(invite_data));
+        sendPacket(ws, packetManager.notify({ message: `Invitation sent to ${invitedUserUsername.charAt(0).toUpperCase() + invitedUserUsername.slice(1)}` }));
       break;
       }
       case "ADD_FRIEND": {

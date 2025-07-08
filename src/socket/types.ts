@@ -53,4 +53,7 @@ export const packetTypes: PacketType = {
   51: "REMOVE_PARTY",
   52: "UPDATE_PARTY",
   53: "PARTY_CHAT",
+  54: "KICK_PARTY_MEMBER",
+  55: "UPDATE_PARTY_MEMBER",
+  56: "LEAVE_PARTY",
 };

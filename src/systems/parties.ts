@@ -2,7 +2,7 @@ import query from "../controllers/sqldatabase";
 import log from "../modules/logger";
 
 const parties = {
-    async isInParty(username: string) {
+    async isInParty(username: string): Promise<boolean> {
         if (!username) return false;
         try {
             const result = await query("SELECT party_id FROM accounts WHERE username = ?", [username]) as any[];
@@ -13,184 +13,173 @@ const parties = {
             return false;
         }
     },
-    async isPartyLeader(username: string) {
+    async isPartyLeader(username: string): Promise<boolean> {
         if (!username) return false;
         try {
-            // First check if the user is in a party
-            const result = await query("SELECT party_id FROM accounts WHERE username = ?", [username]) as any[];
-            if (result.length === 0 || !result[0].party_id) return false; // User not found or not in a party
-            const partyId = result[0].party_id;
-            // Now check if the user is the party leader
-            const leaderResult = await query("SELECT leader FROM parties WHERE id = ?", [partyId]) as any[];
-            if (leaderResult.length === 0) return false; // Party not found
-            return leaderResult[0].leader === username; // Check if the username matches the party leader
+            const result = await query("SELECT id FROM parties WHERE leader = ?", [username]) as any[];
+            return result.length > 0;
         } catch (error) {
             log.error(`Error checking if user is party leader: ${error}`);
             return false;
         }
     },
-    async getPartyId(username: string) {
+    async getPartyId(username: string): Promise<number | null> {
         if (!username) return null;
         try {
             const result = await query("SELECT party_id FROM accounts WHERE username = ?", [username]) as any[];
-            if (result.length === 0 || !result[0].party_id) {
-                return null; // User not found or not in a party
-            }
-            return result[0].party_id; // Return the party ID
+            if (result.length === 0 || !result[0].party_id) return null;
+            return result[0].party_id;
         } catch (error) {
             log.error(`Error getting party ID for user: ${error}`);
             return null;
         }
     },
-    async getPartyMembers(partyId: number) {
+    async getPartyMembers(partyId: number): Promise<string[]> {
         if (!partyId) return [];
         try {
             const result = await query("SELECT members FROM parties WHERE id = ?", [partyId]) as any[];
             if (result.length === 0 || !result[0].members) return []; // Party not found or no members
-            // Assuming members are stored as a comma-separated string
             const members = result[0].members.split(",").map((member: any) => member.trim());
-            return members.filter((member: any) => member); // Filter out any empty strings
+            return members.filter((member: any) => member);
         } catch (error) {
             log.error(`Error getting party members: ${error}`);
             return [];
         }
     },
-    async getPartyLeader(partyId: number) {
+    async getPartyLeader(partyId: number): Promise<string | null> {
         if (!partyId) return null;
         try {
             const result = await query("SELECT leader FROM parties WHERE id = ?", [partyId]) as any[];
             if (result.length === 0 || !result[0].leader) return null; // Party not found or no leader
-            return result[0].leader; // Return the party leader's username
+            return result[0].leader;
         } catch (error) {
             log.error(`Error getting party leader: ${error}`);
             return null;
         }
     },
-    async add(username: string, partyId: number) {
-        if (!username || !partyId) return false;
+    async exists(username: string): Promise<boolean> {
+        if (!username) return false;
+        const result = await this.getPartyId(username);
+        return result !== null;
+    },
+    async add(username: string, partyId: number): Promise<string[]> {
+        if (!username) return [];
         try {
             // Check if the user is already in a party
-            const existingParty = typeof parties.getPartyId(username);
-            if (existingParty) return false; // User is already in a party
-            // Get party members
-            const partyMembers = await parties.getPartyMembers(partyId);
-            if (!partyMembers) return false; // No members found or party does not exist
+            const existingParty = await this.exists(username);
+            if (existingParty) return [];
 
-            // Check if party members exceed the limit of 4
-            if (partyMembers.length >= 4) return false; // Party is full
+            // Get party members
+            const members = await this.getPartyMembers(partyId) as string[];
+            if (!members || members?.length === 0) return [];
+
+            // Check if party members exceed the limit of 5
+            if (members.length >= 5) return [];
 
             // Prevent adding the same user multiple times
-            if (partyMembers.includes(username)) return false;
+            if (members.includes(username)) return [];
 
             // Add the user to the party
             await query("UPDATE accounts SET party_id = ? WHERE username = ?", [partyId, username]);
-            // Update the party members list
-            const updatedMembers = [...partyMembers, username].join(",");
+            const updatedMembers = [...members, username].join(", ");
             await query("UPDATE parties SET members = ? WHERE id = ?", [updatedMembers, partyId]);
-            // Send the updated list of party members to the client
-            return updatedMembers.split(",").map((member: any) => member.trim());
+            return updatedMembers.split(", ").map((member: string) => member.trim());
         } catch (error) {
             log.error(`Error adding user to party: ${error}`);
-            return false;
+            return [];
         }
     },
-    async remove(username: string) {
-        if (!username) return false;
+    async remove(username: string): Promise<string[] | boolean> {
+        if (!username) return [];
         try {
-            // Get the party ID of the user
-            const partyId = await parties.getPartyId(username);
-            if (!partyId) return false; // User is not in a party
-            // Remove the user from the party
+            const partyId = await this.getPartyId(username);
+            if (!partyId) return []; // User is not in a party
+
             await query("UPDATE accounts SET party_id = NULL WHERE username = ?", [username]);
 
-            // Get current party members
-            const partyMembers = await parties.getPartyMembers(partyId);
+            const members = await this.getPartyMembers(partyId);
 
             // Remove the user from the members list
-            const updatedMembers = partyMembers.filter((member: any) => member !== username).join(",");
+            const updatedMembers = members.filter((member: string) => member !== username).join(", ");
             await query("UPDATE parties SET members = ? WHERE id = ?", [updatedMembers, partyId]);
 
-            // If the party is now empty, delete the party
-            if (updatedMembers.length === 0) {
-                await parties.delete(partyId);
-                return true;
-            } else {
-                return updatedMembers.split(",").map((member: any) => member.trim());
+            // If the party has no members left, delete the party
+            const memberArray = Array.isArray(updatedMembers) ? updatedMembers.split(", ") : [updatedMembers];
+            if (memberArray.length <= 1) {
+                await this.delete(partyId);
+                return true; // Party deleted
             }
+
+            return memberArray.map((member: string) => member.trim());
         } catch (error) {
             log.error(`Error removing user from party: ${error}`);
-            return false;
+            return [];
         }
     },
-    async delete (partyId: number) {
+    async delete(partyId: number): Promise<boolean> {
         if (!partyId) return false;
         try {
             await query("DELETE FROM parties WHERE id = ?", [partyId]);
+            // Remove party_id from all members in the accounts table
             await query("UPDATE accounts SET party_id = NULL WHERE party_id = ?", [partyId]);
+            log.info(`Party with ID ${partyId} deleted successfully.`);
             return true;
         } catch (error) {
             log.error(`Error deleting party: ${error}`);
             return false;
         }
     },
-    async create (leader: string, username: string)  {
+    async create(leader: string, username: string): Promise<string[] | boolean> {
         if (!leader || !username) return false;
         try {
-            // Initiate a new party if it doesn't exist
-            const existingParty = await query("SELECT id FROM parties WHERE leader = ?", [leader]) as any[];
-            if (existingParty.length > 0) return false; // Leader already has a party
+            const existingParty = await this.exists(leader);
+            if (existingParty) return false; // Leader is already in a party
 
-            // Ensure the leader isn't already in a party
-            const leaderParty = await query("SELECT party_id FROM accounts WHERE username = ?", [leader]) as any[];
-            if (leaderParty.length > 0 && leaderParty[0].party_id) return false; // Leader is already in a party
-
-            const members = `${leader},${username}`;
+            const members = [leader, username].join(", ");
             const result = await query("INSERT INTO parties (leader, members) VALUES (?, ?)", [leader, members]) as any;
-            if (result.affectedRows === 0) return false; // Failed to create party
             const partyId = result.insertId;
-            // Update the leader's and party member's party_id
+
+            // Update the accounts table to set the party_id for both users
             await query("UPDATE accounts SET party_id = ? WHERE username IN (?, ?)", [partyId, leader, username]);
-            // Return the party member list
-            return [username, leader];
+            return members.split(", ").map((member: string) => member.trim());
         } catch (error) {
             log.error(`Error creating party: ${error}`);
             return false;
         }
     },
-    async leave (username: string) {
+    async leave(username: string): Promise<boolean | string[]> {
         if (!username) return false;
         try {
-            const existingParty = await parties.getPartyId(username);
-            if (!existingParty) return false; // User is not in a party and cannot leave
-            // Check if the user is the party leader
-            const isLeader = await parties.isPartyLeader(username);
-            if (isLeader) {
-                // If the leader leaves, we need to transfer leadership or delete the party
-                const partyMembers = await parties.getPartyMembers(existingParty);
-                if (partyMembers.length > 1) {
-                    // Transfer leadership to the first member in the list
-                    const newLeader = partyMembers[1]; // Assuming the second member becomes the new leader
-                    await query("UPDATE parties SET leader = ? WHERE id = ?", [newLeader, existingParty]);
-                    // Update the party member's party_id
-                    await query("UPDATE accounts SET party_id = ? WHERE username = ?", [existingParty, newLeader]);
-                    // Remove the leader from the party
-                    await query("UPDATE accounts SET party_id = NULL WHERE username = ?", [username]);
-                    // Remove the leader from the party members list
-                    const updatedMembers = partyMembers.filter((member: any) => member !== username).join(",");
-                    await query("UPDATE parties SET members = ? WHERE id = ?", [updatedMembers, existingParty]);
-                    return updatedMembers.split(",").map((member: any) => member.trim());
-                } else {
-                    // If no other members, delete the party
-                    await parties.delete(existingParty);
-                    return true; // Party deleted successfully
-                }
-            } else {
-                // If the user is not the leader, simply remove them from the party
-                const updatedMembers = await parties.remove(username);
-                if (!updatedMembers) return false; // Failed to remove user from party
-            }
+            const partyId = await this.getPartyId(username);
+            if (!partyId) return false; // User is not in a party
+
+            const isLeader = await this.isPartyLeader(username);
+            if (isLeader) return await this.delete(partyId);
+
+            return await this.remove(username);
         } catch (error) {
             log.error(`Error leaving party: ${error}`);
+            return false;
+        }
+    },
+    async disband(username: string): Promise<boolean> {
+        if (!username) return false;
+        try {
+            const partyId = await this.getPartyId(username);
+            if (!partyId) return false; // User is not in a party
+
+            const isLeader = await this.isPartyLeader(username);
+            if (!isLeader) return false; // User is not the leader and cannot disband
+
+            const members = await this.getPartyMembers(partyId);
+            if (members.length === 0) return false; // No members to disband
+
+            // Remove all members from the party
+            await query("UPDATE accounts SET party_id = NULL WHERE party_id = ?", [partyId]);
+            // Delete the party
+            return await this.delete(partyId);
+        } catch (error) {
+            log.error(`Error disbanding party: ${error}`);
             return false;
         }
     }
