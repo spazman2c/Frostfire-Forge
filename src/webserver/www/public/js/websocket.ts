@@ -7,6 +7,7 @@ const positionText = document.getElementById("position") as HTMLDivElement;
 const packetsSentReceived = document.getElementById("packets-sent-received") as HTMLDivElement;
 import * as pako from "../libs/pako.js";
 import parseAPNG from '../libs/apng_parser.js';
+let userHasInteracted = false;
 socket.binaryType = "arraybuffer";
 const players = [] as any[];
 const npcs = [] as any[];
@@ -18,6 +19,17 @@ declare global {
     playerZIndex?: number;
   }
 }
+
+const userInteractionListener = () => {
+  if (!userHasInteracted) {
+    userHasInteracted = true;
+    // Remove event listener after first interaction
+    document.removeEventListener("mousedown", userInteractionListener);
+  }
+};
+
+document.addEventListener("mousedown", userInteractionListener);
+
 // const mapScale = 0.1;
 const audioCache = new Map<string, string>();
 const npcImage = new Image();
@@ -38,30 +50,8 @@ const inventoryGrid = document.getElementById("grid") as HTMLDivElement;
 const statUI = document.getElementById("stat-screen") as HTMLDivElement;
 const chatInput = document.getElementById("chat-input") as HTMLInputElement;
 const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
-const startGameButton = document.getElementById("start-game-button") as HTMLButtonElement;
 const loadingScreen = document.getElementById("loading-screen");
 const xpBar = document.getElementById("xp-bar") as HTMLDivElement;
-if (startGameButton) {
-  startGameButton.addEventListener("click", () => { 
-    sendRequest({
-      type: "STARTGAME",
-      data: null,
-    });
-    // Hide the start game button
-    startGameButton.style.display = "none";
-    // Hide the loading screen
-    if (loadingScreen) {
-      // Fade out the loading screen after the map is loaded
-      loadingScreen.style.transition = "1s";
-      loadingScreen.style.opacity = "0";
-      setTimeout(() => {
-        loadingScreen.style.display = "none";
-        progressBar.style.width = "0%";
-        progressBarContainer.style.display = "block";
-      }, 1000);
-    }
-  });
-}
 const healthBar = document.getElementById(
   "health-progress-bar"
 ) as HTMLDivElement;
@@ -753,9 +743,16 @@ socket.onmessage = async (event) => {
                 currentLayer++;
                 await new Promise(resolve => requestAnimationFrame(resolve));
               }
-              
-              startGameButton.style.display = "block";
-              progressBarContainer.style.display = "none";
+              if (loadingScreen) {
+                // Fade out the loading screen after the map is loaded
+                loadingScreen.style.transition = "1s";
+                loadingScreen.style.opacity = "0";
+                setTimeout(() => {
+                  loadingScreen.style.display = "none";
+                  progressBar.style.width = "0%";
+                  progressBarContainer.style.display = "block";
+                }, 1000);
+              }
               
               // Store layer canvases globally for use in animation loop
               window.mapLayerCanvases = layerCanvases.sort((a: any, b: any) => a.zIndex - b.zIndex);
@@ -1115,7 +1112,13 @@ function updateXp(xp: number, level: number, max_xp: number) {
 }
 
 function playMusic(name: string, data: Uint8Array, timestamp: number): void {
-// Check if the audio is already cached, if not, inflate the data
+  if (!userHasInteracted) {
+    setTimeout(() => {
+      playMusic(name, data, timestamp);
+    }, 100);
+    return;
+  }
+  // Check if the audio is already cached, if not, inflate the data
     // @ts-expect-error - pako is not defined because it is loaded in the index.html
     const cachedAudio = timestamp < performance.now() - 3.6e+6 ? pako.inflate(new Uint8Array(data),{ to: 'string' }) : audioCache.get(name)|| pako.inflate(new Uint8Array(data), { to: 'string' });
     const music = new Audio(`data:audio/wav;base64,${cachedAudio}`);
@@ -1144,6 +1147,13 @@ function startMusicInterval(music: any) {
 }
 
 function playAudio(name: string, data: Uint8Array, pitch: number, timestamp: number): void {
+  // Keep retrying to play the audio until the user has interacted with the page
+  if (!userHasInteracted) {
+    setTimeout(() => {
+      playAudio(name, data, pitch, timestamp);
+    }, 100);
+    return;
+  }
   // Get mute status
   if (mutedCheckbox.checked) return;
   // Get effects volume

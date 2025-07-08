@@ -99,6 +99,16 @@ export default async function packetReceiver(
           ws.close(1008, "Already logged in");
           break;
         }
+
+        const musicData = {
+          name: "music_entry",
+          data: assetCache
+            .get("audio")
+            .find((a: SoundData) => a.name === "music_entry"),
+        };
+
+        sendPacket(ws, packetManager.music(musicData));
+
         const getUsername = (await player.getUsernameBySession(
           ws.data.id
         )) as any[];
@@ -956,17 +966,6 @@ export default async function packetReceiver(
         const questId = data as unknown as number;
         const quest = await quests.find(questId);
         sendPacket(ws, packetManager.questDetails(quest));
-        break;
-      }
-      case "STARTGAME": {
-        // Send music
-        const musicData = {
-          name: "music_morning_dew",
-          data: assetCache
-            .get("audio")
-            .find((a: SoundData) => a.name === "music_morning_dew"),
-        };
-        sendPacket(ws, packetManager.music(musicData));
         break;
       }
       case "STOPTYPING": {
