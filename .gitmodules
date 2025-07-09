@@ -1,0 +1,3 @@
+[submodule "Frostfire-Forge-Client"]
+	path = Frostfire-Forge-Client
+	url = https://github.com/Lillious-Networks/Frostfire-Forge-Client

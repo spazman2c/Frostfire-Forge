@@ -32,7 +32,9 @@
     "docs": "bun ./src/utility/generate_docs.ts",
     "create-config": "bun ./src/utility/create_config.ts",
     "setup-development": "bun create-config && bun setup-sqlite",
-    "setup-production": "bun create-config && bun setup"
+    "setup-production": "bun create-config && bun setup",
+    "start-client": "cd ./Frostfire-Forge-Client && npm i && npm start",
+    "package-client": "cd ./Frostfire-Forge-Client && npm i && npm run package"
   },
   "type": "module"
 }
