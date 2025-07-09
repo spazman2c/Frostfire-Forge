@@ -61,7 +61,7 @@ export default async function packetReceiver(
       return ws.close(1007, "Malformed message");
     // Check if the packet type is valid
     if (
-      Object.values(packetTypes).indexOf(parsedMessage?.type as string) === -1
+      Object.values(packetTypes).indexOf(parsedMessage?.type as unknown as string) === -1
     ) {
       ws.close(1007, "Invalid packet type");
     }

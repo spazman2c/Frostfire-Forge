@@ -218,67 +218,10 @@ declare interface Identity {
 }
 ```
 
-<h3>Packets</h3>
-
-<h5>Types</h5>
+<h3>Authorized Packet Types</h3>
 
 ```ts
-export const packetTypes: PacketType = {
-  0: "PING",
-  1: "PONG",
-  2: "CONNECTION_COUNT",
-  3: "RATE_LIMITED",
-  4: "LOGIN",
-  5: "LOGIN_SUCCESS",
-  6: "LOGIN_FAILED",
-  7: "LOAD_MAP",
-  8: "TIME_SYNC",
-  9: "MOVEXY",
-  10: "AUTH",
-  11: "LOGOUT",
-  12: "DISCONNECT",
-  13: "SPAWN_PLAYER",
-  14: "LOAD_PLAYERS",
-  15: "DISCONNECT_PLAYER",
-  16: "INVENTORY",
-  17: "CHAT",
-  18: "STATS",
-  19: "CLIENTCONFIG",
-  20: "REGISTER",
-  21: "TELEPORTXY",
-  22: "SELECTPLAYER",
-  23: "BENCHMARK",
-  24: "STEALTH",
-  25: "ATTACK",
-  26: "PROJECTILEXY",
-  27: "REVIVE",
-  28: "UPDATESTATS",
-  29: "TARGETCLOSEST",
-  30: "AUDIO",
-  31: "INSPECTPLAYER",
-  32: "MUSIC",
-  33: "STARTGAME",
-  34: "CREATE_NPC",
-  35: "COMMAND",
-  36: "NOTIFY",
-  37: "NOCLIP",
-  38: "QUESTLOG",
-  39: "QUESTDETAILS",
-  40: "TYPING",
-  41: "STOPTYPING",
-  42: "UPDATE_XP",
-  43: "ANIMATION",
-  44: "ADD_FRIEND",
-  45: "REMOVE_FRIEND",
-  46: "UPDATE_FRIENDS",
-  47: "INVITATION_RESPONSE",
-  48: "UPDATE_ONLINE_STATUS",
-  49: "WHISPER",
-  50: "INVITE_PARTY",
-  51: "REMOVE_PARTY",
-  52: "UPDATE_PARTY",
-  53: "PARTY_CHAT",
-};
+import { packetTypes } from "./types";
 ```
 
 <h5>Structure</h5>
@@ -287,8 +230,18 @@ export const packetTypes: PacketType = {
 declare interface Packet {
   type: PacketType;
   data: PacketData;
-  id: string | null;
-  useragent: string | null;
+  id: Nullable<string>;
+  useragent: Nullable<string>;
+  language: Nullable<string>;
+  publicKey: Nullable<string>;
+}
+
+declare interface PacketType {
+  [key: any]: string;
+}
+
+declare interface PacketData {
+  data: Array<any>;
 }
 ```
 

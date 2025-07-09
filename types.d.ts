@@ -12,7 +12,7 @@ declare interface Packet {
 
 // Define the packet type
 declare interface PacketType {
-  [key: number]: string;
+  [key: any]: string;
 }
 
 // Define the packet data
