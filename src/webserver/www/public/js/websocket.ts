@@ -147,162 +147,139 @@ function animationLoop() {
   const fpsTarget = parseFloat(fpsSlider.value);
   const frameDuration = 1000 / fpsTarget;
   const now = performance.now();
-
-  // Skip frame if not enough time has passed
   const deltaTime = (now - lastFrameTime) / 1000;
+
   if (now - lastFrameTime < frameDuration) {
-    window.requestAnimationFrame(animationLoop);
+    requestAnimationFrame(animationLoop);
     return;
   }
   lastFrameTime = now;
 
-  const currentPlayer = players.find(
-    (player) => player.id === sessionStorage.getItem("connectionId")
-  );
-  
+  const currentPlayerId = sessionStorage.getItem("connectionId");
+  const currentPlayer = players.find(p => p.id === currentPlayerId);
   if (!currentPlayer) {
-    window.requestAnimationFrame(animationLoop);
+    requestAnimationFrame(animationLoop);
     return;
   }
 
   // Update camera for current player
   updateCamera(currentPlayer);
 
-  // Handle movement updates if moving
+  // Movement Input Handling
   if (isMoving && isKeyPressed) {
-    const currentKeys = new Set([...pressedKeys]);
-    let currentDirection = "";
-    
     if (document.activeElement === chatInput || document.activeElement === friendsListSearch) {
       isMoving = false;
       lastDirection = "";
       return;
     }
 
-    if (currentKeys.has("KeyW") && currentKeys.has("KeyA")) currentDirection = "UPLEFT";
-    else if (currentKeys.has("KeyW") && currentKeys.has("KeyD")) currentDirection = "UPRIGHT";
-    else if (currentKeys.has("KeyS") && currentKeys.has("KeyA")) currentDirection = "DOWNLEFT";
-    else if (currentKeys.has("KeyS") && currentKeys.has("KeyD")) currentDirection = "DOWNRIGHT";
-    else if (currentKeys.has("KeyW")) currentDirection = "UP";
-    else if (currentKeys.has("KeyS")) currentDirection = "DOWN";
-    else if (currentKeys.has("KeyA")) currentDirection = "LEFT";
-    else if (currentKeys.has("KeyD")) currentDirection = "RIGHT";
+    const keys = pressedKeys;
+    let dir = "";
 
-    if (currentDirection && currentDirection !== lastDirection && !pendingRequest) {
+    if (keys.has("KeyW") && keys.has("KeyA")) dir = "UPLEFT";
+    else if (keys.has("KeyW") && keys.has("KeyD")) dir = "UPRIGHT";
+    else if (keys.has("KeyS") && keys.has("KeyA")) dir = "DOWNLEFT";
+    else if (keys.has("KeyS") && keys.has("KeyD")) dir = "DOWNRIGHT";
+    else if (keys.has("KeyW")) dir = "UP";
+    else if (keys.has("KeyS")) dir = "DOWN";
+    else if (keys.has("KeyA")) dir = "LEFT";
+    else if (keys.has("KeyD")) dir = "RIGHT";
+
+    if (dir && dir !== lastDirection && !pendingRequest) {
       pendingRequest = true;
-      sendRequest({
-        type: "MOVEXY",
-        data: currentDirection,
-      });
-      lastDirection = currentDirection;
-      
-      setTimeout(() => {
-        pendingRequest = false;
-      }, 50);
+      sendRequest({ type: "MOVEXY", data: dir });
+      lastDirection = dir;
+      setTimeout(() => (pendingRequest = false), 50);
     }
   } else if (isMoving && !isKeyPressed) {
-    if (lastDirection !== "") {
-      sendRequest({
-        type: "MOVEXY",
-        data: "ABORT",
-      });
-    }
+    if (lastDirection !== "") sendRequest({ type: "MOVEXY", data: "ABORT" });
     isMoving = false;
     lastDirection = "";
   }
 
-  // Calculate visible area
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const scrollX = window.scrollX;
-  const scrollY = window.scrollY;
+  // Cache viewport details once
+  const viewport = {
+    x: window.scrollX,
+    y: window.scrollY,
+    w: window.innerWidth,
+    h: window.innerHeight,
+    padding: 64,
+  };
 
-  // Clear entire visible viewport
-  ctx.clearRect(scrollX, scrollY, viewportWidth, viewportHeight);
+  const paddedBounds = {
+    x: viewport.x - viewport.padding,
+    y: viewport.y - viewport.padding,
+    w: viewport.w + viewport.padding * 2,
+    h: viewport.h + viewport.padding * 2,
+  };
 
-  // Filter visible entities
-  const visiblePlayers = players.filter(player => 
-    isInViewport(
-      player.position.x, 
-      player.position.y, 
-      scrollX - 64,
-      scrollY - 64,
-      viewportWidth + 128,
-      viewportHeight + 128
-    ) && (player.id === sessionStorage.getItem("connectionId") || !player.isStealth || (player.isStealth && currentPlayer.isAdmin))
+  ctx.clearRect(viewport.x, viewport.y, viewport.w, viewport.h);
+
+  const isInView = (x: number, y: number) =>
+    x >= paddedBounds.x &&
+    y >= paddedBounds.y &&
+    x <= paddedBounds.x + paddedBounds.w &&
+    y <= paddedBounds.y + paddedBounds.h;
+
+  const visiblePlayers = players.filter(p =>
+    isInView(p.position.x, p.position.y) &&
+    (p.id === currentPlayerId || !p.isStealth || (p.isStealth && currentPlayer.isAdmin))
   );
 
-  const visibleNpcs = npcs.filter(npc => 
-    isInViewport(
-      npc.position.x,
-      npc.position.y,
-      scrollX - 64,
-      scrollY - 64,
-      viewportWidth + 128,
-      viewportHeight + 128
-    )
+  const visibleNpcs = npcs.filter(npc =>
+    isInView(npc.position.x, npc.position.y)
   );
 
-  // Render all layers and entities in proper z-order
+  const playerZ = 6;
+
   if (window.mapLayerCanvases) {
-    const playerZIndex = 6; // Assuming players render at z-index 6
-    // Render background layers (z-index < playerZIndex)
-    window.mapLayerCanvases
-      .filter(layer => layer.zIndex < playerZIndex)
-      .forEach(layer => {
+    // Background layers
+    for (const layer of window.mapLayerCanvases) {
+      if (layer.zIndex < playerZ) {
         ctx.drawImage(
           layer.canvas,
-          scrollX, scrollY, viewportWidth, viewportHeight,
-          scrollX, scrollY, viewportWidth, viewportHeight
+          viewport.x, viewport.y, viewport.w, viewport.h,
+          viewport.x, viewport.y, viewport.w, viewport.h
         );
-      });
-    
-    // Render players and NPCs
-    visiblePlayers.forEach(player => player.show(ctx));
-    
-    visibleNpcs.forEach(npc => {
-      npc.show(ctx);
-      if (npc.particles) {
-        npc.particles
-          .filter((particle: any) => 
-            particle.visible && 
-            isInViewport(
-              particle.x,
-              particle.y,
-              scrollX - 64,
-              scrollY - 64,
-              viewportWidth + 128,
-              viewportHeight + 128,
-              32
-            ) 
-          )
-          .forEach((particle: any) => npc.updateParticle(particle, npc, ctx, deltaTime));
       }
+    }
+
+    // Entities
+    for (const p of visiblePlayers) p.show(ctx);
+
+    for (const npc of visibleNpcs) {
+      npc.show(ctx);
+
+      if (npc.particles) {
+        for (const particle of npc.particles) {
+          if (particle.visible && isInView(particle.x, particle.y)) {
+            npc.updateParticle(particle, npc, ctx, deltaTime);
+          }
+        }
+      }
+
       npc.dialogue(ctx);
-    });
-    
-    // Render foreground layers (z-index >= playerZIndex)
-    window.mapLayerCanvases
-      .filter(layer => layer.zIndex >= playerZIndex)
-      .forEach(layer => {
+    }
+
+    // Foreground layers
+    for (const layer of window.mapLayerCanvases) {
+      if (layer.zIndex >= playerZ) {
         ctx.drawImage(
           layer.canvas,
-          scrollX, scrollY, viewportWidth, viewportHeight,
-          scrollX, scrollY, viewportWidth, viewportHeight
+          viewport.x, viewport.y, viewport.w, viewport.h,
+          viewport.x, viewport.y, viewport.w, viewport.h
         );
-      });
+      }
+    }
 
-    // Render player chat on top of everything
-    visiblePlayers.forEach(player => {
-      player.showChat(ctx);
-    });
+    // Overlay chat
+    for (const p of visiblePlayers) p.showChat(ctx);
   }
 
-  // Update FPS counter
   if (times.length > 60) times.shift();
   times.push(now);
 
-  window.requestAnimationFrame(animationLoop);
+  requestAnimationFrame(animationLoop);
 }
 
 const cameraSmoothing = 0.05;
@@ -326,14 +303,6 @@ function updateCamera(currentPlayer: any) {
     // Round only for the final scroll position
     window.scrollTo(Math.round(cameraX), Math.round(cameraY));
   }
-}
-
-// Helper function to check if an entity is in viewport
-function isInViewport(x: number, y: number, scrollX: number, scrollY: number, viewportWidth: number, viewportHeight: number, buffer: number = 64) {
-  return !(x < scrollX - buffer || 
-           x > scrollX + viewportWidth + buffer || 
-           y < scrollY - buffer || 
-           y > scrollY + viewportHeight + buffer);
 }
 
 // Event listener for joystick movement
@@ -709,7 +678,8 @@ socket.onmessage = async (event) => {
                     const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
                     const tileX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
                     const tileY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
-                    
+                    const opacity = layer.opacity !== undefined ? layer.opacity : 1.0;
+                    ctx.globalAlpha = opacity;
                     ctx.drawImage(
                       image,
                       tileX,
@@ -721,6 +691,7 @@ socket.onmessage = async (event) => {
                       mapData.tilewidth,
                       mapData.tileheight
                     );
+                    ctx.globalAlpha = 1.0; // Reset alpha for next tiles
                   }
                 }
                 
@@ -736,15 +707,23 @@ socket.onmessage = async (event) => {
             async function renderLayers(): Promise<void> {
               while (currentLayer < sortedLayers.length) {
                 const layer = sortedLayers[currentLayer];
+
+                // ❌ Skip if layer.visible is false
+                if (!layer.visible) {
+                  currentLayer++;
+                  continue;
+                }
+
                 const layerCanvas = layerCanvases.find((lc: any) => lc.zIndex === (layer.zIndex || currentLayer));
                 if (layerCanvas) {
                   await processLayer(layer, layerCanvas);
                 }
+
                 currentLayer++;
                 await new Promise(resolve => requestAnimationFrame(resolve));
               }
+
               if (loadingScreen) {
-                // Fade out the loading screen after the map is loaded
                 loadingScreen.style.transition = "1s";
                 loadingScreen.style.opacity = "0";
                 setTimeout(() => {
@@ -753,12 +732,12 @@ socket.onmessage = async (event) => {
                   progressBarContainer.style.display = "block";
                 }, 1000);
               }
-              
-              // Store layer canvases globally for use in animation loop
+
               window.mapLayerCanvases = layerCanvases.sort((a: any, b: any) => a.zIndex - b.zIndex);
-              
+
               resolve();
             }
+
             
             loaded = true;
             renderLayers();
@@ -2521,13 +2500,22 @@ function showNotification(message: string, autoClose: boolean = true, reconnect:
       notificationContainer.style.display = "none";
       // If reconnect is true, redirect after hiding notification
       if (reconnect) {
-        window.location.href = "/";
+        if (window.navigator.userAgent === "@Electron/Frostfire-Forge-Client") {
+          window.close(); // Close the Electron window
+        } else {
+          // If not in Electron, redirect to home page
+          window.location.href = "/";
+        }
       }
     }, timeout);
   } else if (reconnect) {
     // If not auto-closing but need to reconnect
     setTimeout(() => {
-      window.location.href = "/";
+      if (window.navigator.userAgent === "@Electron/Frostfire-Forge-Client") {
+        window.close(); // Close the Electron window
+      } else {
+        window.location.href = "/";
+      }
     }, timeout);
   }
 }

@@ -412,80 +412,10 @@ export default async function packetReceiver(
       }
       case "MOVEXY": {
         if (!currentPlayer) return;
-        const tileSize = 16;
         const speed = 2;
         const targetFPS = 60;
         const frameTime = 1000 / targetFPS; // Time per frame in milliseconds
-        const lastDirection = currentPlayer.location.position.direction;
-
-        const directionAdjustments = {
-          up: {
-            tempX: 0,
-            tempY: -speed,
-            direction: "up",
-            collisionX: (tempPosition: PositionData) =>
-              tempPosition.x + (tileSize * 2) / 2,
-            collisionY: (tempPosition: PositionData) => tempPosition.y,
-          },
-          down: {
-            tempX: 0,
-            tempY: speed,
-            direction: "down",
-            collisionX: (tempPosition: PositionData) =>
-              tempPosition.x + tileSize,
-            collisionY: (tempPosition: PositionData) =>
-              tempPosition.y + tileSize * 2 + tileSize,
-          },
-          left: {
-            tempX: -speed,
-            tempY: 0,
-            direction: "left",
-            collisionX: (tempPosition: PositionData) => tempPosition.x,
-            collisionY: (tempPosition: PositionData) =>
-              tempPosition.y + tileSize * 2 + tileSize / 2,
-          },
-          right: {
-            tempX: speed,
-            tempY: 0,
-            direction: "right",
-            collisionX: (tempPosition: PositionData) =>
-              tempPosition.x + tileSize * 2,
-            collisionY: (tempPosition: PositionData) =>
-              tempPosition.y + tileSize * 2 + tileSize / 2,
-          },
-          upleft: {
-            tempX: -speed,
-            tempY: -speed,
-            direction: "upleft",
-            collisionX: (tempPosition: PositionData) => tempPosition.x,
-            collisionY: (tempPosition: PositionData) => tempPosition.y,
-          },
-          upright: {
-            tempX: speed,
-            tempY: -speed,
-            direction: "upright",
-            collisionX: (tempPosition: PositionData) =>
-              tempPosition.x + tileSize * 2,
-            collisionY: (tempPosition: PositionData) => tempPosition.y,
-          },
-          downleft: {
-            tempX: -speed,
-            tempY: speed,
-            direction: "downleft",
-            collisionX: (tempPosition: PositionData) => tempPosition.x,
-            collisionY: (tempPosition: PositionData) =>
-              tempPosition.y + tileSize * 2 + tileSize,
-          },
-          downright: {
-            tempX: speed,
-            tempY: speed,
-            direction: "downright",
-            collisionX: (tempPosition: PositionData) =>
-              tempPosition.x + tileSize * 2,
-            collisionY: (tempPosition: PositionData) =>
-              tempPosition.y + tileSize * 2 + tileSize,
-          },
-        };
+        const lastDirection = currentPlayer.location.position.direction || "down";
 
         const direction = data.toString().toLowerCase();
 
@@ -501,9 +431,6 @@ export default async function packetReceiver(
           return;
         }
 
-        // Now cast to the movement-only types
-        const moveDirection = direction as keyof typeof directionAdjustments;
-
         // Only allow the player to move in these directions
         const directions = [
           "up",
@@ -515,9 +442,11 @@ export default async function packetReceiver(
           "downleft",
           "downright",
         ];
-        if (!directions.includes(moveDirection)) return;
 
-        sendPositionAnimation(ws, moveDirection, true);
+        if (!directions.includes(direction)) return;
+
+        currentPlayer.location.position.direction = direction;
+        sendPositionAnimation(ws, direction, true);
 
         // Clear any existing movement
         if (currentPlayer.movementInterval) {
@@ -538,35 +467,58 @@ export default async function packetReceiver(
           lastTime = currentTime - (deltaTime % frameTime);
 
           const tempPosition = { ...currentPlayer.location.position };
-          const collisionPosition = { ...currentPlayer.location.position };
-          const playerHeight = 48;
-          const playerWidth = 32;
-          collisionPosition.x += playerWidth / 2;
-          collisionPosition.y += playerHeight / 2;
+          const playerHeight = 40;
+          const playerWidth = 24;
 
-          const adjustment = directionAdjustments[moveDirection];
-          tempPosition.x += adjustment.tempX;
-          tempPosition.y += adjustment.tempY;
-          tempPosition.direction = adjustment.direction;
-          collisionPosition.x = adjustment.collisionX(tempPosition);
-          collisionPosition.y = adjustment.collisionY(tempPosition);
+          const directionOffsets: Record<string, { dx: number; dy: number }> = {
+            up: { dx: 0, dy: -speed },
+            down: { dx: 0, dy: speed },
+            left: { dx: -speed, dy: 0 },
+            right: { dx: speed, dy: 0 },
+            upleft: { dx: -speed, dy: -speed },
+            upright: { dx: speed, dy: -speed },
+            downleft: { dx: -speed, dy: speed },
+            downright: { dx: speed, dy: speed },
+          };
 
-          const collision = player.checkIfWouldCollide(
-            currentPlayer.location.map,
-            collisionPosition
-          );
-          if (collision && !currentPlayer.isNoclip) {
-            clearInterval(currentPlayer.movementInterval);
-            currentPlayer.movementInterval = null;
-            
-            // Add idle animation based on current direction
-            if (moveDirection) {
-              sendPositionAnimation(ws, moveDirection, false);
+          const offset = directionOffsets[direction];
+          if (offset) {
+            tempPosition.x += offset.dx;
+            tempPosition.y += offset.dy;
+
+            const collision = player.checkIfWouldCollide(
+              currentPlayer.location.map,
+              {
+                x: tempPosition.x,
+                y: tempPosition.y,
+                direction,
+              },
+              {
+                width: playerWidth,
+                height: playerHeight,
+              }
+            );
+
+            if (!collision) {
+              currentPlayer.location.position = tempPosition;
             }
-            return;
-          }
 
-          currentPlayer.location.position = tempPosition;
+            if (currentPlayer.isNoclip) {
+              currentPlayer.location.position = tempPosition;
+            }
+
+            if (collision && !currentPlayer.isNoclip) {
+              // If collision occurs, stop the movement
+              clearInterval(currentPlayer.movementInterval);
+              currentPlayer.movementInterval = null;
+
+              // Add idle animation based on current direction
+              if (directions.includes(direction)) {
+                sendPositionAnimation(ws, direction, false);
+              }
+              return;
+            }
+          }
 
           // Broadcast movement to other players
           let playersInMap = filterPlayersByMap(currentPlayer.location.map);

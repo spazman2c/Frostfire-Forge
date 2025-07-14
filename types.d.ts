@@ -275,3 +275,16 @@ declare interface WebSocket {
     [key: string]: any;
   };
 }
+
+declare interface MapProperties {
+  name: string;
+  width: number;
+  height: number;
+  tileWidth: number;
+  tileHeight: number;
+}
+
+declare interface PlayerProperties {
+  width: number;
+  height: number;
+}

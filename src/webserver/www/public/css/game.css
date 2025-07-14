@@ -560,12 +560,12 @@ input::placeholder {
 
 #stats-container {
   top: 27;
-  left: 120;
+  left: 10;
 }
 
 #target-stats-container {
   top: 27;
-  left: 500;
+  left: 350;
   display: none;
 }
 
@@ -844,8 +844,8 @@ input::placeholder {
 
 #stat-screen {
   position: fixed;
-  width: 566px;
-  height: 484px;
+  width: 542px;
+  height: 466px;
   top: 150;
   left: -570;
   z-index: 100;
@@ -861,8 +861,8 @@ input::placeholder {
   align-items: center;
   width: 125px;
   height: 300;
-  left: 398px;
-  top: 139px;
+  left: 373px;
+  top: 120px;
   z-index: 100;
   transition: bottom ease-in-out 1s;
 }

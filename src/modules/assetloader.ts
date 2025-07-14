@@ -175,6 +175,7 @@ log.success(`Loaded ${quests.length} quest(s) from the database in ${(performanc
 function loadMaps() {
   const now = performance.now();
   const maps = [] as MapData[];
+  const mapProperties = [] as any[];
   const failedMaps = [] as string[];
   const mapDir = path.join(import.meta.dir, assetData.maps.path);
 
@@ -257,6 +258,14 @@ function loadMaps() {
 
     collisionMap.push(map.data.layers[0].width, map.data.layers[0].height);
 
+    mapProperties.push({
+      name: map.name,
+      width: map.data.layers[0].width,
+      height: map.data.layers[0].height,
+      tileWidth: map.data.tilewidth,
+      tileHeight: map.data.tileheight,
+    } as MapProperties);
+
     const compressedCollisionMap = [] as any[];
     compressedCollisionMap.push(collisionMap[1], collisionMap[2]);
 
@@ -296,7 +305,7 @@ function loadMaps() {
     assetCache.addNested(
       map.name.replace(".json", ""),
       "collision",
-      compressedCollisionMap
+      compressedCollisionMap,
     );
   });
 
@@ -306,6 +315,7 @@ function loadMaps() {
   }
 
   assetCache.add("maps", maps);
+  assetCache.add("mapProperties", mapProperties);
   log.success(`Loaded ${maps.length} map(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
 loadMaps();
@@ -358,7 +368,6 @@ function tryParse(data: string): any {
     return null;
   }
 }
-
 
 function loadSoundEffects() {
   const now = performance.now();

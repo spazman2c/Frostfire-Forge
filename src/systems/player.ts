@@ -343,47 +343,66 @@ const player = {
         if (!response) return [];
         return response;
     },
-    checkIfWouldCollide: (map: string, position: PositionData) => {
+    checkIfWouldCollide: (map: string, position: PositionData, playerProperties: PlayerProperties) => {
+        const playerWidth = playerProperties.width || 32;
+        const playerHeight = playerProperties.height || 32;
+
         // Retrieve collision data for the map
         const collisionData = assetCache.get(map.replace(".json", ""));
-        if (!collisionData) {
-            log.error(`Collision data for map ${map} not found`);
-            return false;
-        }
+        const mapProperties = assetCache.get("mapProperties") as any[];
+        const mapData = mapProperties.find(m => m.name.replace(".json", "") === map.replace(".json", "")) as MapProperties | undefined;
+        if (!mapData) return true;
 
-        const data = collisionData.collision || collisionData; // Use directly if collision is not a property
-        if (!data || !Array.isArray(data)) {
-            log.error(`Collision data for map ${map} is invalid`);
-            return false;
-        }
+        if (!collisionData) return true;
 
-        const tileSize = 16;
-        const gridWidth = data[0];
-        const gridOffset = data[0] / 2;
+        const data = collisionData.collision || collisionData;
+        if (!data || !Array.isArray(data)) return true;
+
+        const gridOffsetWidth = Math.floor(mapData.width / 2);
+        const gridOffsetHeight = Math.floor(mapData.height / 2);
+        const tileWidth = mapData.tileWidth;
+        const tileHeight = mapData.tileHeight;
         const collision = data.slice(2) as any[];
-    
-        // Calculate the tile index based on position and tile size
-        const x = Math.floor(position.x / tileSize) + gridOffset;
-        const y = Math.floor(position.y / tileSize) + gridOffset;
-        const targetIndex = y * gridWidth + x;
+
+        // Calculate player bounding box in tile coordinates
+        // Apply small margin and adjust for offset
+        const margin = 0.1; // Small margin in pixels
+        const adjustedX = position.x + tileWidth/2;
+        const adjustedY = position.y + tileHeight/2;
         
-        let currentIndex = 0;
-        let index = -1;
-        for (let i = 0; i < collision.length; i += 2) {
-            const value = collision[i];
-            const count = collision[i + 1];
-            if (currentIndex + count > targetIndex) {
-                index = value;
-                break;
+        const left = Math.floor((adjustedX + margin) / tileWidth);
+        const right = Math.floor((adjustedX + playerWidth - margin) / tileWidth);
+        const top = Math.floor((adjustedY + margin) / tileHeight);
+        const bottom = Math.floor((adjustedY + playerHeight - margin) / tileHeight);
+
+        for (let y = top; y <= bottom; y++) {
+            for (let x = left; x <= right; x++) {
+                const indexX = x + gridOffsetWidth;
+                const indexY = y + gridOffsetHeight;
+
+                const targetIndex = (indexY * mapData.width) + indexX;
+                let currentIndex = 0;
+                let tileValue = 0;
+
+                for (let i = 0; i < collision.length; i += 2) {
+                    const value = collision[i];
+                    const count = collision[i + 1];
+
+                    if (currentIndex + count > targetIndex) {
+                        tileValue = value;
+                        break;
+                    }
+
+                    currentIndex += count;
+                }
+
+                if (tileValue !== 0) {
+                    return true; // Collision detected
+                }
             }
-            currentIndex += count;
         }
-    
-        if (index !== -1) {
-            return index != 0;
-        } else {
-            return false;
-        }
+
+        return false; // No collisions
     },
     kick: async (username: string, ws: WebSocket) => {
         const response = await query("SELECT session_id FROM accounts WHERE username = ?", [username]) as any;
