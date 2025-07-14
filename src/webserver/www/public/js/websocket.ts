@@ -230,7 +230,7 @@ function animationLoop() {
     isInView(npc.position.x, npc.position.y)
   );
 
-  const playerZ = 6;
+  const playerZ = 3;
 
   if (window.mapLayerCanvases) {
     // Background layers
