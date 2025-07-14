@@ -472,13 +472,23 @@ socket.onmessage = async (event) => {
     }
     case "SPAWN_PLAYER": {
       await isLoaded();
-      console.log(data);
       createPlayer(data);
+      break;
+    }
+    case "RECONNECT": {
+      window.location.reload();
       break;
     }
     case "LOAD_PLAYERS": {
       await isLoaded();
       if (!data) return;
+      // Clear existing players that are not the current player
+      players.forEach((player, index) => {
+        if (player.id !== sessionStorage.getItem("connectionId")) {
+          players.splice(index, 1);
+        }
+      });
+
       data.forEach((player: any) => {
         if (player.id != sessionStorage.getItem("connectionId")) {
           // Check if the player is already created and remove it
@@ -558,6 +568,8 @@ socket.onmessage = async (event) => {
         // if (image) {
         //   fullmap.removeChild(image);
         // }
+        // Clear the canvas
+        canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
         // Uncompress zlib compressed data
         // @ts-expect-error - pako is not defined because it is loaded in the index.html
         const inflated = pako.inflate(new Uint8Array(new Uint8Array(data[0].data)), { to: "string" });
@@ -1235,10 +1247,6 @@ const keyHandlers = {
     toggleFriendsList = toggleUI(friendsListUI, toggleFriendsList, -425);
   },
   KeyC: () => handleStatsUI(),
-  Tab: (e: KeyboardEvent) => {
-    e.preventDefault();
-    sendRequest({ type: "TARGETCLOSEST", data: null });
-  },
   KeyX: () => sendRequest({ type: "STEALTH", data: null }),
   KeyZ: () => sendRequest({ type: "NOCLIP", data: null }),
   Enter: async () => handleEnterKey(),
@@ -1263,7 +1271,7 @@ const blacklistedKeys = new Set([
   'F8',
   'F9',
   'F10',
-  'Tab'
+  'Tab',
 ]);
 
 // Helper functions
@@ -1394,6 +1402,13 @@ window.addEventListener("keydown", async (e) => {
   }
   // Prevent blacklisted keys
   if (blacklistedKeys.has(e.code)) {
+    // Check for tab
+    if (e.code === "Tab" && !contextMenuKeyTriggered) {
+      sendRequest({ type: "TARGETCLOSEST", data: null });
+      e.preventDefault();
+      return;
+    }
+    
     e.preventDefault();
     return;
   }
@@ -1421,7 +1436,7 @@ window.addEventListener("keydown", async (e) => {
   cooldowns[e.code] = now;
 
   try {
-    await handler(e as KeyboardEvent);
+    await handler();
   } catch (err) {
     console.error(`Error handling key ${e.code}:`, err);
   }

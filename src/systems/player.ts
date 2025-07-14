@@ -343,6 +343,63 @@ const player = {
         if (!response) return [];
         return response;
     },
+    isInPvPZone: (map: string, position: PositionData, playerProperties: PlayerProperties) => {
+        const playerWidth = playerProperties.width || 32;
+        const playerHeight = playerProperties.height || 32;
+
+        const mapKey = map.replace(".json", "");
+        const pvpData = assetCache.get(mapKey);
+        const mapProperties = assetCache.get("mapProperties") as MapProperties[];
+        const mapData = mapProperties.find(m => m.name.replace(".json", "") === mapKey);
+        if (!mapData || !pvpData || !pvpData.nopvp) return false;
+
+        const data = pvpData.nopvp;
+        if (!Array.isArray(data) || data.length < 3) return false;
+
+        const tileData = data.slice(2);
+        const tileWidth = mapData.tileWidth;
+        const tileHeight = mapData.tileHeight;
+        const gridOffsetWidth = Math.floor(mapData.width / 2);
+        const gridOffsetHeight = Math.floor(mapData.height / 2);
+
+        const margin = 0.1;
+        const adjustedX = position.x + tileWidth / 2;
+        const adjustedY = position.y + tileHeight / 2;
+
+        const left = Math.floor((adjustedX + margin) / tileWidth);
+        const right = Math.floor((adjustedX + playerWidth - margin) / tileWidth);
+        const top = Math.floor((adjustedY + margin) / tileHeight);
+        const bottom = Math.floor((adjustedY + playerHeight - margin) / tileHeight);
+
+        for (let y = top; y <= bottom; y++) {
+            for (let x = left; x <= right; x++) {
+                const indexX = x + gridOffsetWidth;
+                const indexY = y + gridOffsetHeight;
+
+                const targetIndex = (indexY * mapData.width) + indexX;
+                let currentIndex = 0;
+                let tileValue = 0;
+
+                for (let i = 0; i < tileData.length; i += 2) {
+                    const value = tileData[i];
+                    const count = tileData[i + 1];
+
+                    if (currentIndex + count > targetIndex) {
+                        tileValue = value;
+                        break;
+                    }
+
+                    currentIndex += count;
+                }
+
+                if (tileValue !== 0) {
+                    return false; // Found a no-PvP tile → cannot attack here
+                }
+            }
+        }
+
+        return true; // All tiles under player are PvP-enabled
+    },
     checkIfWouldCollide: (map: string, position: PositionData, playerProperties: PlayerProperties) => {
         const playerWidth = playerProperties.width || 32;
         const playerHeight = playerProperties.height || 32;
@@ -428,20 +485,20 @@ const player = {
         const response = await query("UPDATE accounts SET banned = 0 WHERE username = ?", [username]);
         return response;
     },
-    canAttack: (self: Player, target: Player): boolean => {
+    canAttack: (self: Player, target: Player, playerProperties: PlayerProperties): {value: boolean, reason?: string} => {
         // No self or target or no range
-        if (!self || !target) return false;
+        if (!self || !target) return { value: false, reason: "invalid" };
 
         // Prevent attacks on self
-        if (self.id === target.id) return false;
+        if (self.id === target.id) return { value: false, reason: "self" };
 
         // Ensure self is not dead
-        if (!self.stats || self.stats.health <= 0) return false;
+        if (!self.stats || self.stats.health <= 0) return { value: false, reason: "dead" };
 
         // Check if the target is in the same map
-        if (!self.location || !target.location || target.location.map !== self.location.map) return false;
+        if (!self.location || !target.location || target.location.map !== self.location.map) return { value: false, reason: "different_map" };
 
-        if (self.isStealth || target.isStealth) return false;
+        if (self.isStealth || target.isStealth) return { value: false, reason: "stealth" };
 
         // Check if facing the right direction
         const targetPosition = target.location.position as unknown as PositionData;
@@ -465,9 +522,15 @@ const player = {
             'downright': angle > 45 && angle < 135
         };
 
-        if (!directionAngles[direction as keyof typeof directionAngles]) return false;
+        if (!directionAngles[direction as keyof typeof directionAngles]) return { value: false, reason: "direction" };
 
-        return true;
+        // Check if the target is in PvP zone
+        const isPvpAllowedTarget = player.isInPvPZone(self.location.map, targetPosition, playerProperties);
+        if (!isPvpAllowedTarget) return { value: false, reason: "nopvp" };
+        const isPvpAllowedSelf = player.isInPvPZone(self.location.map, selfPosition, playerProperties);
+        if (!isPvpAllowedSelf) return { value: false, reason: "nopvp" };
+
+        return { value: true, reason: "pvp" };
     },
     findClosestPlayer: async (self: Player, players: Player[], range: number): Promise<NullablePlayer> => {
         if (!players) return null;

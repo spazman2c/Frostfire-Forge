@@ -233,6 +233,7 @@ function loadMaps() {
   // Store collision layers in asset cache
   maps.forEach((map) => {
     const collisions = [] as any[];
+    const noPvpZones = [] as any[];
     map.data.layers.forEach((layer: any) => {
       if (
         layer.properties &&
@@ -241,9 +242,17 @@ function loadMaps() {
       ) {
         collisions.push(layer.data);
       }
+      if (
+        layer.properties &&
+        layer.properties[0]?.name.toLowerCase() === "nopvp" &&
+        layer.properties[0]?.value === true
+      ) {
+        noPvpZones.push(layer.data);
+      }
     });
 
     const collisionMap: number[][] = [];
+    const noPvpMap: number[][] = [];
 
     collisions.forEach((collision: number[]) => {
       if (collisionMap.length === 0) {
@@ -256,7 +265,19 @@ function loadMaps() {
       });
     });
 
+    noPvpZones.forEach((noPvp: number[]) => {
+      if (noPvpMap.length === 0) {
+        noPvpMap.push([...noPvp.map(() => 0)]);
+      }
+      noPvp.forEach((index: number, i: number) => {
+        if (index !== 0) {
+          noPvpMap[0][i] = 1;
+        }
+      });
+    });
+
     collisionMap.push(map.data.layers[0].width, map.data.layers[0].height);
+    noPvpMap.push(map.data.layers[0].width, map.data.layers[0].height);
 
     mapProperties.push({
       name: map.name,
@@ -267,7 +288,10 @@ function loadMaps() {
     } as MapProperties);
 
     const compressedCollisionMap = [] as any[];
+    const compressedNoPvpMap = [] as any[];
+
     compressedCollisionMap.push(collisionMap[1], collisionMap[2]);
+    compressedNoPvpMap.push(noPvpMap[1], noPvpMap[2]);
 
     let current = collisionMap[0][2];
     let count = 1;
@@ -282,30 +306,68 @@ function loadMaps() {
     }
     compressedCollisionMap.push(current, count);
 
-    const collisionBytes = new Uint8Array(collisionMap[0]).length;
-    const compressedBytes = new Uint8Array(compressedCollisionMap).length;
-    const ratio = (collisionBytes / compressedBytes).toFixed(2);
-    const savings = (((collisionBytes - compressedBytes) / collisionBytes) * 100).toFixed(2);
+    current = noPvpMap[0][2];
+    count = 1;
+    for (let i = 1; i < noPvpMap[0].length; i++) {
+      if (noPvpMap[0][i] === current) {
+        count++;
+      } else {
+        compressedNoPvpMap.push(current, count);
+        current = noPvpMap[0][i];
+        count = 1;
+      }
+    }
 
-    if (compressedBytes >= collisionBytes) {
+    const collisionBytes = new Uint8Array(collisionMap[0]).length;
+    const collisionCompressedBytes = new Uint8Array(compressedCollisionMap).length;
+    const collisionRatio = (collisionBytes / collisionCompressedBytes).toFixed(2);
+    const collisionSavings = (((collisionBytes - collisionCompressedBytes) / collisionBytes) * 100).toFixed(2);
+
+    const noPvpBytes = new Uint8Array(noPvpMap[0]).length;
+    const noPvpCompressedBytes = new Uint8Array(compressedNoPvpMap).length;
+    const noPvpRatio = (noPvpBytes / noPvpCompressedBytes).toFixed(2);
+    const noPvpSavings = (((noPvpBytes - noPvpCompressedBytes) / noPvpBytes) * 100).toFixed(2);
+
+    if (collisionCompressedBytes >= collisionBytes) {
       log.error(`Failed to compress collision map for ${map.name}
     - Original: ${collisionBytes} bytes
-    - Compressed: ${compressedBytes} bytes
-    - Compression Ratio: ${ratio}x
-    - Compression Savings: ${savings}%`);
+    - Compressed: ${collisionCompressedBytes} bytes
+    - Compression Ratio: ${collisionRatio}x
+    - Compression Savings: ${collisionSavings}%`);
       throw new Error("Failed to compress collision map");
     }
 
     log.debug(`Generated compressed collision map for ${map.name}
   - Original: ${collisionBytes} bytes
-  - Compressed: ${compressedBytes} bytes
-  - Compression Ratio: ${ratio}x
-  - Compression Savings: ${savings}%`);
+  - Compressed: ${collisionCompressedBytes} bytes
+  - Compression Ratio: ${collisionRatio}x
+  - Compression Savings: ${collisionSavings}%`);
+
+    if (noPvpCompressedBytes >= noPvpBytes) {
+      log.error(`Failed to compress noPVP map for ${map.name}
+    - Original: ${noPvpBytes} bytes
+    - Compressed: ${noPvpCompressedBytes} bytes
+    - Compression Ratio: ${noPvpRatio}x
+    - Compression Savings: ${noPvpSavings}%`);
+      throw new Error("Failed to compress noPVP map");
+    }
+
+    log.debug(`Generated compressed noPVP map for ${map.name}
+  - Original: ${noPvpBytes} bytes
+  - Compressed: ${noPvpCompressedBytes} bytes
+  - Compression Ratio: ${noPvpRatio}x
+  - Compression Savings: ${noPvpSavings}%`);
 
     assetCache.addNested(
       map.name.replace(".json", ""),
       "collision",
       compressedCollisionMap,
+    );
+
+    assetCache.addNested(
+      map.name.replace(".json", ""),
+      "nopvp",
+      compressedNoPvpMap,
     );
   });
 

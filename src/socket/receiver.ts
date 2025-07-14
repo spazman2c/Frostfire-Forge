@@ -809,12 +809,17 @@ export default async function packetReceiver(
           currentPlayer.location.map
         );
         const playersInMapAdminNearBy = playersNearBy.filter((p) => p.isAdmin);
+        const canAttack = player.canAttack(currentPlayer, target, {
+          width: 24,
+          height: 40,
+        }) as { value: boolean, reason: string } | null;
         // Check if targetted player is included in the playersNearBy array and if the player can attack
-        if (
-          !playersInAttackRange.includes(target) ||
-          !player.canAttack(currentPlayer, target)
-        )
+        if (!playersInAttackRange.includes(target) || !canAttack?.value) {
+          if (canAttack?.reason == "nopvp") {
+            sendPacket(ws, packetManager.notify({message: "You are not in a PvP area"}));
+          }
           return;
+        }
 
         // Generate a number for the pitch of the audio
         const pitch = Math.random() * 0.1 + 0.95;
@@ -1977,6 +1982,86 @@ export default async function packetReceiver(
                 break;
               }
             }
+            break;
+          }
+          case "WARP": {
+            // Warp to another map
+            // admin.warp or admin.*
+            if (
+              !currentPlayer.permissions.some(
+                (p: string) => p === "admin.warp" || p === "admin.*"
+              )
+            ) {
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+            const currentMapName = currentPlayer.location.map;
+
+            const mapName = args[0]?.toLowerCase() || null;
+            if (!mapName) {
+              const notifyData = {
+                message: "Please provide a map name",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            if (mapName === currentMapName) {
+              const notifyData = {
+                message: "You are already in this map",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            const map =
+              (maps as any[]).find(
+                (map: MapData) => map.name === `${mapName}.json`
+              );
+
+            if (!map) {
+              const notifyData = {
+                message: "Map not found",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            const identifier = args[1]?.toLowerCase() || null;
+            // If no identifier is provided, warp the current player
+            if (!identifier) {
+              // Warp the current player
+              const result = await player.setLocation(
+                currentPlayer.id,
+                mapName,
+                {
+                  x: 0,
+                  y: 0,
+                  direction: currentPlayer.location.position.direction,
+                }
+              ) as { affectedRows: number } | null;
+              // Check affected rows
+              if (result?.affectedRows != 0) {
+                currentPlayer.location = {
+                  map: mapName,
+                  x: 0,
+                  y: 0,
+                  direction: currentPlayer.location.position.direction,
+                };
+
+                sendPacket(ws, packetManager.reconnect());
+              } else {
+                const notifyData = {
+                  message: "Failed to update location",
+                };
+                sendPacket(ws, packetManager.notify(notifyData));
+              }
+              break;
+            }
+
             break;
           }
           default: {

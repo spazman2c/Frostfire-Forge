@@ -2,6 +2,16 @@ import packet from "../modules/packet";
 import log from "../modules/logger";
 
 export const packetManager = {
+  reconnect: () => {
+    return [
+      packet.encode(
+        JSON.stringify({
+          type: "RECONNECT",
+          data: null,
+        })
+      )
+    ] as any[];
+  },
   ping: (data: any) => {
     return [
       packet.encode(JSON.stringify({ type: "PONG", data: data })),
