@@ -36,8 +36,6 @@ if (security.length > 0) {
 import "../modules/assetloader";
 
 import assetCache from "../services/assetCache";
-const maps = assetCache.get("maps");
-const tilesets = assetCache.get("tilesets");
 
 const _cert = path.join(import.meta.dir, "../certs/cert.crt");
 const _key = path.join(import.meta.dir, "../certs/cert.key");
@@ -67,42 +65,8 @@ const routes = {
     }
     return await updatePassword(req, server);
   },
-  "/map/hash": async (req: Request) => {
-    if (req.method !== "GET") {
-      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-    }
-    const url = new URL(req.url);
-    const mapName = url.searchParams.get("name");
-    if (!mapName) {
-      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-    }
-
-    for (const key of Object.keys(maps)) {
-      if (maps[key].name === mapName) {
-        return new Response(JSON.stringify({ hash: maps[key].hash }), { status: 200 });
-      }
-    }
-
-    return new Response(JSON.stringify({ message: "Map not found" }), { status: 404 });
-  },
-  "/tileset/hash": async (req: Request) => {
-    if (req.method !== "GET") {
-        return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-    }
-    const url = new URL(req.url);
-    const tilesetName = url.searchParams.get("name");
-    if (!tilesetName) {
-      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
-    }
-
-    for (const key of Object.keys(tilesets)) {
-      if (tilesets[key].name === tilesetName) {
-        return new Response(JSON.stringify({ hash: tilesets[key].hash }), { status: 200 });
-      }
-    }
-    return new Response(JSON.stringify({ message: "Tileset not found" }), { status: 404 });
-  },
   "/tileset" : async (req: Request) => {
+    const tilesets = assetCache.get("tilesets");
     if (req.method !== "GET") {
       return new Response(JSON.stringify({ message: "Invalid request" }), { status: 400 });
     }
@@ -137,8 +101,6 @@ Bun.serve({
     "/editor": routes["/editor"],
     "/login": routes["/login"],
     "/verify": routes["/verify"],
-    "/map/hash": routes["/map/hash"],
-    "/tileset/hash": routes["/tileset/hash"],
     "/tileset": routes["/tileset"],
   },
   async fetch(req: Request, server: any) {

@@ -52,7 +52,6 @@ declare interface RateLimitOptions {
 declare interface MapData {
   name: string;
   data: any;
-  hash: string;
   compressed: Buffer;
 }
 
@@ -60,14 +59,12 @@ declare interface MapData {
 declare interface TilesetData {
   name: string;
   data: Buffer;
-  hash: string;
 }
 
 // Define script data
 declare interface ScriptData {
   name: string;
   data: string;
-  hash: string;
 }
 
 // Define player data
@@ -180,14 +177,12 @@ declare interface SpriteSheetData {
   width: number;
   height: number;
   data: Buffer;
-  hash: string;
 }
 
 // Define Sprite data
 declare interface SpriteData {
   name: string;
   data: Buffer;
-  hash: string;
 }
 
 // Define Spell data
@@ -282,9 +277,25 @@ declare interface MapProperties {
   height: number;
   tileWidth: number;
   tileHeight: number;
+  warps?: Nullable<WarpObject[]>;
 }
 
 declare interface PlayerProperties {
   width: number;
   height: number;
+}
+
+declare interface WarpObject {
+  name: string;
+  map: string;
+  x: number;
+  y: number;
+  position: {
+    x: number;
+    y: number;
+  };
+  size: {
+    width: number;
+    height: number;
+  };
 }

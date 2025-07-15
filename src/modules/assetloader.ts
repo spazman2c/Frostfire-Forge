@@ -1,6 +1,5 @@
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
 import log from "./logger";
 import weapon from "../systems/weapons";
 import item from "../systems/items";
@@ -86,14 +85,9 @@ function loadIcons() {
 
     log.debug(`Loaded icon: ${name}`);
 
-    const iconHash = crypto
-      .createHash("sha256")
-      .update(base64Data)
-      .digest("hex");
-
     const compressedData = zlib.gzipSync(base64Data);
 
-    icons.push({ name, data: compressedData, hash: iconHash });
+    icons.push({ name, data: compressedData });
     assetCache.add(name, compressedData);
 
     const originalSize = base64Data.length;
@@ -172,215 +166,261 @@ const quests = assetCache.get("quests") as Quest[];
 log.success(`Loaded ${quests.length} quest(s) from the database in ${(performance.now() - questNow).toFixed(2)}ms`);
 
 // Load maps
-function loadMaps() {
+const mapProperties: MapProperties[] = [];
+function loadAllMaps() {
   const now = performance.now();
-  const maps = [] as MapData[];
-  const mapProperties = [] as any[];
-  const failedMaps = [] as string[];
   const mapDir = path.join(import.meta.dir, assetData.maps.path);
+  const maps: MapData[] = [];
 
-  if (!fs.existsSync(mapDir)) {
-    throw new Error(`Maps directory not found at ${mapDir}`);
-  }
+  if (!fs.existsSync(mapDir)) throw new Error(`Maps directory not found at ${mapDir}`);
 
-  const mapFiles = fs.readdirSync(mapDir);
+  const mapFiles = fs.readdirSync(mapDir).filter(f => f.endsWith(".json"));
+  if (mapFiles.length === 0) throw new Error("No maps found in the maps directory");
 
-  if (mapFiles.length === 0) {
-    throw new Error("No maps found in the maps directory");
-  }
-
-  mapFiles.forEach((file) => {
-    if (!file.endsWith(".json")) return;
-    const f = path.join(mapDir, file);
-    const result = tryParse(fs.readFileSync(f, "utf-8")) || failedMaps.push(f);
-
-    if (result) {
-      const jsonString = JSON.stringify(result);
-      const compressedData = zlib.gzipSync(jsonString);
-
-      const mapHash = crypto
-        .createHash("sha256")
-        .update(jsonString)
-        .digest("hex");
-
-      maps.push({
-        name: file,
-        data: result,
-        hash: mapHash,
-        compressed: compressedData,
+  for (const file of mapFiles) {
+    const map = processMapFile(file);
+    if (map) {
+      maps.push(map);
+      mapProperties.push({
+        name: map.name,
+        width: map.data.layers[0].width,
+        height: map.data.layers[0].height,
+        tileWidth: map.data.tilewidth,
+        tileHeight: map.data.tileheight,
+        warps: null, // Will be set later
       });
-
-      const originalSize = jsonString.length;
-      const compressedSize = compressedData.length;
-      const ratio = (originalSize / compressedSize).toFixed(2);
-      const savings = (((originalSize - compressedSize) / originalSize) * 100).toFixed(2);
-
-      log.debug(`Loaded map: ${file}`);
-      log.debug(`Compressed map: ${file}
-  - Original: ${originalSize} bytes
-  - Compressed: ${compressedSize} bytes
-  - Compression Ratio: ${ratio}x
-  - Compression Savings: ${savings}%`);
-    }
-  });
-
-  if (failedMaps.length > 0) {
-    for (const map of failedMaps) {
-      log.error(`Failed to parse ${map} as a map`);
+      extractAndCompressLayers(map);
     }
   }
 
-  // Store collision layers in asset cache
-  maps.forEach((map) => {
-    const collisions = [] as any[];
-    const noPvpZones = [] as any[];
-    map.data.layers.forEach((layer: any) => {
-      if (
-        layer.properties &&
-        layer.properties[0]?.name.toLowerCase() === "collision" &&
-        layer.properties[0]?.value === true
-      ) {
-        collisions.push(layer.data);
-      }
-      if (
-        layer.properties &&
-        layer.properties[0]?.name.toLowerCase() === "nopvp" &&
-        layer.properties[0]?.value === true
-      ) {
-        noPvpZones.push(layer.data);
-      }
-    });
-
-    const collisionMap: number[][] = [];
-    const noPvpMap: number[][] = [];
-
-    collisions.forEach((collision: number[]) => {
-      if (collisionMap.length === 0) {
-        collisionMap.push([...collision.map(() => 0)]);
-      }
-      collision.forEach((index: number, i: number) => {
-        if (index !== 0) {
-          collisionMap[0][i] = 1;
-        }
-      });
-    });
-
-    noPvpZones.forEach((noPvp: number[]) => {
-      if (noPvpMap.length === 0) {
-        noPvpMap.push([...noPvp.map(() => 0)]);
-      }
-      noPvp.forEach((index: number, i: number) => {
-        if (index !== 0) {
-          noPvpMap[0][i] = 1;
-        }
-      });
-    });
-
-    collisionMap.push(map.data.layers[0].width, map.data.layers[0].height);
-    noPvpMap.push(map.data.layers[0].width, map.data.layers[0].height);
-
-    mapProperties.push({
-      name: map.name,
-      width: map.data.layers[0].width,
-      height: map.data.layers[0].height,
-      tileWidth: map.data.tilewidth,
-      tileHeight: map.data.tileheight,
-    } as MapProperties);
-
-    const compressedCollisionMap = [] as any[];
-    const compressedNoPvpMap = [] as any[];
-
-    compressedCollisionMap.push(collisionMap[1], collisionMap[2]);
-    compressedNoPvpMap.push(noPvpMap[1], noPvpMap[2]);
-
-    let current = collisionMap[0][2];
-    let count = 1;
-    for (let i = 1; i < collisionMap[0].length; i++) {
-      if (collisionMap[0][i] === current) {
-        count++;
-      } else {
-        compressedCollisionMap.push(current, count);
-        current = collisionMap[0][i];
-        count = 1;
-      }
-    }
-    compressedCollisionMap.push(current, count);
-
-    current = noPvpMap[0][2];
-    count = 1;
-    for (let i = 1; i < noPvpMap[0].length; i++) {
-      if (noPvpMap[0][i] === current) {
-        count++;
-      } else {
-        compressedNoPvpMap.push(current, count);
-        current = noPvpMap[0][i];
-        count = 1;
-      }
-    }
-
-    const collisionBytes = new Uint8Array(collisionMap[0]).length;
-    const collisionCompressedBytes = new Uint8Array(compressedCollisionMap).length;
-    const collisionRatio = (collisionBytes / collisionCompressedBytes).toFixed(2);
-    const collisionSavings = (((collisionBytes - collisionCompressedBytes) / collisionBytes) * 100).toFixed(2);
-
-    const noPvpBytes = new Uint8Array(noPvpMap[0]).length;
-    const noPvpCompressedBytes = new Uint8Array(compressedNoPvpMap).length;
-    const noPvpRatio = (noPvpBytes / noPvpCompressedBytes).toFixed(2);
-    const noPvpSavings = (((noPvpBytes - noPvpCompressedBytes) / noPvpBytes) * 100).toFixed(2);
-
-    if (collisionCompressedBytes >= collisionBytes) {
-      log.error(`Failed to compress collision map for ${map.name}
-    - Original: ${collisionBytes} bytes
-    - Compressed: ${collisionCompressedBytes} bytes
-    - Compression Ratio: ${collisionRatio}x
-    - Compression Savings: ${collisionSavings}%`);
-      throw new Error("Failed to compress collision map");
-    }
-
-    log.debug(`Generated compressed collision map for ${map.name}
-  - Original: ${collisionBytes} bytes
-  - Compressed: ${collisionCompressedBytes} bytes
-  - Compression Ratio: ${collisionRatio}x
-  - Compression Savings: ${collisionSavings}%`);
-
-    if (noPvpCompressedBytes >= noPvpBytes) {
-      log.error(`Failed to compress noPVP map for ${map.name}
-    - Original: ${noPvpBytes} bytes
-    - Compressed: ${noPvpCompressedBytes} bytes
-    - Compression Ratio: ${noPvpRatio}x
-    - Compression Savings: ${noPvpSavings}%`);
-      throw new Error("Failed to compress noPVP map");
-    }
-
-    log.debug(`Generated compressed noPVP map for ${map.name}
-  - Original: ${noPvpBytes} bytes
-  - Compressed: ${noPvpCompressedBytes} bytes
-  - Compression Ratio: ${noPvpRatio}x
-  - Compression Savings: ${noPvpSavings}%`);
-
-    assetCache.addNested(
-      map.name.replace(".json", ""),
-      "collision",
-      compressedCollisionMap,
-    );
-
-    assetCache.addNested(
-      map.name.replace(".json", ""),
-      "nopvp",
-      compressedNoPvpMap,
-    );
-  });
-
-  const mainMap = maps.find((map) => map.name === "main.json");
-  if (!mainMap) {
-    throw new Error("Main map not found");
-  }
+  const mainMap = maps.find((m) => m.name === "main.json");
+  if (!mainMap) throw new Error("Main map not found");
 
   assetCache.add("maps", maps);
   assetCache.add("mapProperties", mapProperties);
   log.success(`Loaded ${maps.length} map(s) in ${(performance.now() - now).toFixed(2)}ms`);
 }
-loadMaps();
+
+function processMapFile(file: string): MapData | null {
+  const mapDir = path.join(import.meta.dir, assetData.maps.path);
+  const fullPath = path.join(mapDir, file);
+  const parsed = tryParse(fs.readFileSync(fullPath, "utf-8"));
+
+  if (!parsed) {
+    log.error(`Failed to parse ${file} as a map`);
+    return null;
+  }
+
+  const jsonString = JSON.stringify(parsed);
+  const compressedData = zlib.gzipSync(jsonString);
+
+  log.debug(`Loaded map: ${file}`);
+  log.debug(`Compressed map: ${file}
+  - Original: ${jsonString.length} bytes
+  - Compressed: ${compressedData.length} bytes
+  - Compression Ratio: ${(jsonString.length / compressedData.length).toFixed(2)}x
+  - Compression Savings: ${(((jsonString.length - compressedData.length) / jsonString.length) * 100).toFixed(2)}%`);
+
+  return {
+    name: file,
+    data: parsed,
+    compressed: compressedData,
+  };
+}
+
+function extractAndCompressLayers(map: MapData) {
+  const collisions: number[][] = [];
+  const noPvpZones: number[][] = [];
+  const warps: any[] = [];
+
+  map.data.layers.forEach((layer: any) => {
+    // Collisions
+    if (layer.properties?.[0]?.name.toLowerCase() === "collision" && layer.properties[0].value === true) {
+      collisions.push(layer.data);
+    }
+    // No PvP zones
+    if (layer.properties?.[0]?.name.toLowerCase() === "nopvp" && layer.properties[0].value === true) {
+      noPvpZones.push(layer.data);
+    }
+
+    // Warps
+    if (layer?.name.toLowerCase() === "warps") {
+      const objects = layer.objects;
+      objects.forEach((obj: any) => {
+        const _map = obj.properties?.find((p: any) => p.name === "map")?.value;
+        const x = obj.properties?.find((p: any) => p.name === "x")?.value;
+        const y = obj.properties?.find((p: any) => p.name === "y")?.value;
+        // Normalize position: top-left (map) is (0,0), canvas center is (0,0)
+        const mapWidth = map.data.width * map.data.tilewidth;
+        const mapHeight = map.data.height * map.data.tileheight;
+        const posX = Math.floor(obj.x - mapWidth / 2);
+        const posY = Math.floor(obj.y - mapHeight / 2);
+        const width = Math.floor(obj.width);
+        const height = Math.floor(obj.height);
+
+        if (_map && x !== undefined && y !== undefined) {
+          warps.push({
+            name: obj.name,
+            map: _map,
+            x: x,
+            y: y,
+            position: {
+              x: posX,
+              y: posY,
+            },
+            size: {
+              width: width,
+              height: height,
+            },
+          });
+        } else {
+          log.warn(`Invalid warp object in map ${map.name}: ${JSON.stringify(obj)}`);
+        }
+      });
+      if (warps.length > 0) {
+        const _map = mapProperties.find(m => m.name.replace(".json", "") === map.name.replace(".json", "")) as MapProperties | undefined;
+        if (!_map) {
+          log.error(`Map properties not found for ${map.name}`);
+          return;
+        }
+        _map.warps = warps.reduce((acc, warp) => {
+          acc[warp.name] = {
+            map: warp.map,
+            position: warp.position,
+            x: warp.x,
+            y: warp.y,
+            size: warp.size
+          };
+          return acc;
+        }, {} as { [key: string]: { map: string; position: any; x: number; y: number; size: { width: number; height: number; }; } });
+        log.debug(`Extracted ${warps.length} warp(s) from map ${map.name}`);
+      }
+    }
+  });
+
+  let width: number | null = null;
+  let height: number | null = null;
+
+  // Find the first layer that has a defined width and height
+  for (const layer of map.data.layers) {
+    if (layer.type !== "objectgroup") {
+      if (layer.width && layer.height) {
+        width = layer.width;
+        height = layer.height;
+        break;
+      }
+    }
+  }
+
+  if (width === null || height === null) {
+    log.error(`Failed to find width and height for map ${map.name}`);
+    throw new Error(`Invalid map data for ${map.name}`);
+  }
+
+  const tileCount = width * height;
+
+  function compressLayer(layers: number[][], label: "collision" | "nopvp") {
+    const rawMap = new Array(tileCount).fill(0);
+
+    layers.forEach(layer => {
+      for (let i = 0; i < layer.length; i++) {
+        if (layer[i] !== 0) rawMap[i] = 1;
+      }
+    });
+
+    const compressed: (number | [number, number])[] = [Number(width), Number(height)];
+    let current = rawMap[0];
+    let count = 1;
+    for (let i = 1; i < rawMap.length; i++) {
+      if (rawMap[i] === current) {
+        count++;
+      } else {
+        compressed.push(current, count);
+        current = rawMap[i];
+        count = 1;
+      }
+    }
+    compressed.push(current, count);
+
+    const rawBytes = new Uint8Array(rawMap).length;
+    const compressedBytes = new Uint8Array(compressed.flat()).length;
+
+    const ratio = (rawBytes / compressedBytes).toFixed(2);
+    const savings = (((rawBytes - compressedBytes) / rawBytes) * 100).toFixed(2);
+
+    if (compressedBytes >= rawBytes) {
+      log.error(`Failed to compress ${label} map for ${map.name}
+  - Original: ${rawBytes} bytes
+  - Compressed: ${compressedBytes} bytes`);
+      throw new Error(`Failed to compress ${label} map`);
+    }
+
+    log.debug(`Compressed ${label} map for ${map.name}
+  - Original: ${rawBytes} bytes
+  - Compressed: ${compressedBytes} bytes
+  - Compression Ratio: ${ratio}x
+  - Compression Savings: ${savings}%`);
+
+    assetCache.addNested(map.name.replace(".json", ""), label, compressed);
+  }
+
+  if (collisions.length > 0) compressLayer(collisions, "collision");
+  if (noPvpZones.length > 0) compressLayer(noPvpZones, "nopvp");
+}
+
+export async function reloadMap(mapName: string): Promise<MapData> {
+  try {
+    const mapDir = path.join(import.meta.dir, assetData.maps.path);
+    const file = mapName.endsWith(".json") ? mapName : `${mapName}.json`;
+    const fullPath = path.join(mapDir, file);
+
+    if (!fs.existsSync(fullPath)) {
+      throw new Error(`Map ${file} not found`);
+    }
+
+    const newMap = processMapFile(file);
+    if (!newMap) {
+      throw new Error(`Failed to load map ${file}`);
+    }
+  
+    assetCache.removeNested(mapName, "collision");
+    assetCache.removeNested(mapName, "nopvp");
+
+    extractAndCompressLayers(newMap);
+
+    const maps = assetCache.get("maps") as MapData[];
+    const mapProps = assetCache.get("mapProperties") as MapProperties[];
+
+    const index = maps.findIndex(m => m.name === file);
+    const newProps: MapProperties = {
+      name: newMap.name,
+      width: newMap.data.layers[0].width,
+      height: newMap.data.layers[0].height,
+      tileWidth: newMap.data.tilewidth,
+      tileHeight: newMap.data.tileheight,
+      warps: null, // Will be set later
+    };
+
+    if (index >= 0) {
+      maps[index] = newMap;
+      mapProps[index] = newProps;
+    } else {
+      maps.push(newMap);
+      mapProps.push(newProps);
+    }
+
+    assetCache.add("maps", maps);
+    assetCache.add("mapProperties", mapProps);
+
+    log.success(`Reloaded map: ${file}`);
+    return newMap;
+  } catch (error) {
+    log.error(`Failed to reload map: ${mapName}: ${error}`);
+    throw error; // Let the caller handle the error
+  }
+}
+
+loadAllMaps();
 
 // Load tilesets
 function loadTilesets() {
@@ -409,12 +449,7 @@ function loadTilesets() {
   - Compression Ratio: ${ratio}x
   - Compression Savings: ${savings}%`);
 
-    const tilesetHash = crypto
-      .createHash("sha256")
-      .update(tilesetData)
-      .digest("hex");
-
-    tilesets.push({ name: file, data: compressedData, hash: tilesetHash });
+    tilesets.push({ name: file, data: compressedData });
   });
 
   assetCache.add("tilesets", tilesets);
@@ -481,11 +516,7 @@ async function loadSpriteSheets() {
     const data = fs.readFileSync(path.join(spriteDir, file), "base64");
     const buffer = Buffer.from(data, "base64");
     log.debug(`Loaded sprite sheet: ${name}`);
-    const spriteHash = crypto
-      .createHash("sha256")
-      .update(data)
-      .digest("hex");
-      spritesheets.push({ name, width: 24, height: 40, data: buffer, hash: spriteHash });
+    spritesheets.push({ name, width: 24, height: 40, data: buffer });
   });
 
   assetCache.add("spritesheets", spritesheets);

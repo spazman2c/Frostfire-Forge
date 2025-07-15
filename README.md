@@ -109,6 +109,20 @@ Aliases: disconnect
 Permission: admin.kick | admin.*
 ```
 
+<h4>Warp</h4>
+
+```
+/warp [map]
+Permission: admin.warp | admin.*
+```
+
+<h4>Reload Map</h4>
+
+```
+/reloadmap [map]
+Permission: admin.reloadmap | admin.*
+```
+
 <h4>Ban Player</h4>
 
 ```

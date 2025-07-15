@@ -6,6 +6,7 @@ import permissions from "../systems/permissions";
 import inventory from "../systems/inventory";
 import cache from "../services/cache";
 import assetCache from "../services/assetCache";
+import { reloadMap } from "../modules/assetloader";
 import language from "../systems/language";
 import questlog from "../systems/questlog";
 import quests from "../systems/quests";
@@ -244,7 +245,6 @@ export default async function packetReceiver(
         );
         const mapData = [
           map?.compressed,
-          map?.hash,
           spawnLocation?.map,
           position?.x || 0,
           position?.y || 0,
@@ -412,58 +412,52 @@ export default async function packetReceiver(
       }
       case "MOVEXY": {
         if (!currentPlayer) return;
+
         const speed = 2;
         const targetFPS = 60;
-        const frameTime = 1000 / targetFPS; // Time per frame in milliseconds
+        const frameTime = 1000 / targetFPS;
         const lastDirection = currentPlayer.location.position.direction || "down";
 
         const direction = data.toString().toLowerCase();
 
-        // Handle movement abort
+        const directions = [
+          "up", "down", "left", "right",
+          "upleft", "upright", "downleft", "downright"
+        ];
+
         if (direction === "abort") {
           if (currentPlayer.movementInterval) {
             clearInterval(currentPlayer.movementInterval);
             currentPlayer.movementInterval = null;
-            if (lastDirection) {
-              sendPositionAnimation(ws, lastDirection, false);
-            }
+            sendPositionAnimation(ws, lastDirection, false);
           }
           return;
         }
-
-        // Only allow the player to move in these directions
-        const directions = [
-          "up",
-          "down",
-          "left",
-          "right",
-          "upleft",
-          "upright",
-          "downleft",
-          "downright",
-        ];
 
         if (!directions.includes(direction)) return;
 
         currentPlayer.location.position.direction = direction;
         sendPositionAnimation(ws, direction, true);
 
-        // Clear any existing movement
         if (currentPlayer.movementInterval) {
           clearInterval(currentPlayer.movementInterval);
         }
 
         let lastTime = performance.now();
-        const movePlayer = () => {
+        let running = false;
+
+        const movePlayer = async () => {
+          if (running) return;
+          running = true;
+
           const currentTime = performance.now();
           const deltaTime = currentTime - lastTime;
 
-          // Skip frame if too early
           if (deltaTime < frameTime) {
+            running = false;
             return;
           }
 
-          // Update last frame time
           lastTime = currentTime - (deltaTime % frameTime);
 
           const tempPosition = { ...currentPlayer.location.position };
@@ -482,66 +476,100 @@ export default async function packetReceiver(
           };
 
           const offset = directionOffsets[direction];
-          if (offset) {
-            tempPosition.x += offset.dx;
-            tempPosition.y += offset.dy;
-
-            const collision = player.checkIfWouldCollide(
-              currentPlayer.location.map,
-              {
-                x: tempPosition.x,
-                y: tempPosition.y,
-                direction,
-              },
-              {
-                width: playerWidth,
-                height: playerHeight,
-              }
-            );
-
-            if (!collision) {
-              currentPlayer.location.position = tempPosition;
-            }
-
-            if (currentPlayer.isNoclip) {
-              currentPlayer.location.position = tempPosition;
-            }
-
-            if (collision && !currentPlayer.isNoclip) {
-              // If collision occurs, stop the movement
-              clearInterval(currentPlayer.movementInterval);
-              currentPlayer.movementInterval = null;
-
-              // Add idle animation based on current direction
-              if (directions.includes(direction)) {
-                sendPositionAnimation(ws, direction, false);
-              }
-              return;
-            }
+          if (!offset) {
+            running = false;
+            return;
           }
 
-          // Broadcast movement to other players
-          let playersInMap = filterPlayersByMap(currentPlayer.location.map);
-          if (currentPlayer.isStealth) {
-            playersInMap = playersInMap.filter((p) => p.isAdmin);
+          tempPosition.x += offset.dx;
+          tempPosition.y += offset.dy;
+
+          const collision = player.checkIfWouldCollide(
+            currentPlayer.location.map,
+            {
+              x: tempPosition.x,
+              y: tempPosition.y,
+              direction,
+            },
+            {
+              width: playerWidth,
+              height: playerHeight,
+            }
+          );
+
+          const isColliding = collision?.value === true;
+
+          if (!isColliding || currentPlayer.isNoclip) {
+            currentPlayer.location.position = tempPosition;
           }
+
+          if (isColliding && !currentPlayer.isNoclip) {
+            clearInterval(currentPlayer.movementInterval);
+            currentPlayer.movementInterval = null;
+            sendPositionAnimation(ws, direction, false);
+
+            const reason = collision.reason;
+            console.log(`Collision detected: ${reason}`);
+
+            if (reason === "warp_collision" && collision.warp) {
+              const currentMap = currentPlayer.location.map;
+              const warp = collision.warp as { map: string; position: PositionData };
+
+              console.log(`Warping to ${warp.map} at position ${warp.position.x},${warp.position.y}`);
+
+              const result = await player.setLocation(
+                currentPlayer.id,
+                warp.map.replace(".json", ""),
+                {
+                  x: warp.position.x || 0,
+                  y: warp.position.y || 0,
+                  direction: currentPlayer.location.position.direction,
+                }
+              ) as { affectedRows: number } | null;
+
+              if (result?.affectedRows !== 0) {
+                currentPlayer.location = {
+                  map: warp.map.replace(".json", ""),
+                  x: warp.position.x || 0,
+                  y: warp.position.y || 0,
+                  direction: currentPlayer.location.position.direction,
+                };
+
+                if (currentMap !== warp.map) {
+                  sendPacket(ws, packetManager.reconnect());
+                } else {
+                  const movementData = {
+                    id: ws.data.id,
+                    _data: currentPlayer.location.position,
+                  };
+                  sendPacket(ws, packetManager.moveXY(movementData));
+                }
+              }
+            }
+
+            running = false;
+            return;
+          }
+
+          const playersInMap = filterPlayersByMap(currentPlayer.location.map);
           const targetPlayers = currentPlayer.isStealth
             ? playersInMap.filter((p) => p.isAdmin)
             : playersInMap;
 
-          targetPlayers.forEach((player) => {
-            const movementData = {
-              id: ws.data.id,
-              _data: currentPlayer.location.position,
-            };
+          const movementData = {
+            id: ws.data.id,
+            _data: currentPlayer.location.position,
+          };
 
+          targetPlayers.forEach((player) => {
             sendPacket(player.ws, packetManager.moveXY(movementData));
           });
+
+          running = false;
         };
 
-        // Start continuous movement with requestAnimationFrame-like timing
-        movePlayer(); // Execute first movement immediately
-        currentPlayer.movementInterval = setInterval(movePlayer, 1); // Check frequently but only update at 60fps
+        movePlayer(); // Immediate first step
+        currentPlayer.movementInterval = setInterval(movePlayer, 1);
         break;
       }
       case "TELEPORTXY": {
@@ -1981,6 +2009,71 @@ export default async function packetReceiver(
                 sendPacket(ws, packetManager.notify(notifyData));
                 break;
               }
+            }
+            break;
+          }
+          case "RELOADMAP": {
+            // admin.reloadmap or admin.*
+            if (
+              !currentPlayer.permissions.some(
+                (p: string) => p === "admin.reloadmap" || p === "admin.*"
+              )
+            ) {
+              const notifyData = {
+                message: "You don't have permission to use this command",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+            const mapName = args[0]?.toLowerCase() || null;
+            if (!mapName) {
+              const notifyData = {
+                message: "Please provide a map name",
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            // Check if the map exists
+            const map = (maps as any[]).find((m) => m.name === `${mapName}.json`);
+            if (!map) {
+              const notifyData = {
+                message: `Map ${mapName} not found`,
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+              break;
+            }
+
+            const result = await reloadMap(mapName) as MapData | null;
+            if (result) {
+              console.log(`Map ${mapName} reloaded successfully`);
+              const notifyData = {
+                message: `Map ${mapName} reloaded successfully`,
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
+
+              map.compressed = result.compressed;
+              map.data = result.data;
+
+              const playersInMap = filterPlayersByMap(
+                currentPlayer.location.map
+              );
+              playersInMap.forEach((player) => {
+                const mapData = [
+                  result?.compressed,
+                  player.location.map,
+                  player.location.x || 0,
+                  player.location.y || 0,
+                  player.location.direction || "down",
+                ];
+                sendPacket(player.ws, packetManager.loadMap(mapData));
+              });
+            } else {
+              console.error(`Failed to reload map ${mapName}`);
+              const notifyData = {
+                message: `Failed to reload map ${mapName}`,
+              };
+              sendPacket(ws, packetManager.notify(notifyData));
             }
             break;
           }

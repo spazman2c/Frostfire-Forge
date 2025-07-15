@@ -408,12 +408,23 @@ const player = {
         const collisionData = assetCache.get(map.replace(".json", ""));
         const mapProperties = assetCache.get("mapProperties") as any[];
         const mapData = mapProperties.find(m => m.name.replace(".json", "") === map.replace(".json", "")) as MapProperties | undefined;
-        if (!mapData) return true;
+        if (!mapData) return { value: true, reason: "no_map_data" };
+        
+        const warps = (mapData.warps || {}) as WarpObject[];
 
-        if (!collisionData) return true;
+        for (const key of Object.keys(warps)) {
+            const warp = warps[key as any];
+            // Just check if player position is within warp bounds
+            if (position.x >= warp.position.x && position.x <= warp.position.x + warp.size.width &&
+                position.y >= warp.position.y && position.y <= warp.position.y + warp.size.height) {
+                return { value: true, reason: "warp_collision", warp: { map: warp.map, position: warp.position } };
+            }
+        }
+
+        if (!collisionData) return { value: true, reason: "no_collision_data" };
 
         const data = collisionData.collision || collisionData;
-        if (!data || !Array.isArray(data)) return true;
+        if (!data || !Array.isArray(data)) return { value: true, reason: "no_collision_data" };
 
         const gridOffsetWidth = Math.floor(mapData.width / 2);
         const gridOffsetHeight = Math.floor(mapData.height / 2);
@@ -454,12 +465,12 @@ const player = {
                 }
 
                 if (tileValue !== 0) {
-                    return true; // Collision detected
+                    return { value: true, reason: "tile_collision", tile: { x: left, y: top } };
                 }
             }
         }
 
-        return false; // No collisions
+        return { value: false, reason: "no_collision" }; // No collisions
     },
     kick: async (username: string, ws: WebSocket) => {
         const response = await query("SELECT session_id FROM accounts WHERE username = ?", [username]) as any;

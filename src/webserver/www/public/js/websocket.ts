@@ -574,41 +574,20 @@ socket.onmessage = async (event) => {
         // @ts-expect-error - pako is not defined because it is loaded in the index.html
         const inflated = pako.inflate(new Uint8Array(new Uint8Array(data[0].data)), { to: "string" });
         const mapData = inflated ? JSON.parse(inflated) : null;
-        const mapHash = data[1] as string;
-        const mapName = data[2];
-
-        const validateMap = async (mapName: string, mapHash: string) => {
-            const response = await fetch(`/map/hash?name=${mapName}`);
-            if (!response.ok || response.headers.get('content-length') === '0') {
-                throw new Error("Failed to fetch map");
-            }
-            const { hash } = await response.json();
-            if (hash !== mapHash) throw new Error("Map hash mismatch");
-        };
 
         const loadTilesets = async (tilesets: any[]) => {
             if (!tilesets?.length) throw new Error("No tilesets found");
 
-            // Fetch all tileset data and hashes concurrently
+            // Fetch all tileset data and create images
             const tilesetPromises = tilesets.map(async (tileset) => {
                 const name = tileset.image.split("/").pop();
-                const [tilesetResponse, hashResponse] = await Promise.all([
-                    fetch(`/tileset?name=${name}`),
-                    fetch(`/tileset/hash?name=${name}`)
-                ]);
+                const tilesetResponse = await fetch(`/tileset?name=${name}`);
 
-                if (!tilesetResponse.ok || !hashResponse.ok) {
+                if (!tilesetResponse.ok) {
                     throw new Error(`Failed to fetch tileset: ${name}`);
                 }
 
-                const [tilesetData, hashData] = await Promise.all([
-                    tilesetResponse.json(),
-                    hashResponse.json()
-                ]);
-
-                if (hashData.hash !== tilesetData.tileset.hash) {
-                    throw new Error(`Hash mismatch for tileset: ${name}`);
-                }
+                const tilesetData = await tilesetResponse.json();
 
                 // @ts-expect-error - pako is loaded in index.html
                 const inflatedData = pako.inflate(new Uint8Array(tilesetData.tileset.data.data), { to: "string" });
@@ -624,7 +603,6 @@ socket.onmessage = async (event) => {
             return Promise.all(tilesetPromises);
         };
         try {
-            await validateMap(mapName, mapHash);
             const images = await loadTilesets(mapData.tilesets);
             if (!images.length) throw new Error("No tileset images loaded");
             await drawMap(images);
@@ -721,7 +699,7 @@ socket.onmessage = async (event) => {
                 const layer = sortedLayers[currentLayer];
 
                 // ❌ Skip if layer.visible is false
-                if (!layer.visible) {
+                if (!layer.visible || layer.type !== "tilelayer") {
                   currentLayer++;
                   continue;
                 }

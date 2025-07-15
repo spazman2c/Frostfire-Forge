@@ -39,6 +39,11 @@ class AssetCacheService {
         }
         this.cache[key][nestedKey] = value;
     }
+    removeNested(key: string, nestedKey: string) {
+        if (this.cache[key] && this.cache[key][nestedKey]) {
+            delete this.cache[key][nestedKey];
+        }
+    }
 }
 
 const assetCache: AssetCacheService = new AssetCacheService();
