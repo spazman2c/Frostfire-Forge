@@ -613,61 +613,63 @@ socket.onmessage = async (event) => {
           return new Promise((resolve) => {
             const mapWidth = mapData.width * mapData.tilewidth;
             const mapHeight = mapData.height * mapData.tileheight;
-            
+
             // Create off-screen canvases for each layer (not added to DOM)
             const layerCanvases = mapData.layers.map((_layer: any, index: number) => {
               const layerCanvas = document.createElement('canvas');
               layerCanvas.width = mapWidth;
               layerCanvas.height = mapHeight;
-              
+
               return {
                 canvas: layerCanvas,
                 ctx: layerCanvas.getContext('2d', { willReadFrequently: false })!,
                 zIndex: _layer.zIndex || index
               };
             });
-            
+
             // Set main canvas dimensions
             canvas.width = mapWidth;
             canvas.height = mapHeight;
             canvas.style.width = mapWidth + "px";
             canvas.style.height = mapHeight + "px";
             canvas.style.display = "block";
-            
+
             // Sort layers by zIndex for proper rendering order
             const sortedLayers = [...mapData.layers].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+            const visibleTileLayers = sortedLayers.filter(layer => layer.visible && layer.type === "tilelayer");
+            const step = 100 / visibleTileLayers.length;
+
             let currentLayer = 0;
             let progress = 0;
-            const step = 100 / mapData.layers.length;
-            
+
             async function processLayer(layer: any, layerCanvas: any): Promise<void> {
               const ctx = layerCanvas.ctx;
               ctx.imageSmoothingEnabled = false;
-              
+
               const batchSize = 10;
               progress += step;
-              progressBar.style.width = `${progress}%`;
-              
+              progressBar.style.width = `${Math.min(progress, 100)}%`;
+
               async function processRowBatch(startY: number): Promise<void> {
                 for (let y = startY; y < startY + batchSize && y < mapData.height; y++) {
                   for (let x = 0; x < mapData.width; x++) {
                     const tileIndex = layer.data[y * mapData.width + x];
                     if (tileIndex === 0) continue;
-                    
+
                     const tileset = mapData.tilesets.find(
                       (t: any) => t.firstgid <= tileIndex && tileIndex < t.firstgid + t.tilecount
                     );
                     if (!tileset) continue;
-                    
-                    const image = images[mapData.tilesets.indexOf(tileset)] as unknown as HTMLImageElement;
+
+                    const image = images[mapData.tilesets.indexOf(tileset)] as HTMLImageElement;
                     if (!image) continue;
-                    
+
                     const localTileIndex = tileIndex - tileset.firstgid;
                     const tilesPerRow = Math.floor(tileset.imagewidth / tileset.tilewidth);
                     const tileX = (localTileIndex % tilesPerRow) * tileset.tilewidth;
                     const tileY = Math.floor(localTileIndex / tilesPerRow) * tileset.tileheight;
-                    const opacity = layer.opacity !== undefined ? layer.opacity : 1.0;
-                    ctx.globalAlpha = opacity;
+
                     ctx.drawImage(
                       image,
                       tileX,
@@ -679,24 +681,22 @@ socket.onmessage = async (event) => {
                       mapData.tilewidth,
                       mapData.tileheight
                     );
-                    ctx.globalAlpha = 1.0; // Reset alpha for next tiles
                   }
                 }
-                
+
                 if (startY + batchSize < mapData.height) {
                   await new Promise(resolve => setTimeout(resolve, 0));
                   await processRowBatch(startY + batchSize);
                 }
               }
-              
+
               await processRowBatch(0);
             }
-            
+
             async function renderLayers(): Promise<void> {
               while (currentLayer < sortedLayers.length) {
                 const layer = sortedLayers[currentLayer];
 
-                // ❌ Skip if layer.visible is false
                 if (!layer.visible || layer.type !== "tilelayer") {
                   currentLayer++;
                   continue;
@@ -711,22 +711,27 @@ socket.onmessage = async (event) => {
                 await new Promise(resolve => requestAnimationFrame(resolve));
               }
 
-              if (loadingScreen) {
-                loadingScreen.style.transition = "1s";
-                loadingScreen.style.opacity = "0";
-                setTimeout(() => {
-                  loadingScreen.style.display = "none";
-                  progressBar.style.width = "0%";
-                  progressBarContainer.style.display = "block";
-                }, 1000);
-              }
+              // Ensure the progress bar completes fully
+              progressBar.style.width = `100%`;
 
               window.mapLayerCanvases = layerCanvases.sort((a: any, b: any) => a.zIndex - b.zIndex);
 
               resolve();
+              
+              setTimeout(() => {
+                if (loadingScreen) {
+                  // Fade out the loading screen after the map is loaded
+                  loadingScreen.style.transition = "1s";
+                  loadingScreen.style.opacity = "0";
+                  setTimeout(() => {
+                    loadingScreen.style.display = "none";
+                    progressBar.style.width = "0%";
+                    progressBarContainer.style.display = "block";
+                  }, 1000);
+                }
+              }, 1000);
             }
 
-            
             loaded = true;
             renderLayers();
           });
