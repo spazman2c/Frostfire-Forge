@@ -568,8 +568,6 @@ socket.onmessage = async (event) => {
         // if (image) {
         //   fullmap.removeChild(image);
         // }
-        // Clear the canvas
-        canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
         // Uncompress zlib compressed data
         // @ts-expect-error - pako is not defined because it is loaded in the index.html
         const inflated = pako.inflate(new Uint8Array(new Uint8Array(data[0].data)), { to: "string" });
