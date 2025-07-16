@@ -244,7 +244,6 @@ function animationLoop() {
       }
     }
 
-    // Entities
     for (const p of visiblePlayers) p.show(ctx);
 
     for (const npc of visibleNpcs) {
@@ -252,7 +251,8 @@ function animationLoop() {
 
       if (npc.particles) {
         for (const particle of npc.particles) {
-          if (particle.visible && isInView(particle.x, particle.y)) {
+          if (particle.visible) {
+            console.log("Updating particle for NPC:", npc.id, particle);
             npc.updateParticle(particle, npc, ctx, deltaTime);
           }
         }
@@ -558,6 +558,7 @@ socket.onmessage = async (event) => {
     case "CREATE_NPC": {
       await isLoaded();
       if (!data) return;
+      console.log("Creating NPC:", data);
       createNPC(data);
       break;
     }
@@ -697,7 +698,7 @@ socket.onmessage = async (event) => {
               while (currentLayer < sortedLayers.length) {
                 const layer = sortedLayers[currentLayer];
 
-                if (!layer.visible || layer.type !== "tilelayer") {
+                if (!layer.visible || layer.type !== "tilelayer" || layer.name.toLowerCase() === "collisions") {
                   currentLayer++;
                   continue;
                 }

@@ -417,7 +417,10 @@ const player = {
             // Just check if player position is within warp bounds
             if (position.x >= warp.position.x && position.x <= warp.position.x + warp.size.width &&
                 position.y >= warp.position.y && position.y <= warp.position.y + warp.size.height) {
-                return { value: true, reason: "warp_collision", warp: { map: warp.map, position: warp.position } };
+                return { value: true, reason: "warp_collision", warp: { map: warp.map, position: {
+                    x: warp.x,
+                    y: warp.y
+                } } };
             }
         }
 
