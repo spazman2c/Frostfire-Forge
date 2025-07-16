@@ -101,15 +101,6 @@ export default async function packetReceiver(
           break;
         }
 
-        const musicData = {
-          name: "music_entry",
-          data: assetCache
-            .get("audio")
-            .find((a: SoundData) => a.name === "music_entry"),
-        };
-
-        sendPacket(ws, packetManager.music(musicData));
-
         const getUsername = (await player.getUsernameBySession(
           ws.data.id
         )) as any[];
@@ -387,6 +378,15 @@ export default async function packetReceiver(
             }
           });
         }
+
+        const musicData = {
+          name: "music_entry",
+          data: assetCache
+            .get("audio")
+            .find((a: SoundData) => a.name === "music_entry"),
+        };
+
+        sendPacket(ws, packetManager.music(musicData));
         break;
       }
       // TODO:Move this to the logout packet
@@ -509,13 +509,10 @@ export default async function packetReceiver(
             sendPositionAnimation(ws, direction, false);
 
             const reason = collision.reason;
-            console.log(`Collision detected: ${reason}`);
 
             if (reason === "warp_collision" && collision.warp) {
               const currentMap = currentPlayer.location.map;
               const warp = collision.warp as { map: string; position: PositionData };
-
-              console.log(`Warping to ${warp.map} at position ${warp.position.x},${warp.position.y}`);
 
               const result = await player.setLocation(
                 currentPlayer.id,
