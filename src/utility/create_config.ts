@@ -49,9 +49,9 @@ const settings = {
     "maxWindowTime": 1000
   },
   "websocket": {
-    "maxPayloadMB": 1,
+    "maxPayloadMB": 50,
     "benchmarkenabled": false,
-    "idleTimeout": 1
+    "idleTimeout": 5
   },
   "world": "default",
   "default_map": "main"
