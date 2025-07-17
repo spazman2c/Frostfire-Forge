@@ -911,7 +911,7 @@ socket.onmessage = async (event) => {
       const player = players.find((player) => player.id === data.id);
       if (!player) return;
       updateXp(data.xp, data.level, data.max_xp);
-        player.stats = data;
+      player.stats = data;
       break;
     }
     case "CLIENTCONFIG": {
@@ -982,7 +982,6 @@ socket.onmessage = async (event) => {
     }
     case "UPDATESTATS": {
       const { target, stats } = JSON.parse(packet.decode(event.data))["data"];
-      console.log("Updating stats for target:", target, stats);
       const t = players.find((player) => player.id === target);
       if (t) {
         t.stats = stats;
