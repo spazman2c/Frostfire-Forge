@@ -1,3 +1,4 @@
+let cachedPlayerId: string | null = null;
 const socket = new WebSocket(`__VAR.WEBSOCKETURL__`);
 let sentRequests = 0;
 let receivedResponses = 0;
@@ -52,21 +53,21 @@ const chatInput = document.getElementById("chat-input") as HTMLInputElement;
 const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
 const loadingScreen = document.getElementById("loading-screen");
 const xpBar = document.getElementById("xp-bar") as HTMLDivElement;
-const healthBar = document.getElementById(
-  "health-progress-bar"
-) as HTMLDivElement;
-const staminaBar = document.getElementById(
-  "stamina-progress-bar"
-) as HTMLDivElement;
-const targetStats = document.getElementById(
-  "target-stats-container"
-) as HTMLDivElement;
-const targetHealthBar = document.getElementById(
-  "target-health-progress-bar"
-) as HTMLDivElement;
-const targetStaminaBar = document.getElementById(
-  "target-stamina-progress-bar"
-) as HTMLDivElement;
+// const healthBar = document.getElementById(
+//   "health-progress-bar"
+// ) as HTMLDivElement;
+// const staminaBar = document.getElementById(
+//   "stamina-progress-bar"
+// ) as HTMLDivElement;
+// const targetStats = document.getElementById(
+//   "target-stats-container"
+// ) as HTMLDivElement;
+// const targetHealthBar = document.getElementById(
+//   "target-health-progress-bar"
+// ) as HTMLDivElement;
+// const targetStaminaBar = document.getElementById(
+//   "target-stamina-progress-bar"
+// ) as HTMLDivElement;
 //const map = document.getElementById("map") as HTMLDivElement;
 //const fullmap = document.getElementById("full-map") as HTMLDivElement;
 //const mapPosition = document.getElementById("position") as HTMLDivElement;
@@ -155,8 +156,7 @@ function animationLoop() {
   }
   lastFrameTime = now;
 
-  const currentPlayerId = sessionStorage.getItem("connectionId");
-  const currentPlayer = players.find(p => p.id === currentPlayerId);
+  const currentPlayer = players.find(p => p.id === cachedPlayerId);
   if (!currentPlayer) {
     requestAnimationFrame(animationLoop);
     return;
@@ -223,8 +223,37 @@ function animationLoop() {
 
   const visiblePlayers = players.filter(p =>
     isInView(p.position.x, p.position.y) &&
-    (p.id === currentPlayerId || !p.isStealth || (p.isStealth && currentPlayer.isAdmin))
+    (p.id === cachedPlayerId || !p.isStealth || (p.isStealth && currentPlayer.isAdmin))
   );
+
+  // DOM health and stamina bar updates
+  // if (currentPlayer) {
+  //   const { health, max_health, stamina, max_stamina } = currentPlayer.stats;
+  //   const healthPercent = (health / max_health) * 100;
+  //   const staminaPercent = (stamina / max_stamina) * 100;
+
+  //   updateHealthBar(healthBar, healthPercent);
+  //   if (staminaBar.style.width !== `${staminaPercent}%`) {
+  //     staminaBar.style.width = `${staminaPercent}%`;
+  //   }
+  // }
+
+  // Update targeted player's bars
+  // const targetPlayer = players.find(p => p.targeted);
+  // if (targetPlayer) {
+  //   const { health, max_health, stamina, max_stamina } = targetPlayer.stats;
+  //   const healthPercent = (health / max_health) * 100;
+  //   const staminaPercent = (stamina / max_stamina) * 100;
+
+  //   updateHealthBar(targetHealthBar, healthPercent);
+  //   if (targetStaminaBar.style.width !== `${staminaPercent}%`) {
+  //     targetStaminaBar.style.width = `${staminaPercent}%`;
+  //   }
+  // } else if (targetHealthBar.style.width !== "0%") {
+  //   targetHealthBar.style.width = "0%";
+  //   targetStaminaBar.style.width = "0%";
+  //   targetHealthBar.classList.remove("green", "yellow", "orange", "red");
+  // }
 
   const visibleNpcs = npcs.filter(npc =>
     isInView(npc.position.x, npc.position.y)
@@ -393,7 +422,7 @@ socket.onmessage = async (event) => {
       break;
     }
     case "UPDATE_FRIENDS": {
-        const currentPlayer = players.find((player) => player.id === sessionStorage.getItem("connectionId"));
+        const currentPlayer = players.find((player) => player.id === cachedPlayerId);
         if (currentPlayer) {
           currentPlayer.friends = data.friends || [];
           updateFriendsList(data);
@@ -405,7 +434,7 @@ socket.onmessage = async (event) => {
       break;
     }
     case "UPDATE_PARTY": {
-      const currentPlayer = players.find((player) => player.id === sessionStorage.getItem("connectionId"));
+      const currentPlayer = players.find((player) => player.id === cachedPlayerId);
       if (currentPlayer) {
         currentPlayer.party = data.members || [];
         createPartyUI(currentPlayer.party);
@@ -484,13 +513,13 @@ socket.onmessage = async (event) => {
       if (!data) return;
       // Clear existing players that are not the current player
       players.forEach((player, index) => {
-        if (player.id !== sessionStorage.getItem("connectionId")) {
+        if (player.id !== cachedPlayerId) {
           players.splice(index, 1);
         }
       });
 
       data.forEach((player: any) => {
-        if (player.id != sessionStorage.getItem("connectionId")) {
+        if (player.id != cachedPlayerId) {
           // Check if the player is already created and remove it
           players.forEach((p, index) => {
             if (p.id === player.id) {
@@ -503,26 +532,23 @@ socket.onmessage = async (event) => {
       break;
     }
     case "DISCONNECT_PLAYER": {
-      // If there is no username, it means the player is not logged in
       if (!data || !data.id || !data.username) return;
+
       console.log(`Player (${data.username}) ${data.id} disconnected`);
       updateFriendOnlineStatus(data.username, false);
-      // Remove the player from the players array
-      players.forEach((player, index) => {
-        if (player.id === data.id) {
-          players.splice(index, 1);
-          const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
-          if (dot) {
-            dot.remove();
-          }
-        }
-        // Untarget the player if they are targeted
-        if (player.targeted) {
-          player.targeted = false;
-          targetStats.style.display = "none";
-          updateTargetStats(0, 0, 0, 0);
-        }
-      });
+
+      // Remove player from the array
+      const index = players.findIndex(player => player.id === data.id);
+      if (index !== -1) {
+        //const wasTargeted = players[index].targeted;
+
+        players.splice(index, 1); // Remove from array
+
+        // If they were targeted, hide target stats
+        // if (wasTargeted) {
+        //   targetStats.style.display = "none";
+        // }
+      }
 
       break;
     }
@@ -542,7 +568,7 @@ socket.onmessage = async (event) => {
       const targetY = canvas.height / 2 + data._data.y;
       
       // Update position directly for non-client players
-      if (data.id !== sessionStorage.getItem("connectionId")) {
+      if (data.id !== cachedPlayerId) {
         player.position.x = targetX;
         player.position.y = targetY;
       } else {
@@ -744,6 +770,7 @@ socket.onmessage = async (event) => {
         const connectionId = JSON.parse(packet.decode(event.data))["data"];
         const chatDecryptionKey = JSON.parse(packet.decode(event.data))["chatDecryptionKey"];
         sessionStorage.setItem("connectionId", connectionId); // Store client's socket ID
+        cachedPlayerId = connectionId;
         const sessionToken = getCookie("token");
         if (!sessionToken) {
           window.location.href = "/";
@@ -881,14 +908,12 @@ socket.onmessage = async (event) => {
       break;
     }
     case "STATS": {
-      updateStats(data.health, data.stamina, data.max_stamina, data.max_health);
-      updateXp(data.xp, data.level, data.max_xp);
-      // Update the player's stats so the health and stamina bars are accurate
-      players.forEach((player) => {
-        if (player.id === data.id) {
-          player.stats = data;
-        }
-      });
+      const player = players.find((player) => player.id === data.id);
+      console.log("Received stats for player:", player, data);
+      if (player) {
+        updateXp(data.xp, data.level, data.max_xp);
+        player.stats = data;
+      }
       break;
     }
     case "CLIENTCONFIG": {
@@ -913,32 +938,29 @@ socket.onmessage = async (event) => {
     }
     case "SELECTPLAYER": {
       const data = JSON.parse(packet.decode(event.data))["data"];
+
       if (!data || !data.id || !data.username) {
         players.forEach((player) => {
           player.targeted = false;
         });
-        targetStats.style.display = "none";
-        updateTargetStats(0, 0, 0, 0);
+        //targetStats.style.display = "none";
         break;
-      } else {
-        players.forEach((player) => {
-          if (player.id === data.id) {
-            player.targeted = true;
-            targetStats.style.display = "block";
-            updateTargetStats(player.stats.health, player.stats.max_health, player.stats.stamina, player.stats.max_stamina);
-          } else {
-            player.targeted = false;
-          }
-        });
       }
+
+      players.forEach((player) => {
+        player.targeted = (player.id === data.id);
+      });
+
+      //targetStats.style.display = "block";
       break;
     }
     case "STEALTH": {
       const data = JSON.parse(packet.decode(event.data))["data"];
       const currentPlayer = players.find(
-        (player) => player.id === sessionStorage.getItem("connectionId")
+        (player) => player.id === cachedPlayerId || player.id === cachedPlayerId
       );
 
+      // Abort movement if self
       if (currentPlayer && data.id === currentPlayer.id) {
         sendRequest({
           type: "MOVEXY",
@@ -950,58 +972,46 @@ socket.onmessage = async (event) => {
         if (player.id === data.id) {
           player.isStealth = data.isStealth;
         }
-        // Untarget if the player is stealthed and targeted
+
+        // Untarget stealthed players
         if (player.isStealth && player.targeted) {
           player.targeted = false;
-          targetStats.style.display = "none";
-          updateTargetStats(0, 0, 0, 0);
-        }
-
-        const dot = document.querySelector(`[data-id="${player.id}"]`) as HTMLElement;
-        if (!dot) return;
-        if (player.isStealth) {
-          if (currentPlayer?.isAdmin) {
-            dot.style.opacity = "1";
-          } else {
-            dot.style.opacity = "0";
-          }
-        } else {
-          dot.style.opacity = "1";
+          //targetStats.style.display = "none";
         }
       });
+
       break;
     }
     case "UPDATESTATS": {
-      const data = JSON.parse(packet.decode(event.data))["data"];
-      const target = players.find((player) => player.id === data.target);
-      if (!target) return;
-      updateStatsNew(target.id, data.stats.health, data.stats.stamina, data.stats.max_stamina);
+      const { target, stats } = JSON.parse(packet.decode(event.data))["data"];
+      console.log("Updating stats for target:", target, stats);
+      const t = players.find((player) => player.id === target);
+      if (t) {
+        t.stats = stats;
+      }
       break;
     }
     case "REVIVE": {
       const data = JSON.parse(packet.decode(event.data))["data"];
       const target = players.find((player) => player.id === data.target);
       if (!target) return;
+
       target.stats = data.stats;
-      if (target.id === sessionStorage.getItem("connectionId")) {
-        updateStats(target.stats.health, target.stats.stamina, target.stats.max_stamina, target.stats.max_health);
-      } else {
+
+      const isSelf = target.id.toString() === cachedPlayerId;
+
+      if (!isSelf) {
         target.targeted = false;
-        updateTargetStats(0, 0, 0, 0);
       }
 
-      // untarget all players
-      targetStats.style.display = "none";
-      players.forEach((player) => {
-        player.targeted = false;
-      });
+      //targetStats.style.display = "none";
+      players.forEach((player) => player.targeted = false);
       break;
     }
     case "UPDATE_XP": {
       const data = JSON.parse(packet.decode(event.data))["data"];
-      console.log(data);
       // Only update the xp bar if the current player is the target
-      if (data.id === sessionStorage.getItem("connectionId")) {
+      if (data.id === cachedPlayerId) {
         updateXp(data.xp, data.level, data.max_xp);
       }
       break;
@@ -1268,7 +1278,7 @@ function toggleUI(element: HTMLElement, toggleFlag: boolean, hidePosition: numbe
 }
 
 function handleStatsUI() {
-  const isCurrentPlayerStats = statUI.getAttribute("data-id") === sessionStorage.getItem("connectionId");
+  const isCurrentPlayerStats = statUI.getAttribute("data-id") === cachedPlayerId;
   if (statUI.style.left === "10px" && isCurrentPlayerStats) {
     statUI.style.transition = "1s";
     statUI.style.left = "-570";
@@ -1362,7 +1372,7 @@ async function handleChatMessage(message: string) {
 
   // Set timeout to clear chat
   setTimeout(() => {
-    const currentPlayer = players.find(p => p.id === sessionStorage.getItem("connectionId"));
+    const currentPlayer = players.find(p => p.id === cachedPlayerId);
     if (currentPlayer?.chat === message) {
       sendRequest({ type: "CHAT", data: null });
     }
@@ -1712,6 +1722,7 @@ async function createPlayer(data: any) {
     chat: "",
     isStealth: data.isStealth,
     isAdmin: data.isAdmin,
+    _adminColorHue: Math.floor(Math.random() * 360), // Add this property
     targeted: false,
     stats: data.stats,
     typing: false,
@@ -1817,6 +1828,55 @@ async function createPlayer(data: any) {
       context.globalAlpha = 1;
     },
     show: function (context: CanvasRenderingContext2D) {
+      let shadow: { width: number; height: number; fillStyle: string; borderColor: string } = { width: 0, height: 0, fillStyle: "black", borderColor: "black" };
+      if (this.targeted) {
+        shadow = {
+          width: 18,
+          height: 7,
+          fillStyle: "rgba(255, 0, 0, 0.35)",
+          borderColor: "rgba(255, 0, 0, 0.8)"
+        };
+      } else {
+        shadow = {
+          width: 15,
+          height: 5,
+          fillStyle: "rgba(0, 0, 0, 0.35)",
+          borderColor: "transparent"
+        };
+      }
+
+      // Outer ring (darker)
+      context.save();
+      context.beginPath();
+      context.ellipse(
+        this.position.x + 16,
+        this.position.y + 40,
+        shadow.width,
+        shadow.height,
+        0,
+        0,
+        Math.PI * 2
+      );
+      context.strokeStyle = shadow.borderColor;
+      context.lineWidth = 1;
+      context.stroke();
+
+      // Inner fill (lighter)
+      context.beginPath();
+      context.ellipse(
+        this.position.x + 16,
+        this.position.y + 40,
+        shadow.width,
+        shadow.height,
+        0,
+        0,
+        Math.PI * 2
+      );
+      context.fillStyle = shadow.fillStyle;
+      context.fill();
+      context.closePath();
+      context.restore();
+
       context.globalAlpha = 1;
       context.font = "14px 'Comic Relief'";
       
@@ -1830,20 +1890,37 @@ async function createPlayer(data: any) {
       // Draw the player's username
       context.textAlign = "center";
 
-      // Current player
-      if (data.id === sessionStorage.getItem("connectionId") && !this.isStealth) {
-        context.fillStyle = "#ffe561";
-      } else {
-        if (this.targeted && !this.isStealth) {
-          context.fillStyle = "#E01F1F";
+      const currentPlayer = players.find(player => player.id === cachedPlayerId);
+      if (!currentPlayer) return;
+      
+      // Determine color for player name
+      let nameColor: string | undefined;
+
+      const isCurrent = data.id === currentPlayer?.id;
+      const isVisible = !this.isStealth;
+
+      // Admin color animation (only when visible)
+      if (this.isAdmin && isVisible) {
+        this._adminColorHue = (this._adminColorHue + 2) % 360;
+        nameColor = `hsl(${this._adminColorHue}, 100%, 50%)`;
+      }
+
+      if (isCurrent && isVisible && !this.isAdmin) {
+        nameColor = "#ffe561";
+      } else if (this.isStealth) {
+        nameColor = "rgba(97, 168, 255, 1)";
+      } else if (!nameColor) {
+        if (currentPlayer.party?.includes(this.username)) {
+          nameColor = "#00ff88ff";
+        } else if (currentPlayer.friends.includes(this.username)) {
+          nameColor = "#00b7ffff";
         } else {
-          if (this.isStealth) {
-            context.fillStyle = "rgba(97, 168, 255, 1)";
-          } else {
-            context.fillStyle = "#ffffff";
-          }
+          nameColor = "#FFFFFF";
         }
       }
+
+      context.fillStyle = nameColor;
+
 
       context.shadowColor = "black";
       context.shadowBlur = 2;
@@ -1851,36 +1928,22 @@ async function createPlayer(data: any) {
       context.strokeStyle = "black";
       
       // Uppercase the first letter of the username
-      data.username =
-        data.username.charAt(0).toUpperCase() + data.username.slice(1);
+      data.username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
       // Display (Admin) tag if the player is an admin
-      if (data.isAdmin) {
-        context.strokeText(
-          data.username + " (Admin)",
-          this.position.x + 16,
-          this.position.y + 65
-        );
-        context.fillText(
-          data.username + " (Admin)",
-          this.position.x + 16,
-          this.position.y + 65
-        );
-      } else {
-        context.strokeText(
-          data.username,
-          this.position.x + 16,
-          this.position.y + 65
-        );
-        context.fillText(
-          data.username,
-          this.position.x + 16,
-          this.position.y + 65
-        );
-      }
+      context.strokeText(
+        data.username,
+        this.position.x + 16,
+        this.position.y + 65
+      );
+      context.fillText(
+        data.username,
+        this.position.x + 16,
+        this.position.y + 65
+      );
 
       // Draw the player's health bar below the player's name with a width of 100px, centered below the player name
       if (!this.isStealth) {
-        if (data.id === sessionStorage.getItem("connectionId") || this.targeted) {
+        if (data.id === cachedPlayerId || this.targeted) {
           context.fillStyle = "rgba(0, 0, 0, 0.8)";
           context.fillRect(this.position.x - 34, this.position.y + 71, 100, 3);
 
@@ -1909,7 +1972,7 @@ async function createPlayer(data: any) {
 
         // Draw the player's stamina bar below the player's health bar with a width of 75px, centered below the player's health bar
         // Check if current player is the same as the player we are drawing
-        if (data.id === sessionStorage.getItem("connectionId") || this.targeted) {
+        if (data.id === cachedPlayerId || this.targeted) {
         context.fillStyle = "rgba(0, 0, 0, 0.8)";
         context.fillRect(this.position.x - 34, this.position.y + 76, 100, 3);
         context.fillStyle = "#469CD9";
@@ -1919,6 +1982,17 @@ async function createPlayer(data: any) {
             (this.stats.stamina / this.stats.max_stamina) * 100,
             3
           );
+        }
+
+        if (data.id === cachedPlayerId || this.targeted) {
+          // Draw the player's level on the left side of the health bar
+          context.textAlign = "left";
+          context.font = "12px 'Comic Relief'";
+          context.fillStyle = "white";
+          // Text shadow for better visibility
+          context.shadowColor = "black";
+          context.shadowBlur = 2;
+          context.fillText(`${this.stats.level}`, this.position.x - 45, this.position.y + 81);
         }
       }
 
@@ -1933,13 +2007,14 @@ async function createPlayer(data: any) {
   players.push(player);
 
   // Current player
-  if (data.id === sessionStorage.getItem("connectionId")) {
+  if (data.id === cachedPlayerId) {
     // Initialize camera position immediately for the current player
     cameraX = player.position.x - window.innerWidth / 2 + 8;
     cameraY = player.position.y - window.innerHeight / 2 + 48;
     window.scrollTo(cameraX, cameraY);
     updateFriendsList({friends: data.friends || []});
     createPartyUI(data.party || []);
+    updateXp(data.stats.xp, data.stats.level, data.stats.max_xp);
   }
 
   // Update player dots on the full map if it is open
@@ -1969,8 +2044,7 @@ function getLines(ctx: any, text: string, maxWidth: number) {
 
 // Snap to player's position on resize
 window.addEventListener("resize", () => {
-  const clientSocketId = sessionStorage.getItem("connectionId");
-  const currentPlayer = players.find((player) => player.id === clientSocketId);
+  const currentPlayer = players.find((player) => player.id === cachedPlayerId);
   if (currentPlayer) {
     cameraX = currentPlayer.position.x - window.innerWidth / 2 + 8;
     cameraY = currentPlayer.position.y - window.innerHeight / 2 + 48;
@@ -1989,112 +2063,58 @@ window.addEventListener("blur", () => {
   pressedKeys.clear();
 });
 
-function updateStatsNew(id: number | null, health: number, stamina: number, max_stamina: number) {
-  // If id is null, use the current player
-  if (id === null) {
-    updateHealthBar(healthBar, health);
-    staminaBar.style.width = `${stamina}%`;
-    return;
-  }
-  
-  const player = players.find((player) => player.id === id);
-  if (!player) return;
-  player.stats.health = health;
-  player.stats.stamina = stamina;
-  player.stats.max_stamina = max_stamina;
-  
-  // Calculate percentages based on max values
-  const healthPercent = (health / player.stats.max_health) * 100;
-  const staminaPercent = (stamina / player.stats.max_stamina) * 100;
-  
-  // Update appropriate health/stamina bars based on whether this is current player or target
-  if (player.id === sessionStorage.getItem("connectionId")) {
-    // Update current player's bars
-    updateHealthBar(healthBar, healthPercent);
-    staminaBar.style.width = `${staminaPercent}%`;
-    if (player.targeted) {
-      updateHealthBar(targetHealthBar, healthPercent);
-      targetStaminaBar.style.width = `${staminaPercent}%`;
-    }
-  } else if (player.targeted) {
-    // Update target's bars
-    updateHealthBar(targetHealthBar, healthPercent);
-    targetStaminaBar.style.width = `${staminaPercent}%`;
-  }
-}
-
 // Helper function to update health bar styling
-function updateHealthBar(bar: HTMLDivElement, health: number) {
-  bar.removeAttribute("class");
-  bar.classList.add("ui");
-  bar.style.width = `${Math.max(0, health)}%`;
+// function updateHealthBar(bar: HTMLDivElement, healthPercent: number) {
+//   const width = `${Math.max(0, healthPercent)}%`;
 
-  if (health >= 80) {
-    bar.classList.add("green");
-  } else if (health >= 50) {
-    bar.classList.add("yellow");
-  } else if (health >= 30) {
-    bar.classList.add("orange");
-  } else {
-    bar.classList.add("red");
-  }
-}
+//   // Only update if changed
+//   if (bar.style.width !== width) {
+//     bar.style.width = width;
+//   }
 
-function updateStats(health: number, stamina: number, max_stamina: number, max_health: number) {
-  const healthPercent = (health / max_health) * 100;
-  const staminaPercent = (stamina / max_stamina) * 100;
-  staminaBar.style.width = `${staminaPercent}%`;
-  healthBar.removeAttribute("class");
-  healthBar.classList.add("ui");
-  healthBar.style.width = `${healthPercent}%`;
-  if (staminaPercent < 0) {
-    staminaBar.style.width = `0%`;
-  }
-  if (healthPercent < 0) {
-    healthBar.style.width = `0%`;
-  }
-  if (healthPercent >= 80) {
-    healthBar.classList.add("green");
-    return;
-  }
-  if (healthPercent >= 50 && healthPercent < 80) {
-    healthBar.classList.add("yellow");
-    return;
-  }
-  if (healthPercent >= 30 && healthPercent < 50) {
-    healthBar.classList.add("orange");
-    return;
-  }
-  if (healthPercent < 30) {
-    healthBar.classList.add("red");
-    return;
-  }
-}
+//   // Avoid clearing and re-adding class if unnecessary
+//   let colorClass = "green";
+//   if (healthPercent < 30) {
+//     colorClass = "red";
+//   } else if (healthPercent < 50) {
+//     colorClass = "orange";
+//   } else if (healthPercent < 80) {
+//     colorClass = "yellow";
+//   }
 
-function updateTargetStats(health: number, max_health: number, stamina: number, max_stamina: number) {
-  targetHealthBar.removeAttribute("class");
-  targetHealthBar.classList.add("ui");
-  const healthPercent = (health / max_health) * 100;
-  const staminaPercent = (stamina / max_stamina) * 100;
-  targetHealthBar.style.width = `${healthPercent}%`;
-  targetStaminaBar.style.width = `${staminaPercent}%`;
-  if (healthPercent >= 80) {
-    targetHealthBar.classList.add("green");
-    return;
-  }
-  if (healthPercent >= 50 && healthPercent < 80) {
-    targetHealthBar.classList.add("yellow");
-    return;
-  }
-  if (healthPercent >= 30 && healthPercent < 50) {
-    targetHealthBar.classList.add("orange");
-    return;
-  }
-  if (healthPercent < 30) {
-    targetHealthBar.classList.add("red");
-    return;
-  }
-}
+//   const current = Array.from(bar.classList).find(c =>
+//     ["green", "yellow", "orange", "red"].includes(c)
+//   );
+
+//   if (current !== colorClass) {
+//     bar.classList.remove("green", "yellow", "orange", "red");
+//     bar.classList.add(colorClass);
+//   }
+
+//   // Ensure base class is set
+//   if (!bar.classList.contains("ui")) {
+//     bar.classList.add("ui");
+//   }
+// }
+
+// function updateStats(
+//   playerId: number | null,
+//   health: number,
+//   stamina: number,
+//   max_stamina: number,
+//   max_health: number
+// ) {
+//   const player = playerId === null
+//     ? players.find(p => p.id.toString() === cachedPlayerId)
+//     : players.find(p => p.id === playerId);
+
+//   if (!player) return;
+
+//   player.stats.health = health;
+//   player.stats.stamina = stamina;
+//   player.stats.max_stamina = max_stamina;
+//   player.stats.max_health = max_health;
+// }
 
 document
   .getElementById("pause-menu-action-back")
@@ -2279,7 +2299,7 @@ function createPartyContextMenu(event: MouseEvent, username: string) {
 
   contextMenu.dataset.username = username.toLowerCase();
   const ul = document.createElement("ul");
-  const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
+  const currentPlayer = players.find(player => player.id === cachedPlayerId);
   const isSelf = currentPlayer?.username.toLowerCase() === username.toLowerCase();
   Object.entries(partyContextActions).forEach(([action, { label, handler, only_self, allowed_self }]) => {
     if (only_self && !isSelf) return; // Skip actions that are only for self
@@ -2331,8 +2351,8 @@ function createContextMenu(event: MouseEvent, id: string) {
   contextMenu.dataset.id = id;
 
   const ul = document.createElement("ul");
-  const isSelf = id === sessionStorage.getItem("connectionId");
-  const currentPlayer = players.find(player => player.id === sessionStorage.getItem("connectionId"));
+  const isSelf = id === cachedPlayerId;
+  const currentPlayer = players.find(player => player.id === cachedPlayerId);
   const targetedPlayer = players.find(player => player.id === id);
   const isFriend = currentPlayer?.friends?.includes(targetedPlayer?.username?.toString()) || false;
   const isInParty = currentPlayer?.party?.includes(targetedPlayer?.username?.toString()) || false;
@@ -2648,8 +2668,7 @@ function updateFriendOnlineStatus(friendName: string, isOnline: boolean) {
 }
 
 function updateFriendsList(data: any) {
-    const connectionId = sessionStorage.getItem("connectionId");
-    const currentPlayer = players.find(player => player.id === connectionId);
+    const currentPlayer = players.find(player => player.id === cachedPlayerId);
     if (!currentPlayer || !data?.friends) return;
 
     const list = Array.from(friendsList.querySelectorAll('.friend-name')) as HTMLElement[];
@@ -2671,12 +2690,14 @@ function updateFriendsList(data: any) {
 
             const friendName = document.createElement("div");
             friendName.classList.add("friend-name");
+            friendName.classList.add("ui");
             friendName.innerText = friend.charAt(0).toUpperCase() + friend.slice(1);
             friendElement.appendChild(friendName);
 
             const friendStatus = document.createElement("div");
-            const isOnline = players.some(player => player.username.toLowerCase() === friend.toLowerCase() && player.id !== connectionId);
+            const isOnline = players.some(player => player.username.toLowerCase() === friend.toLowerCase() && player.id !== cachedPlayerId);
             friendStatus.classList.add("friend-status", isOnline ? "online" : "offline");
+            friendStatus.classList.add("ui");
             friendStatus.innerText = isOnline ? "Online" : "Offline";
             friendElement.appendChild(friendStatus);
 
@@ -2684,6 +2705,7 @@ function updateFriendsList(data: any) {
             const removeButton = document.createElement("button");
             removeButton.innerText = "X";
             removeButton.classList.add("remove-friend-button");
+            removeButton.classList.add("ui");
 
             // Add the click event handler
             removeButton.onclick = () => {

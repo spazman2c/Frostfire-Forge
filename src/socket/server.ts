@@ -272,50 +272,55 @@ listener.on("onFixedUpdate", async () => {
 // Server tick (every 1 second)
 listener.on("onServerTick", async () => {
   const players = cache.list() as any;
-  Object.keys(players).forEach((p: any) => {
-    const timeSinceLastAttack = players[p].last_attack ? performance.now() - players[p].last_attack : Infinity;
+
+  Object.values(players).forEach(async (playerData: any) => {
+    const now = performance.now();
+
+    // Reset PvP flag if no recent attack
+    const timeSinceLastAttack = playerData.last_attack ? now - playerData.last_attack : Infinity;
     if (timeSinceLastAttack > 5000) {
-      players[p].pvp = false;
+      playerData.pvp = false;
     }
 
-    // Return if the player is at full stamina and health
-    if (players[p].stats.stamina == players[p].stats.max_stamina && players[p].stats.health == players[p].stats.max_health) return;
-    
-    // Regenerate stamina by 1% of max stamina every server tick until it reaches max_stamina
-    // Allow stamina to regenerate even if the player is in combat
-    if ((players[p].stats.stamina < players[p].stats.max_stamina)) {
-      players[p].stats.stamina += Math.floor(players[p].stats.max_stamina * 0.01);
-      // If it would go over max stamina, set it to max stamina
-      if (players[p].stats.stamina > players[p].stats.max_stamina) {
-        players[p].stats.stamina = players[p].stats.max_stamina;
-      }
+    const { stats } = playerData;
+    if (!stats) return;
+    let updated = false;
+
+    // Regenerate stamina (always)
+    if (stats.stamina < stats.max_stamina) {
+      stats.stamina += Math.floor(stats.max_stamina * 0.01);
+      if (stats.stamina > stats.max_stamina) stats.stamina = stats.max_stamina;
+      updated = true;
     }
 
-    // Regenerate health by 1% of max health every server tick until it reaches max_health if not in combat
-    if (players[p].stats.health < players[p].stats.max_health) {
-      players[p].stats.health += players[p].pvp ? 0 : Math.floor(players[p].stats.max_health * 0.01);
-      // If it would go over max health, set it to max health
-      if (players[p].stats.health > players[p].stats.max_health) {
-        players[p].stats.health = players[p].stats.max_health;
-      }
+    // Regenerate health only if not in PvP
+    if (!playerData.pvp && stats.health < stats.max_health) {
+      stats.health += Math.floor(stats.max_health * 0.01);
+      if (stats.health > stats.max_health) stats.health = stats.max_health;
+      updated = true;
     }
+
+    // Only update if something changed
+    if (!updated) return;
 
     const updateStatsData = {
-      id: players[p].id,
-      target: players[p].id,
-      stats: players[p].stats,
+      id: playerData.id,
+      target: playerData.id,
+      stats: stats,
     };
-    
-    player.setStats(players[p].username, players[p].stats);
 
-    // Send to only players in the same map
-    Object.keys(players).forEach((p: any) => {
-      if (players[p].location.map === players[p].location.map) {
-        players[p].ws.send(packetManager.updateStats(updateStatsData)[0]);
+    // Send only to the player themselves (or uncomment for same-map broadcasting)
+    playerData.ws.send(packetManager.updateStats(updateStatsData)[0]);
+
+    // Broadcast to other players on the same map
+    Object.values(players).forEach((otherPlayer: any) => {
+      if (otherPlayer.id !== playerData.id && otherPlayer.location.map === playerData.location.map) {
+        otherPlayer.ws.send(packetManager.updateStats(updateStatsData)[0]);
       }
     });
   });
 });
+
 
 // On new connection
 listener.on("onConnection", (data) => {
@@ -330,6 +335,8 @@ listener.on("onDisconnect", async (data) => {
   const playerData = cache.get(data.id);
   if (!playerData) return;
 
+  // Save player stats and location
+  await player.setStats(playerData.username, playerData.stats);
   await player.setLocation(playerData.id, playerData.location.map, playerData.location.position);
   cache.remove(playerData.id);
   await player.clearSessionId(playerData.id);
@@ -340,6 +347,9 @@ listener.on("onDisconnect", async (data) => {
 listener.on("onSave", async () => {
   const playerCache = cache.list();
   for (const p in playerCache) {
+    if (!playerCache[p]) continue;
+    // Save player stats and location
+    await player.setStats(playerCache[p].username, playerCache[p].stats);
     await player.setLocation(
       p,
       playerCache[p].location.map,

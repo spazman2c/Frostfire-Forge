@@ -130,7 +130,6 @@ export default async function packetReceiver(
 
         // Get the player's stats
         const stats = await player.getStats(username);
-        sendPacket(ws, packetManager.stats(stats));
 
         // Get the player's friends list
         const friendsList = await friends.list(username);
@@ -286,15 +285,20 @@ export default async function packetReceiver(
 
         // Notify all *existing* players about the new player's online status
         for (const [, player] of Object.entries(allPlayers)) {
-          if (player.ws !== ws) {
+          if (player.ws.id !== ws.data.id) {
             // Check if they are even friends
             const isFriend = currentPlayerData.friends.some(
-              (friend: any) => friend.username === player.username
+              (friend: any) => friend === player.username
             );
             if (!isFriend) continue;
+            // Send the online status update to both players
             sendPacket(player.ws, packetManager.updateOnlineStatus({
               online: true,
               username: currentPlayerData.username,
+            }));
+            sendPacket(currentPlayerData.ws, packetManager.updateOnlineStatus({
+              online: true,
+              username: player.username,
             }));
           }
         }
@@ -821,6 +825,13 @@ export default async function packetReceiver(
         const _data = data as any;
         const target = cache.get(_data.id);
         if (!target) return;
+        
+
+        // Check if in the same party
+        if (currentPlayer.party.includes(target.username)) {
+          sendPacket(ws, packetManager.notify({message: "You cannot attack your party members"}));
+          return;
+        }
 
         const playersInMap = filterPlayersByMap(currentPlayer.location.map);
         const playersNearBy = filterPlayersByDistance(
@@ -834,6 +845,7 @@ export default async function packetReceiver(
           currentPlayer.location.map
         );
         const playersInMapAdminNearBy = playersNearBy.filter((p) => p.isAdmin);
+
         const canAttack = player.canAttack(currentPlayer, target, {
           width: 24,
           height: 40,
@@ -877,9 +889,6 @@ export default async function packetReceiver(
             sendPacket(player.ws, packetManager.audio(audioData));
           });
         } else {
-          playersNearBy.forEach((player) => {
-            sendPacket(player.ws, packetManager.audio(audioData));
-          });
           // Dead player
           if (target.stats.health <= 0) {
             target.stats.health = target.stats.max_health;
@@ -914,6 +923,10 @@ export default async function packetReceiver(
               };
               sendPacket(player.ws, packetManager.revive(reviveData));
             });
+
+            playersNearBy.forEach((player) => {
+              sendPacket(player.ws, packetManager.audio(audioData));
+            });
           } else {
             playersInMap.forEach((player) => {
               const updateStatsData = {
@@ -927,6 +940,7 @@ export default async function packetReceiver(
                 target: currentPlayer.id,
                 stats: currentPlayer.stats,
               };
+              
               sendPacket(player.ws, packetManager.updateStats(updateStatsData));
               sendPacket(player.ws, packetManager.updateStats(currentPlayerUpdateStatsData));
             });
@@ -937,8 +951,6 @@ export default async function packetReceiver(
         currentPlayer.last_attack = performance.now();
         target.last_attack = performance.now();
 
-        player.setStats(target.username, target.stats);
-        player.setStats(currentPlayer.username, currentPlayer.stats);
         currentPlayer.attackDelay = performance.now() + 1000;
         await new Promise((resolve) => setTimeout(resolve, 1000));
         currentPlayer.attackDelay = 0;
@@ -1511,10 +1523,7 @@ export default async function packetReceiver(
             }
 
             // Toggle admin status
-            const admin = await player.toggleAdmin(
-              targetPlayer.username,
-              targetPlayer.ws
-            );
+            const admin = await player.toggleAdmin(targetPlayer.username);
             // Update player cache if the player is in the cache
             if (targetPlayer) {
               targetPlayer.isAdmin = admin;
@@ -1523,6 +1532,10 @@ export default async function packetReceiver(
             const notifyData = {
               message: `${targetPlayer.username.charAt(0).toUpperCase() + targetPlayer.username.slice(1)} is now ${admin ? "an admin" : "not an admin"}`,
             };
+            // Reconnect the player if they are in the cache
+            if (targetPlayer?.ws) {
+              sendPacket(targetPlayer.ws, packetManager.reconnect());
+            }
             sendPacket(ws, packetManager.notify(notifyData));
             break;
           }
@@ -2467,7 +2480,11 @@ export default async function packetReceiver(
                 updatedPartyMembers.forEach(async (member: string) => {
                   const session_id = await player.getSessionIdByUsername(member);
                   const p = session_id && cache.get(session_id);
-                  if (p) sendPacket(p.ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                  if (p) {
+                    sendPacket(p.ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                    p.party = updatedPartyMembers;
+                    cache.set(p.id, p);
+                  }
                 });
               } else {
                 // If the party does not exist, create a new one
@@ -2480,6 +2497,15 @@ export default async function packetReceiver(
                 sendPacket(inviter.ws, packetManager.notify({ message: `${currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1)} has joined your party` }));
                 sendPacket(inviter.ws, packetManager.updateParty({ members: updatedPartyMembers }));
                 sendPacket(ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                (updatedPartyMembers as string[]).forEach(async (member: string) => {
+                  const session_id = await player.getSessionIdByUsername(member);
+                  const p = session_id && cache.get(session_id);
+                  if (p) {
+                    sendPacket(p.ws, packetManager.updateParty({ members: updatedPartyMembers }));
+                    p.party = updatedPartyMembers;
+                    cache.set(p.id, p);
+                  }
+                });
               }
             }
             break;

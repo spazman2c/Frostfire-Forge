@@ -277,7 +277,6 @@ export const packetManager = {
     ] as any[];
   },
   updateXp: (data: any) => {
-    console.log(data);
     return [
       packet.encode(JSON.stringify({ type: "UPDATE_XP", data })),
     ] as any[];

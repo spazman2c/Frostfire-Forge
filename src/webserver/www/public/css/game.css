@@ -17,6 +17,10 @@ body {
     padding: 0;
 }
 
+.ui {
+  user-select: none;
+}
+
 #container {
   width: 100vw; /* Full width of the viewport */
   height: 100vh; /* Full height of the viewport */
@@ -1181,7 +1185,7 @@ input[type=range]:disabled {
 .party-member {
   position: relative;
   backdrop-filter: blur(1px);
-  background:  #ffffff0d;
+  background:  #ffffffbf;
   width: 100px;
   height: 50px;
   margin: 5px;
@@ -1197,10 +1201,9 @@ input[type=range]:disabled {
   text-align: center;
   font-family: "Comic Relief";
   font-size: 0.8em;
-  color: #FFF1DA;
+  color: #000000c9;
   font-size: 0.8em;
   font-weight: 600;
-  text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
   white-space: pre-wrap;
   word-break: break-all;
   user-select: none;

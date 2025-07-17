@@ -225,7 +225,7 @@ const player = {
         const response = await query("SELECT role FROM accounts WHERE username = ?", [username]) as any;
         return response[0]?.role === 1;
     },
-    toggleAdmin: async (username: string, ws?: WebSocket) => {
+    toggleAdmin: async (username: string) => {
         if (!username) return;
         username = username.toLowerCase();
         const response = await query("UPDATE accounts SET role = !role WHERE username = ?", [username]) as any;
@@ -234,7 +234,6 @@ const player = {
         // Remove stealth status if the player is not an admin and is stealth
         if (!admin) await query("UPDATE accounts SET stealth = 0, noclip = 0 WHERE username = ?", [username]) as any;
         log.debug(`${username} admin status has been updated to ${admin}`);
-        if (ws) ws.close();
         return admin;
     },
     isStealth: async (username: string) => {
