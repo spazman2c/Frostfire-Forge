@@ -1733,6 +1733,8 @@ async function createPlayer(data: any) {
           context.shadowColor = "black";
           context.shadowOffsetX = 1;
           context.shadowOffsetY = 1;
+          // Set font and size
+          context.font = "14px 'Comic Relief'";
           const lines = getLines(context, this.chat, 500).reverse();
           let startingPosition = this.position.y;
 
