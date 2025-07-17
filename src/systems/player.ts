@@ -545,7 +545,7 @@ const player = {
 
         return { value: true, reason: "pvp" };
     },
-    findClosestPlayer: async (self: Player, players: Player[], range: number): Promise<NullablePlayer> => {
+    findClosestPlayer: (self: Player, players: Player[], range: number): NullablePlayer => {
         if (!players) return null;
         if (!self.location?.position) return null;
 

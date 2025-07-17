@@ -59,9 +59,9 @@ const healthBar = document.getElementById(
 const staminaBar = document.getElementById(
   "stamina-progress-bar"
 ) as HTMLDivElement;
-const targetStats = document.getElementById(
-  "target-stats-container"
-) as HTMLDivElement;
+// const targetStats = document.getElementById(
+//   "target-stats-container"
+// ) as HTMLDivElement;
 const targetHealthBar = document.getElementById(
   "target-health-progress-bar"
 ) as HTMLDivElement;
@@ -531,14 +531,14 @@ socket.onmessage = async (event) => {
       // Remove player from the array
       const index = players.findIndex(player => player.id === data.id);
       if (index !== -1) {
-        const wasTargeted = players[index].targeted;
+        //const wasTargeted = players[index].targeted;
 
         players.splice(index, 1); // Remove from array
 
         // If they were targeted, hide target stats
-        if (wasTargeted) {
-          displayElement(targetStats, false);
-        }
+        // if (wasTargeted) {
+        //   displayElement(targetStats, false);
+        // }
       }
 
       break;
@@ -929,10 +929,9 @@ socket.onmessage = async (event) => {
       const data = JSON.parse(packet.decode(event.data))["data"];
 
       if (!data || !data.id || !data.username) {
-        players.forEach((player) => {
-          player.targeted = false;
-        });
-        displayElement(targetStats, false);
+        const target = players.find(p => p.targeted);
+        if (target) target.targeted = false;
+        //displayElement(targetStats, false);
         break;
       }
 
@@ -940,7 +939,7 @@ socket.onmessage = async (event) => {
         player.targeted = (player.id === data.id);
       });
 
-      displayElement(targetStats, true);
+      // displayElement(targetStats, true);
       break;
     }
     case "STEALTH": {
@@ -965,7 +964,7 @@ socket.onmessage = async (event) => {
         // Untarget stealthed players
         if (player.isStealth && player.targeted) {
           player.targeted = false;
-          displayElement(targetStats, false);
+          //displayElement(targetStats, false);
         }
       });
 
@@ -992,7 +991,7 @@ socket.onmessage = async (event) => {
         target.targeted = false;
       }
 
-      displayElement(targetStats, false);
+      //displayElement(targetStats, false);
       players.forEach((player) => player.targeted = false);
       break;
     }
@@ -1389,6 +1388,11 @@ window.addEventListener("keydown", async (e) => {
   if (blacklistedKeys.has(e.code)) {
     // Check for tab
     if (e.code === "Tab" && !contextMenuKeyTriggered) {
+      const target = players.find(player => player.targeted);
+      if (target) {
+        target.targeted = false;
+      }
+      //displayElement(targetStats, false);
       sendRequest({ type: "TARGETCLOSEST", data: null });
       e.preventDefault();
       return;
@@ -2446,6 +2450,12 @@ document.addEventListener("click", (event) => {
 
   const moveX = x - canvas.width / 2 - 16;
   const moveY = y - canvas.height / 2 - 24;
+  // Untarget any currently targeted player
+  const target = players.find(player => player.targeted);
+  if (target) {
+    target.targeted = false;
+  }
+
   sendRequest({
     type: "SELECTPLAYER",
     data: { x: moveX, y: moveY },
@@ -2787,11 +2797,11 @@ function createPartyUI(partyMembers: string[]) {
 }
 
 
-function displayElement(element: HTMLElement, display: boolean) {
-    element.animate([
-      { transform: `scaleX(${display ? 1 : 0})` },
-    ], {
-      duration: 0,
-      fill: "forwards"
-    });
-}
+// function displayElement(element: HTMLElement, display: boolean) {
+//     element.animate([
+//       { transform: `scaleX(${display ? 1 : 0})` },
+//     ], {
+//       duration: 0,
+//       fill: "forwards"
+//     });
+// }

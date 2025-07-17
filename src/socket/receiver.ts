@@ -721,17 +721,10 @@ export default async function packetReceiver(
               25
         );
 
-        if (!selectedPlayer) {
+        if (!selectedPlayer) break;
+        if (selectedPlayer.isStealth && !currentPlayer.isAdmin) {
           const selectPlayerData = {
             id: ws.data.id,
-            data: null,
-          };
-          sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
-          break;
-        } else {
-          if (selectedPlayer.isStealth && !currentPlayer.isAdmin) {
-            const selectPlayerData = {
-              id: ws.data.id,
               data: null,
             };
             sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
@@ -744,7 +737,6 @@ export default async function packetReceiver(
             };
             sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
           }
-        }
         break;
       }
       case "TARGETCLOSEST": {
@@ -755,18 +747,21 @@ export default async function packetReceiver(
           currentPlayer.location.map
         ).filter((p) => !p.isStealth && p.id !== currentPlayer.id); // Filter out stealth players and self
 
-        const closestPlayer = await player.findClosestPlayer(
+        const closestPlayer = player.findClosestPlayer(
           currentPlayer,
           playersInRange,
           500
         );
 
-        const selectPlayerData = {
-          id: closestPlayer?.id || null,
-          username: closestPlayer?.username || null,
-          stats: closestPlayer?.stats || null,
-        };
-        sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
+        if (closestPlayer) {
+          const selectPlayerData = {
+            id: closestPlayer.id || null,
+            username: closestPlayer.username || null,
+            stats: closestPlayer.stats || null,
+          };
+          
+          sendPacket(ws, packetManager.selectPlayer(selectPlayerData));
+        }
         break;
       }
       case "INSPECTPLAYER": {
