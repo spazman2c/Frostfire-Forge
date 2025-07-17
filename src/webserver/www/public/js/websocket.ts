@@ -909,11 +909,9 @@ socket.onmessage = async (event) => {
     }
     case "STATS": {
       const player = players.find((player) => player.id === data.id);
-      console.log("Received stats for player:", player, data);
-      if (player) {
-        updateXp(data.xp, data.level, data.max_xp);
+      if (!player) return;
+      updateXp(data.xp, data.level, data.max_xp);
         player.stats = data;
-      }
       break;
     }
     case "CLIENTCONFIG": {
