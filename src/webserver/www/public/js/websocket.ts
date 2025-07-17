@@ -53,21 +53,21 @@ const chatInput = document.getElementById("chat-input") as HTMLInputElement;
 const chatMessages = document.getElementById("chat-messages") as HTMLDivElement;
 const loadingScreen = document.getElementById("loading-screen");
 const xpBar = document.getElementById("xp-bar") as HTMLDivElement;
-// const healthBar = document.getElementById(
-//   "health-progress-bar"
-// ) as HTMLDivElement;
-// const staminaBar = document.getElementById(
-//   "stamina-progress-bar"
-// ) as HTMLDivElement;
-// const targetStats = document.getElementById(
-//   "target-stats-container"
-// ) as HTMLDivElement;
-// const targetHealthBar = document.getElementById(
-//   "target-health-progress-bar"
-// ) as HTMLDivElement;
-// const targetStaminaBar = document.getElementById(
-//   "target-stamina-progress-bar"
-// ) as HTMLDivElement;
+const healthBar = document.getElementById(
+  "health-progress-bar"
+) as HTMLDivElement;
+const staminaBar = document.getElementById(
+  "stamina-progress-bar"
+) as HTMLDivElement;
+const targetStats = document.getElementById(
+  "target-stats-container"
+) as HTMLDivElement;
+const targetHealthBar = document.getElementById(
+  "target-health-progress-bar"
+) as HTMLDivElement;
+const targetStaminaBar = document.getElementById(
+  "target-stamina-progress-bar"
+) as HTMLDivElement;
 //const map = document.getElementById("map") as HTMLDivElement;
 //const fullmap = document.getElementById("full-map") as HTMLDivElement;
 //const mapPosition = document.getElementById("position") as HTMLDivElement;
@@ -227,33 +227,24 @@ function animationLoop() {
   );
 
   // DOM health and stamina bar updates
-  // if (currentPlayer) {
-  //   const { health, max_health, stamina, max_stamina } = currentPlayer.stats;
-  //   const healthPercent = (health / max_health) * 100;
-  //   const staminaPercent = (stamina / max_stamina) * 100;
+  if (currentPlayer) {
+    const { health, max_health, stamina, max_stamina } = currentPlayer.stats;
+    const healthPercent = (health / max_health) * 100;
+    const staminaPercent = (stamina / max_stamina) * 100;
 
-  //   updateHealthBar(healthBar, healthPercent);
-  //   if (staminaBar.style.width !== `${staminaPercent}%`) {
-  //     staminaBar.style.width = `${staminaPercent}%`;
-  //   }
-  // }
+    updateHealthBar(healthBar, healthPercent);
+    updateStaminaBar(staminaBar, staminaPercent);
+  }
 
   // Update targeted player's bars
-  // const targetPlayer = players.find(p => p.targeted);
-  // if (targetPlayer) {
-  //   const { health, max_health, stamina, max_stamina } = targetPlayer.stats;
-  //   const healthPercent = (health / max_health) * 100;
-  //   const staminaPercent = (stamina / max_stamina) * 100;
-
-  //   updateHealthBar(targetHealthBar, healthPercent);
-  //   if (targetStaminaBar.style.width !== `${staminaPercent}%`) {
-  //     targetStaminaBar.style.width = `${staminaPercent}%`;
-  //   }
-  // } else if (targetHealthBar.style.width !== "0%") {
-  //   targetHealthBar.style.width = "0%";
-  //   targetStaminaBar.style.width = "0%";
-  //   targetHealthBar.classList.remove("green", "yellow", "orange", "red");
-  // }
+  const targetPlayer = players.find(p => p.targeted);
+  if (targetPlayer) {
+    const { health, max_health, stamina, max_stamina } = targetPlayer.stats;
+    const healthPercent = (health / max_health) * 100;
+    const staminaPercent = (stamina / max_stamina) * 100;
+    updateHealthBar(targetHealthBar, healthPercent);
+    updateStaminaBar(targetStaminaBar, staminaPercent);
+  }
 
   const visibleNpcs = npcs.filter(npc =>
     isInView(npc.position.x, npc.position.y)
@@ -540,14 +531,14 @@ socket.onmessage = async (event) => {
       // Remove player from the array
       const index = players.findIndex(player => player.id === data.id);
       if (index !== -1) {
-        //const wasTargeted = players[index].targeted;
+        const wasTargeted = players[index].targeted;
 
         players.splice(index, 1); // Remove from array
 
         // If they were targeted, hide target stats
-        // if (wasTargeted) {
-        //   targetStats.style.display = "none";
-        // }
+        if (wasTargeted) {
+          targetStats.style.display = "none";
+        }
       }
 
       break;
@@ -941,7 +932,7 @@ socket.onmessage = async (event) => {
         players.forEach((player) => {
           player.targeted = false;
         });
-        //targetStats.style.display = "none";
+        targetStats.style.display = "none";
         break;
       }
 
@@ -949,7 +940,7 @@ socket.onmessage = async (event) => {
         player.targeted = (player.id === data.id);
       });
 
-      //targetStats.style.display = "block";
+      targetStats.style.display = "block";
       break;
     }
     case "STEALTH": {
@@ -974,7 +965,7 @@ socket.onmessage = async (event) => {
         // Untarget stealthed players
         if (player.isStealth && player.targeted) {
           player.targeted = false;
-          //targetStats.style.display = "none";
+          targetStats.style.display = "none";
         }
       });
 
@@ -1001,7 +992,7 @@ socket.onmessage = async (event) => {
         target.targeted = false;
       }
 
-      //targetStats.style.display = "none";
+      targetStats.style.display = "none";
       players.forEach((player) => player.targeted = false);
       break;
     }
@@ -1087,8 +1078,13 @@ socket.onmessage = async (event) => {
 }
 
 function updateXp(xp: number, level: number, max_xp: number) {
-  const xpPercent = (xp / max_xp) * 100;
-  xpBar.style.width = `${Math.max(0, Math.min(100, xpPercent))}%`;
+  const xscale = Math.max(0, Math.min(1, xp / max_xp));
+  xpBar.animate([
+    { transform: `scaleX(${xscale})` }
+  ], {
+    duration: 0,
+    fill: 'forwards'
+  });
 }
 
 function playMusic(name: string, data: Uint8Array, timestamp: number): void {
@@ -2061,57 +2057,49 @@ window.addEventListener("blur", () => {
 });
 
 // Helper function to update health bar styling
-// function updateHealthBar(bar: HTMLDivElement, healthPercent: number) {
-//   const width = `${Math.max(0, healthPercent)}%`;
+function updateHealthBar(bar: HTMLDivElement, healthPercent: number) {
+  const xscale = Math.max(0, Math.min(1, healthPercent / 100));
+  bar.animate([
+    { transform: `scaleX(${xscale})` }
+  ], {
+    duration: 0,
+    fill: 'forwards'
+  });
 
-//   // Only update if changed
-//   if (bar.style.width !== width) {
-//     bar.style.width = width;
-//   }
+  // Avoid clearing and re-adding class if unnecessary
+  let colorClass = "green";
+  if (healthPercent < 30) {
+    colorClass = "red";
+  } else if (healthPercent < 50) {
+    colorClass = "orange";
+  } else if (healthPercent < 80) {
+    colorClass = "yellow";
+  }
 
-//   // Avoid clearing and re-adding class if unnecessary
-//   let colorClass = "green";
-//   if (healthPercent < 30) {
-//     colorClass = "red";
-//   } else if (healthPercent < 50) {
-//     colorClass = "orange";
-//   } else if (healthPercent < 80) {
-//     colorClass = "yellow";
-//   }
+  const current = Array.from(bar.classList).find(c =>
+    ["green", "yellow", "orange", "red"].includes(c)
+  );
 
-//   const current = Array.from(bar.classList).find(c =>
-//     ["green", "yellow", "orange", "red"].includes(c)
-//   );
+  if (current !== colorClass) {
+    bar.classList.remove("green", "yellow", "orange", "red");
+    bar.classList.add(colorClass);
+  }
 
-//   if (current !== colorClass) {
-//     bar.classList.remove("green", "yellow", "orange", "red");
-//     bar.classList.add(colorClass);
-//   }
+  // Ensure base class is set
+  if (!bar.classList.contains("ui")) {
+    bar.classList.add("ui");
+  }
+}
 
-//   // Ensure base class is set
-//   if (!bar.classList.contains("ui")) {
-//     bar.classList.add("ui");
-//   }
-// }
-
-// function updateStats(
-//   playerId: number | null,
-//   health: number,
-//   stamina: number,
-//   max_stamina: number,
-//   max_health: number
-// ) {
-//   const player = playerId === null
-//     ? players.find(p => p.id.toString() === cachedPlayerId)
-//     : players.find(p => p.id === playerId);
-
-//   if (!player) return;
-
-//   player.stats.health = health;
-//   player.stats.stamina = stamina;
-//   player.stats.max_stamina = max_stamina;
-//   player.stats.max_health = max_health;
-// }
+function updateStaminaBar(bar: HTMLDivElement, staminaPercent: number) {
+  const xscale = Math.max(0, Math.min(1, staminaPercent / 100));
+  bar.animate([
+    { transform: `scaleX(${xscale})` }
+  ], {
+    duration: 0,
+    fill: 'forwards'
+  });
+}
 
 document
   .getElementById("pause-menu-action-back")

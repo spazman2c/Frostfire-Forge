@@ -889,62 +889,63 @@ export default async function packetReceiver(
             sendPacket(player.ws, packetManager.audio(audioData));
           });
         } else {
-          // Dead player
-          if (target.stats.health <= 0) {
-            target.stats.health = target.stats.max_health;
-            target.stats.stamina = target.stats.max_stamina;
-            target.location.position = { x: 0, y: 0, direction: "down" };
-            // Give the attacker xp
-            const xp = 10;
-            const updatedStats = await player.increaseXp(currentPlayer.username, xp) as StatsData;
-            currentPlayer.stats.xp = updatedStats.xp;
-            currentPlayer.stats.level = updatedStats.level;
-            currentPlayer.stats.max_xp = updatedStats.max_xp;
-            // Send the current player's updated xp to the current player
-            const updateXpData = {
-              id: currentPlayer.id,
-              xp: currentPlayer.stats.xp,
-              level: currentPlayer.stats.level, 
-              max_xp: currentPlayer.stats.max_xp,
-            };
-            sendPacket(ws, packetManager.updateXp(updateXpData));
-            
-            playersInMap.forEach((player) => {
-              const moveXYData = {
-                id: target.id,
-                _data: target.location.position,
-              };
-              sendPacket(player.ws, packetManager.moveXY(moveXYData));
-
-              const reviveData = {
-                id: target.id,
-                target: target.id,
-                stats: target.stats,
-              };
-              sendPacket(player.ws, packetManager.revive(reviveData));
-            });
-
             playersNearBy.forEach((player) => {
               sendPacket(player.ws, packetManager.audio(audioData));
             });
-          } else {
-            playersInMap.forEach((player) => {
-              const updateStatsData = {
-                id: ws.data.id,
-                target: target.id,
-                stats: target.stats,
+          // Dead player
+            if (target.stats.health <= 0) {
+              target.stats.health = target.stats.max_health;
+              target.stats.stamina = target.stats.max_stamina;
+              target.location.position = { x: 0, y: 0, direction: "down" };
+              // Give the attacker xp
+              const xp = 10;
+              const updatedStats = await player.increaseXp(currentPlayer.username, xp) as StatsData;
+              currentPlayer.stats.xp = updatedStats.xp;
+              currentPlayer.stats.level = updatedStats.level;
+              currentPlayer.stats.max_xp = updatedStats.max_xp;
+              // Send the current player's updated xp to the current player
+              const updateXpData = {
+                id: currentPlayer.id,
+                xp: currentPlayer.stats.xp,
+                level: currentPlayer.stats.level, 
+                max_xp: currentPlayer.stats.max_xp,
               };
 
-              const currentPlayerUpdateStatsData = {
-                id: currentPlayer.id,
-                target: currentPlayer.id,
-                stats: currentPlayer.stats,
-              };
-              
-              sendPacket(player.ws, packetManager.updateStats(updateStatsData));
-              sendPacket(player.ws, packetManager.updateStats(currentPlayerUpdateStatsData));
-            });
-          }
+              sendPacket(ws, packetManager.updateXp(updateXpData));
+
+              playersInMap.forEach((player) => {
+                const moveXYData = {
+                  id: target.id,
+                  _data: target.location.position,
+                };
+                
+                sendPacket(player.ws, packetManager.moveXY(moveXYData));
+
+                const reviveData = {
+                  id: target.id,
+                  target: target.id,
+                  stats: target.stats,
+                };
+                sendPacket(player.ws, packetManager.revive(reviveData));
+              });
+            } else {
+              playersInMap.forEach((player) => {
+                const updateStatsData = {
+                  id: ws.data.id,
+                  target: target.id,
+                  stats: target.stats,
+                };
+
+                const currentPlayerUpdateStatsData = {
+                  id: currentPlayer.id,
+                  target: currentPlayer.id,
+                  stats: currentPlayer.stats,
+                };
+
+                sendPacket(player.ws, packetManager.updateStats(updateStatsData));
+                sendPacket(player.ws, packetManager.updateStats(currentPlayerUpdateStatsData));
+              });
+            }
         }
         currentPlayer.pvp = true;
         target.pvp = true;

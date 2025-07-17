@@ -479,8 +479,10 @@ input::placeholder {
 
 #xp-bar {
   height: 100%;
-  width: 50%;
   background: url("../img/ui/ui-xp-bar.png");
+  transform: scaleX(var(--xp-scale, 0.5));
+  transform-origin: left;
+  will-change: transform;
 }
 
 #loading-screen {
@@ -595,26 +597,31 @@ input::placeholder {
 }
 
 #health-progress-bar, #target-health-progress-bar {
-  width: 100%;
   height: 100%;
+  will-change: transform;
+  transform: scaleX(var(--xscale, 1));
+  transform-origin: left;
 }
 
 /* Max Health */
-.green {
+.health {
   background: url("../img/ui/ui-health-green.png");
 }
 
-/* 70% Health */
-.yellow {
-  background: url("../img/ui/ui-health-yellow.png");  
+.green {
+  filter: hue-rotate(0deg);
 }
-/* */
+
+.yellow {
+  filter: hue-rotate(305deg);
+}
+
 .orange {
-  background: url("../img/ui/ui-health-orange.png");
+  filter: hue-rotate(265deg);
 }
 
 .red {
-  background: url("../img/ui/ui-health-red.png");
+  filter: hue-rotate(250deg);
 }
 
 #stamina-bar-container, #target-stamina-bar-container {
@@ -628,7 +635,9 @@ input::placeholder {
 
 #stamina-progress-bar, #target-stamina-progress-bar {
   height: 100%;
-  width: 100%;
+  will-change: transform;
+  transform: scaleX(var(--xscale, 1));
+  transform-origin: left;
   background: url("../img/ui/ui-stamina.png");
 }
 
