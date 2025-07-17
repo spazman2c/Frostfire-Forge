@@ -537,7 +537,7 @@ socket.onmessage = async (event) => {
 
         // If they were targeted, hide target stats
         if (wasTargeted) {
-          targetStats.style.display = "none";
+          displayElement(targetStats, false);
         }
       }
 
@@ -932,7 +932,7 @@ socket.onmessage = async (event) => {
         players.forEach((player) => {
           player.targeted = false;
         });
-        targetStats.style.display = "none";
+        displayElement(targetStats, false);
         break;
       }
 
@@ -940,7 +940,7 @@ socket.onmessage = async (event) => {
         player.targeted = (player.id === data.id);
       });
 
-      targetStats.style.display = "block";
+      displayElement(targetStats, true);
       break;
     }
     case "STEALTH": {
@@ -965,7 +965,7 @@ socket.onmessage = async (event) => {
         // Untarget stealthed players
         if (player.isStealth && player.targeted) {
           player.targeted = false;
-          targetStats.style.display = "none";
+          displayElement(targetStats, false);
         }
       });
 
@@ -992,7 +992,7 @@ socket.onmessage = async (event) => {
         target.targeted = false;
       }
 
-      targetStats.style.display = "none";
+      displayElement(targetStats, false);
       players.forEach((player) => player.targeted = false);
       break;
     }
@@ -2782,4 +2782,14 @@ function createPartyUI(partyMembers: string[]) {
       partyContainer.appendChild(memberElement);
     }
   }
+}
+
+
+function displayElement(element: HTMLElement, display: boolean) {
+    element.animate([
+      { transform: `scaleX(${display ? 1 : 0})` },
+    ], {
+      duration: 0,
+      fill: "forwards"
+    });
 }

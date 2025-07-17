@@ -560,19 +560,21 @@ input::placeholder {
   background: url("../img/ui/ui-stats-container.png");
   background-repeat: no-repeat;
   background-size: 100% 100%;
+  will-change: transform;
   width: 330px;
   height: 110px;
 }
 
 #stats-container {
+  transform: scaleX(var(--xscale, 1));
   top: 27;
   left: 10;
 }
 
 #target-stats-container {
+  transform: scaleX(var(--xscale, 0));
   top: 27;
   left: 350;
-  display: none;
 }
 
 #player-image-container {
