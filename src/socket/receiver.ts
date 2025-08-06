@@ -374,6 +374,7 @@ export default async function packetReceiver(
             },
             username: player.username,
             isAdmin: player.isAdmin,
+            isGuest: player.isGuest,
             isStealth: player.isStealth,
             stats: player.stats,
             animation: null,
