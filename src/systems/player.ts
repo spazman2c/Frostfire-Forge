@@ -2,6 +2,8 @@ import query from "../controllers/sqldatabase";
 import { randomBytes, verify } from "../modules/hash";
 import log from "../modules/logger";
 import assetCache from "../services/assetCache";
+import * as settings from "../../config/settings.json";
+const defaultMap = settings.default_map?.replace(".json", "") || "main";
 
 const player = {
     clear: async () => {
@@ -41,7 +43,7 @@ const player = {
               password_hash,
               req.ip,
               req.headers["cf-ipcountry"],
-              "main",
+              defaultMap,
               "0,0",
               guest ? 1 : 0
             ]
@@ -195,7 +197,7 @@ const player = {
     },
     returnHome: async (session_id: string) => {
         if (!session_id) return;
-        const response = await query("UPDATE accounts SET map = 'main', position = '0,0' WHERE session_id = ?", [session_id]);
+        const response = await query("UPDATE accounts SET map = ?, position = '0,0' WHERE session_id = ?", [defaultMap, session_id]);
         return response;
     },
     setToken: async (username: string) => {
