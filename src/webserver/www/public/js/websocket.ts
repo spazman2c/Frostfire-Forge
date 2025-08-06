@@ -141,7 +141,7 @@ const packet = {
 let lastDirection = "";
 let pendingRequest = false;
 
-let cachedViewport = {
+const cachedViewport = {
   x: 0,
   y: 0,
   w: window.innerWidth,
@@ -149,7 +149,7 @@ let cachedViewport = {
   padding: 64,
 };
 
-let cachedPaddedBounds = {
+const cachedPaddedBounds = {
   x: 0,
   y: 0,
   w: 0,
