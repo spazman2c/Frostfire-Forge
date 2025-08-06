@@ -54,7 +54,10 @@ const settings = {
     "idleTimeout": 5
   },
   "world": "default",
-  "default_map": "main"
+  "default_map": "main",
+  "guest_mode": {
+    "enabled": true
+  }
 };
 
 if (!fs.existsSync(path.join(configPath, "assets.json"))) {

@@ -161,6 +161,7 @@ export const packetManager = {
             },
             username: data.username,
             isAdmin: data.isAdmin,
+            isGuest: data.isGuest,
             isStealth: data.isStealth,
             stats: data.stats,
             sprite: data.sprite,

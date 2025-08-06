@@ -156,6 +156,7 @@ export default async function packetReceiver(
         })) as LocationData | null;
 
         const isAdmin = await player.isAdmin(username);
+        const isGuest = await player.isGuest(username);
         let isStealth = await player.isStealth(username);
         let isNoclip = await player.isNoclip(username);
 
@@ -231,6 +232,7 @@ export default async function packetReceiver(
           invitations: [],
           party: partyMembers,
           currency: playerCurrency,
+          isGuest,
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -340,6 +342,7 @@ export default async function packetReceiver(
             },
             username,
             isAdmin,
+            isGuest,
             isStealth,
             stats,
             animation: null,
@@ -613,6 +616,10 @@ export default async function packetReceiver(
       }
       case "CHAT": {
         if (!currentPlayer) return;
+        if (currentPlayer.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "Please create an account to use that feature." }));
+          return;
+        }
         const messageData = data as any;
         const message = messageData?.message;
         const mode = messageData?.mode;
@@ -691,7 +698,7 @@ export default async function packetReceiver(
         break;
       }
       case "TYPING": {
-        if (!currentPlayer) return;
+        if (!currentPlayer || currentPlayer?.isGuest) return;
         const typingData = {
           id: ws.data.id,
         };
@@ -821,12 +828,21 @@ export default async function packetReceiver(
         break;
       }
       case "ATTACK": {
+        if (!currentPlayer) return;
+        if (currentPlayer.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "Please create an account to use that feature." }));
+          return;
+        }
         if (currentPlayer?.attackDelay > performance.now()) return;
         if (currentPlayer.stats.stamina < 10) return;
         const _data = data as any;
         const target = cache.get(_data.id);
         if (!target) return;
         
+        if (target.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "You cannot attack guests." }));
+          return;
+        }
 
         // Check if in the same party
         if (currentPlayer.party.includes(target.username)) {
@@ -965,7 +981,7 @@ export default async function packetReceiver(
         break;
       }
       case "STOPTYPING": {
-        if (!currentPlayer) return;
+        if (!currentPlayer || currentPlayer.isGuest) return;
         let playersInMap = filterPlayersByMap(currentPlayer.location.map);
         const stopTypingData = {
           id: ws.data.id,
@@ -980,6 +996,10 @@ export default async function packetReceiver(
       }
       case "COMMAND": {
         if (!currentPlayer) return;
+        if (currentPlayer.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "Please create an account to use that feature." }));
+          return;
+        }
         const _data = data as any;
         const command = _data?.command;
         const mode = _data?.mode;
@@ -2326,6 +2346,16 @@ export default async function packetReceiver(
         const invitedUserUsername = invitedUser?.username || invited_user;
         if (!currentPlayer || !invited_user || !invitedUserUsername) return;
 
+        if (currentPlayer.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "Please create an account to use that feature." }));
+          return;
+        }
+
+        if (invitedUser.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: `${invitedUserUsername.charAt(0).toUpperCase() + invitedUserUsername.slice(1)} is a guest and cannot be invited to a party.` }));
+          return;
+        }
+
         // Get the leaders party ID
         const partyId = await parties.getPartyId(currentPlayer.username);
         if (partyId) {
@@ -2384,11 +2414,22 @@ export default async function packetReceiver(
         if (!id) return;
 
         if (!currentPlayer) return;
+
+        if (currentPlayer.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: "Please create an account to use that feature." }));
+          return;
+        }
+
         // Uppercase the first letter of the username
         const player_username = currentPlayer.username.charAt(0).toUpperCase() + currentPlayer.username.slice(1);
 
         const get_friend = cache.get(id);
         if (!get_friend) return;
+
+        if (get_friend.isGuest) {
+          sendPacket(ws, packetManager.notify({ message: `${get_friend.username.charAt(0).toUpperCase() + get_friend.username.slice(1)} is a guest and cannot be added as a friend.` }));
+          return;
+        }
 
         const invite_data = {
           action: "FRIEND_REQUEST",

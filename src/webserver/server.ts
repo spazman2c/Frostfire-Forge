@@ -51,6 +51,7 @@ const routes = {
   "/login": (req: Request, server: any) => login(req, server),
   "/verify": (req: Request, server: any) => authenticate(req, server),
   "/register": (req: Request, server: any) => register(req, server),
+  "/guest-login": async (req: Request, server: any) => createGuestAccount(req, server),
   "/forgot-password": forgotpassword_html,
   "/change-password": changepassword_html,
   "/reset-password": async (req: Request, server: any) => {
@@ -93,6 +94,7 @@ Bun.serve({
     "/": routes["/"],
     "/registration": routes["/registration"],
     "/register": routes["/register"],
+    "/guest-login": routes["/guest-login"],
     "/forgot-password": routes["/forgot-password"],
     "/change-password": routes["/change-password"],
     "/reset-password": routes["/reset-password"],
@@ -182,6 +184,43 @@ async function authenticate(req: Request, server: any) {
   return Response.redirect(`${process.env.DOMAIN}/game`, 301);
 }
 
+async function createGuestAccount(req: Request, server: any) {
+  try {
+    if (!settings.guest_mode?.enabled) {
+      return new Response(JSON.stringify({ message: "Guest mode is disabled" }), { status: 403 });
+    }
+    const ip = server.requestIP(req)?.address;
+    if (b_ips.includes(ip) && !w_ips.includes(ip)) {
+      return new Response(JSON.stringify({ message: "Invalid request" }), { status: 403 });
+    }
+
+    const guest_username = `guest_${randomBytes(12)}`;
+    const guest_email = `${guest_username}@${process.env.DOMAIN}`;
+    const guest_password = `guest_${randomBytes(12)}`;
+    const guest_password_hash = await hash(guest_password);
+
+    const user = await player.register(guest_username.toLowerCase(), guest_password_hash, guest_email, req, true) as any;
+    if (!user) {
+      return new Response(JSON.stringify({ message: "Failed to create guest account" }), { status: 500 });
+    }
+
+    if (user.error) {
+      return new Response(JSON.stringify({ message: user.error }), { status: 400 });
+    }
+
+    const token = await player.login(guest_username.toLowerCase(), guest_password);
+    if (!token) {
+      return new Response(JSON.stringify({ message: "Failed to create guest account" }), { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ message: "Logged in successfully"}), { status: 301, headers: { "Set-Cookie": `token=${token}; Path=/;` } });
+
+  } catch (error) {
+    log.error(`Failed to create guest account: ${error}`);
+    return new Response(JSON.stringify({ message: "Failed to create guest account" }), { status: 500 });
+  }
+}
+
 async function register(req: Request, server: any) {
   try {
     // Check if ip banned
@@ -213,7 +252,7 @@ async function register(req: Request, server: any) {
 
     const password_hash = await hash(password);
 
-    const user = await player.register(username.toLowerCase(), password_hash, email.toLowerCase(), req) as any;
+    const user = await player.register(username.toLowerCase(), password_hash, email.toLowerCase(), req, false) as any;
     if (!user) {
       return new Response(JSON.stringify({ message: "Failed to register" }), { status: 400 });
     }

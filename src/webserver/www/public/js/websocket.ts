@@ -291,7 +291,6 @@ function animationLoop() {
       if (npc.particles) {
         for (const particle of npc.particles) {
           if (particle.visible) {
-            console.log("Updating particle for NPC:", npc.id, particle);
             npc.updateParticle(particle, npc, ctx, deltaTime);
           }
         }
@@ -1739,6 +1738,7 @@ async function createPlayer(data: any) {
     Position: (${data.location.x}, ${data.location.y})
     Stealth: ${data.isStealth ? "Yes" : "No"}
     Admin: ${data.isAdmin ? "Yes" : "No"}
+    Guest: ${data.isGuest ? "Yes" : "No"}
     Party: ${data.party ? data.party.join(", ") : "None"}
     Stats: ${JSON.stringify(data.stats, null, 2)}
   `)
@@ -1758,6 +1758,7 @@ async function createPlayer(data: any) {
     chat: "",
     isStealth: data.isStealth,
     isAdmin: data.isAdmin,
+    isGuest: data.isGuest || false,
     _adminColorHue: Math.floor(Math.random() * 360), // Add this property
     targeted: false,
     stats: data.stats,
@@ -1966,8 +1967,12 @@ async function createPlayer(data: any) {
       context.strokeStyle = "black";
       
       // Uppercase the first letter of the username
-      data.username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
-      // Display (Admin) tag if the player is an admin
+      if (this.isGuest) {
+        data.username = "Guest";
+      } else {
+        data.username = data.username.charAt(0).toUpperCase() + data.username.slice(1);
+      }
+
       context.strokeText(
         data.username,
         this.position.x + 16,

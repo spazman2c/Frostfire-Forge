@@ -27,7 +27,8 @@ const createAccountsTable = async () => {
         direction TEXT DEFAULT 'down' NOT NULL,
         verified INTEGER DEFAULT 0 NOT NULL,
         noclip INTEGER DEFAULT 0 NOT NULL,
-        party_id INTEGER DEFAULT NULL
+        party_id INTEGER DEFAULT NULL,
+        guest_mode INTEGER DEFAULT 0 NOT NULL
       );
   `;
   await query(sql);

@@ -13,11 +13,16 @@ const player = {
         } else {
             await query("TRUNCATE TABLE parties");
         }
+
+        // Clear all guest accounts
+        await query("DELETE FROM accounts WHERE guest_mode = 1");
     },
-    register: async (username: string, password_hash: string, email: string, req: any) => {
+    register: async (username: string, password_hash: string, email: string, req: any, guest: boolean) => {
         if (!username || !password_hash || !email) return { error: "Missing fields" };
         username = username.toLowerCase();
         email = email.toLowerCase();
+
+        if (!guest && username.startsWith("guest_")) return { error: "Username cannot start with 'guest_'" };
 
         // Check if the user exists by username
         const usernameExists = await player.findByUsername(username) as string[];
@@ -28,7 +33,7 @@ const player = {
         if (emailExists && emailExists.length != 0) return { error: "Email already exists" };
 
         const response = await query(
-            "INSERT INTO accounts (email, username, token, password_hash, ip_address, geo_location, map, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO accounts (email, username, token, password_hash, ip_address, geo_location, map, position, guest_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
               email,
               username,
@@ -37,7 +42,8 @@ const player = {
               req.ip,
               req.headers["cf-ipcountry"],
               "main",
-              "0,0"
+              "0,0",
+              guest ? 1 : 0
             ]
           ).catch((err) => {
             log.error(err);
@@ -226,6 +232,12 @@ const player = {
         username = username.toLowerCase();
         const response = await query("SELECT role FROM accounts WHERE username = ?", [username]) as any;
         return response[0]?.role === 1;
+    },
+    isGuest: async (username: string) => {
+        if (!username) return;
+        username = username.toLowerCase();
+        const response = await query("SELECT guest_mode FROM accounts WHERE username = ?", [username]) as any;
+        return response[0]?.guest_mode === 1;
     },
     toggleAdmin: async (username: string) => {
         if (!username) return;
