@@ -195,7 +195,8 @@ async function createGuestAccount(req: Request, server: any) {
     }
 
     const guest_username = `guest_${randomBytes(12)}`;
-    const guest_email = `${guest_username}@${process.env.DOMAIN}`;
+    const domain = process.env.DOMAIN?.replace(/^https?:\/\//, "");
+    const guest_email = `${guest_username}@${domain}`;
     const guest_password = `guest_${randomBytes(12)}`;
     const guest_password_hash = await hash(guest_password);
 
