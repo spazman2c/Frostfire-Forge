@@ -1,0 +1,194 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 25px;
+    background-color: #010409;
+    color: #CAD0D6;
+}
+
+h1 {
+    text-align: center;
+}
+
+#benchmark-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+label {
+    font-size: 1.1em;
+    padding-bottom: 10px;
+    padding-top: 10px;
+    font-weight: bold;
+    color: #CAD0D6;
+}
+
+hr {
+    width: 60%;
+    border: 1px dashed rgba(64, 102, 148, 0.5);
+    margin-top: 15px;
+    margin-bottom: 30px;
+}
+
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+input[type="range"] {
+    width: 60%;
+    height: 20px;
+    background-color: #151B23;
+    border-radius: 5px;
+    outline: none;
+    transition: background-color 0.3s ease;
+}
+
+input[type="range"]:focus {
+    background-color: #151B23;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    background-color: #151B23;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 100%;
+    background-color: #005ed1;
+    border-radius: none;
+    cursor: pointer;
+}
+
+input[type=range]::-moz-range-thumb {
+    -moz-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 100%;
+    background-color: #005ed1;
+    border-radius: none;
+    cursor: pointer;
+}
+
+input[type=range]::-ms-thumb {
+    -ms-appearance: none;
+    appearance: none;
+    width: 8px;
+    height: 100%;
+    background-color: #005ed1;
+}
+
+/* Hover effect */
+input[type=range]::-webkit-slider-thumb:hover:not(:disabled) {
+    background-color: #066eec;
+}
+
+input[type=range]::-moz-range-thumb:hover:not(:disabled) {
+    background-color: #066eec;
+}
+
+/* disabled range slider */
+input[type=range]:disabled {
+    opacity: 0.5;
+}
+
+/* Add button container */
+.button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+#start {
+    background-color: #005ed1;
+    color: #fff;
+    border: none;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 10px 25px;
+    border-radius: 2px;
+    cursor: pointer;
+    margin-top: 0; /* Remove margin-top since it's handled by container */
+}
+
+#start:disabled {
+    background-color: #005ed1;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#start:hover {
+    background-color:#066eec;
+}
+
+#stop {
+    background-color:#cc2a2a;
+    color: #fff;
+    border: none;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 10px 25px;
+    border-radius: 2px;
+    cursor: pointer;
+    margin-top: 0; /* Remove margin-top since it's handled by container */
+}
+
+#stop:disabled {
+    background-color:#ee3030;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#stop:hover {
+    background-color:#ee3030;
+}
+
+#result {
+    margin-top: 50px;
+    font-size: 1em;
+    font-weight: bold;
+    line-height: 1.5;
+    border-radius: 2px;
+    text-align: center;
+    background-color: #151B23;
+    padding: 5px;
+    padding-left: 50px;
+    padding-right: 50px;
+    display: none;
+}
+
+#result p {
+    border-bottom: 1px solid rgb(41, 54, 71);
+    padding-bottom: 10px;
+}
+
+.home-button {
+  position: fixed;
+  z-index: 1000000;
+  top: 10px;
+  left: 10px;
+  background-color: transparent;
+  color: #b17767;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  width: 32px;
+  height: 32px;
+  background-color: #ffffff10;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  padding: 10px;
+  content: url("../img/icons/home-light.png");
+  transition: ease-in-out 0.3s;
+}
+
+.home-button:hover {
+  background-color: #ffffff50;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+  transition: ease-in-out 0.3s;
+}

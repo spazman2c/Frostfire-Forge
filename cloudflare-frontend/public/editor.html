@@ -1,0 +1,38 @@
+<html>
+    <head>
+        <link rel="icon" type="image/ico" href="./img/icons/favicon.ico">
+        <meta charset="utf-8">
+        <title>Animation Editor</title>
+        <!-- Blacklist Unsupported Browsers -->
+        <script src="./js/browsers.js"></script>
+        <script src="./js/editor.js"></script>
+        <link rel="stylesheet" href="./css/editor.css">
+    </head>
+    <body>
+        <div class="home-button" onclick="location.href='/'"></div>
+        <div id="editor">
+            <div id="editor-navbar">
+                <div id="editor-navbar-left">
+                    <div id="editor-navbar-left-title">
+                        Animation Editor
+                    </div>
+                </div>
+                <div id="editor-navbar-right">
+                    <div class="editor-navbar-right-checkbox">
+                        <input type="checkbox" id="autosave-checkbox">
+                        <label for="autosave-checkbox">Autosave</label>
+                    </div>
+                    <button id="animate-button" class="editor-navbar-right-button">
+                        Animate
+                    </button>
+                </div>
+            </div>
+            <div id="editor-content">
+                <div class="dropzone-message">Drag and drop PNG files here</div>
+                <div id="editor-dropzone">
+                    <div id="editor-images-container"></div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

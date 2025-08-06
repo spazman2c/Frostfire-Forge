@@ -1,0 +1,1 @@
+window.ServerUtils=window.ServerUtils||{};let Client={PONG:{type:"PING",data:null}},Server={};window.ServerUtils={Packets:{Client:Client,Server:Server}};

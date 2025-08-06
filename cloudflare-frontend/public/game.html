@@ -1,0 +1,126 @@
+<html lang="en">
+  <head>
+    <link rel="icon" type="image/ico" href="./img/icons/favicon.ico">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />
+    <title>Frostfire Forge</title>
+    
+    <!-- Configuration -->
+    <script src="./config.js"></script>
+    
+    <!-- Blacklist Unsupported Browsers -->
+    <script src="./js/browsers.js"></script>
+    <script async defer src="./js/packets.js" type="text/javascript"></script>
+    <script async defer src="./js/gamepad.js" type="text/javascript"></script>
+    <script async defer src="./js/websocket.js" type="text/javascript"></script>
+    <script async defer src="./js/config-updater.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="./css/game.css" />
+  </head>
+  <body oncontextmenu="return false;">
+    <div id="loading-screen" class="ui">
+      <button type="button" id="start-game-button" class="ui">Start Game</button>
+      <div id="progress-bar-container" class="ui">
+        <div id="loading-bar-left" class="ui"></div>
+        <div id="loading-bar-center" class="ui"></div>
+        <div id="loading-bar-right" class="ui"></div>
+        <div id="progress-bar" class="ui"></div>
+      </div>
+    </div>
+    <div id="overlay" class="ui">
+      <div id="game-notification-container" class="ui">
+        <div id="game-notification-message" class="ui"></div>
+      </div>
+      <div id="pause-menu-container" class="ui">
+        <div id="pause-menu" class="ui">
+          <div id="pause-menu-button-container" class="ui">
+            <button type="button" id="pause-menu-action-back" class="ui"></button>
+            <button type="button" id="pause-menu-action-options" class="ui"></button>
+            <button type="button" id="pause-menu-action-exit" class="ui"></button>
+          </div>
+        </div>
+      </div>
+      <div id="options-menu-container" class="ui">
+        <div id="options-menu" class="ui">
+          <div id="options-menu-selections-container" class="ui">
+            <div id="options-menu-left-container" class="ui">
+              <label id="limit-fps-label" class="ui">FPS:</label>
+              <label id="music-volume-label" class="ui">Music:</label>
+              <label id="effects-volume-label" class="ui">Effects:</label>
+              <label id="muted-label" class="ui">Muted:</label>
+            </div>
+            <div id="options-menu-right-container" class="ui">
+              <input type="range" min="30" max="240" value="50" step="1" class="slider" id="fps-slider" class="ui">
+              <input type="range" min="0" max="100" value="50" step="1" class="slider" id="music-slider" class="ui">
+              <input type="range" min="0" max="100" value="50" step="1" class="slider" id="effects-slider" class="ui">
+              <input type="checkbox" id="muted-checkbox" class="ui">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="debug-container" class="ui">
+        <div id="onlinecount" class="ui"></div>
+        <div id="packets-sent-received" class="ui">Sent: 0, Received: 0</div>
+        <div id="position" class="ui">Position: 0, 0</div>
+      </div>
+      <div id="chat-container" class="ui">
+        <div id="chat" class="ui">
+          <div id="chat-messages" class="ui"></div>
+          <input id="chat-input" type="text" placeholder="Type here..." spellcheck="false" autocomplete="off" class="ui"/>
+        </div>
+      </div>
+      <div id="full-map" class="ui">
+      </div>
+      <div id="inventory" class="ui">
+        <div id="grid" class="ui"></div>
+      </div>
+      <div id="stat-screen" class="ui">
+        <div id="stats-screen-player-info" class="ui">
+          <label id="stats-screen-health-label" class="ui">Health:</label>
+          <label id="stats-screen-mana-label" class="ui">Mana:</label>
+        </div>
+      </div>
+      <div id="hotbar" class="ui">
+        <div id="xp-bar-container">
+          <div id="xp-bar"></div>
+        </div>
+        <div id="grid" class="ui">
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+          <div class="slot empty ui"></div>
+        </div>
+      </div>
+      <div id="spell-book-container" class="ui">
+        <div id="grid" class="ui">
+        </div>
+      </div>
+      <div id="friends-list-container" class="ui">
+        <div id="friends-list-header" class="ui">
+          <h3>Friends</h3>
+          <input type="text" id="friends-list-search" placeholder="Search friends..." class="ui">
+        </div>
+        <div id="friends-list-content" class="ui">
+        </div>
+      </div>
+      <div id="party-container" class="ui">
+        <h3>Party</h3>
+      </div>
+    </div>
+    <canvas id="game" style="display: none;"></canvas>
+    
+    <script>
+      // Initialize game with configuration
+      window.addEventListener('DOMContentLoaded', function() {
+        if (window.FROSTFIRE_CONFIG) {
+          console.log('Frostfire Forge Configuration loaded:', window.FROSTFIRE_CONFIG);
+        }
+      });
+    </script>
+  </body>
+</html>

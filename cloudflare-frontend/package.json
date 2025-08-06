@@ -1,0 +1,26 @@
+{
+  "name": "frostfire-forge-frontend",
+  "version": "1.0.0",
+  "description": "Frostfire Forge Game Frontend - Cloudflare Deployment",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler publish",
+    "deploy:staging": "wrangler publish --env staging",
+    "deploy:production": "wrangler publish --env production"
+  },
+  "dependencies": {
+    "@cloudflare/kv-asset-handler": "^0.3.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "keywords": [
+    "game",
+    "cloudflare",
+    "workers",
+    "frontend"
+  ],
+  "author": "Frostfire Forge Team",
+  "license": "MIT"
+} 

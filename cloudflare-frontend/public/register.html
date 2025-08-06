@@ -1,0 +1,28 @@
+<html lang="en">
+    <head>
+        <link rel="icon" type="image/ico" href="./img/icons/favicon.ico">
+        <meta charset="utf-8">
+        <title>Register</title>
+        <!-- Blacklist Unsupported Browsers -->
+        <script src="./js/browsers.js"></script>
+        <script src="./js/notification.js"></script>
+        <script defer src="js/register.js"></script>
+        <link rel="stylesheet" href="css/style.css">
+    </head>
+    <body>
+        <div class="home-button" onclick="location.href='/'"></div>
+        <div id="container"> <!-- Displays the background of the webpage -->
+            <div id="register-container"> <!-- Creates the container for the registration form-->
+                <form>
+                    <input type="text" id="register-email" name="email" placeholder="Email" spellcheck="false" autocomplete="off" required>
+                    <input type="text" id="register-username" name="username" placeholder="Username" spellcheck="false" autocomplete="off" required>
+                    <input type="password" id="register-password" name="password" placeholder="Password" spellcheck="false" autocomplete="off" required>
+                    <input type="password" id="register-confirm-password" name="password2" placeholder="Confirm Password" spellcheck="false" autocomplete="off" required>
+                    <input type="button" id="register-button" value="Register">
+                </form>
+            </div>
+            <div id="register"></div> <!-- Displays the registration UI-->
+            <div id="logo"></div>
+        </div>
+    </body>
+</html>
