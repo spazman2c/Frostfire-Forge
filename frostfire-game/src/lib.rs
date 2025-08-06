@@ -179,7 +179,10 @@ pub fn player_chat(ctx: &ReducerContext, message: String, channel: String) {
     let identity = ctx.sender.to_string();
     
     let chat_message = ChatMessage {
-        id: Uuid::new_v4().to_string(),
+        id: format!("msg_{}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()),
         sender_identity: identity.clone(),
         message,
         channel,
