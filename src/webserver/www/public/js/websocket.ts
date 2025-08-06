@@ -422,31 +422,48 @@ const animationCache = new Map<string, string>();
 socket.onmessage = async (event) => {
   receivedResponses++;
   if (!(event.data instanceof ArrayBuffer)) return;
-  const data = JSON.parse(packet.decode(event.data))["data"];
-  const type = JSON.parse(packet.decode(event.data))["type"];
-  switch (type) {
+  
+  try {
+    const parsedMessage = JSON.parse(packet.decode(event.data));
+    const data = parsedMessage["data"];
+    const type = parsedMessage["type"];
+    
+    if (!type) {
+      console.warn("Received message without type:", parsedMessage);
+      return;
+    }
+    
+    switch (type) {
     case "INVITATION": {
       // Show the invitation modal
-      createInvitationPopup(data);
+      if (data) {
+        createInvitationPopup(data);
+      }
       break;
     }
     case "UPDATE_FRIENDS": {
-        const currentPlayer = players.find((player) => player.id === cachedPlayerId);
-        if (currentPlayer) {
-          currentPlayer.friends = data.friends || [];
-          updateFriendsList(data);
+        if (data && data.friends) {
+          const currentPlayer = players.find((player) => player.id === cachedPlayerId);
+          if (currentPlayer) {
+            currentPlayer.friends = data.friends || [];
+            updateFriendsList(data);
+          }
         }
       break;
     }
     case "UPDATE_ONLINE_STATUS": {
-      updateFriendOnlineStatus(data.username, data.online);
+      if (data && data.username !== undefined && data.online !== undefined) {
+        updateFriendOnlineStatus(data.username, data.online);
+      }
       break;
     }
     case "UPDATE_PARTY": {
-      const currentPlayer = players.find((player) => player.id === cachedPlayerId);
-      if (currentPlayer) {
-        currentPlayer.party = data.members || [];
-        createPartyUI(currentPlayer.party);
+      if (data && data.members) {
+        const currentPlayer = players.find((player) => player.id === cachedPlayerId);
+        if (currentPlayer) {
+          currentPlayer.party = data.members || [];
+          createPartyUI(currentPlayer.party);
+        }
       }
       break;
     }
@@ -1096,6 +1113,10 @@ socket.onmessage = async (event) => {
     }
     default:
       break;
+  }
+  } catch (error) {
+    console.error("Error processing WebSocket message:", error);
+    console.error("Message data:", event.data);
   }
 }
 

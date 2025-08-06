@@ -63,6 +63,7 @@ const ClientRateLimit = [] as ClientRateLimit[];
 const keyPair = generateKeyPair(process.env.RSA_PASSPHRASE);
 
 const Server = Bun.serve<Packet, any>({
+  port: 3001,
   fetch(req, Server) {
     // Upgrade the request to a WebSocket connection
     // and generate a random id for the client

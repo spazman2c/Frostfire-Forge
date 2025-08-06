@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ROW_ITER_CHUNK_SIZE"],"enum":["AttributeKind","ColOrCols","ConstraintKind"],"macro":["col_list","errnos"],"mod":["errno"],"struct":["ColId","ColSet","ColumnAttribute","ConstraintId","Constraints","IndexId","ReducerId","ScheduleId","SequenceId","TableId"],"union":["ColList"]};

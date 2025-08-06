@@ -1,0 +1,1 @@
+searchState.loadedDescShard("spacetimedb_bindings_macro", 0, "Defines procedural macros like <code>#[spacetimedb::table]</code>, …")

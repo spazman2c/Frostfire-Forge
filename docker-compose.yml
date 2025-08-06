@@ -1,0 +1,27 @@
+services:
+  spacetimedb:
+    image: clockworklabs/spacetime:latest
+    container_name: frostfire-spacetimedb
+    ports:
+      - "3002:3000"
+    environment:
+      - SPACETIME_LOG=info
+    volumes:
+      - spacetimedb_data:/data
+    restart: unless-stopped
+    command: start
+
+  # Optional: Add a database viewer for development
+  spacetimedb-admin:
+    image: clockworklabs/spacetime-admin:latest
+    container_name: frostfire-spacetimedb-admin
+    ports:
+      - "8081:80"
+    environment:
+      - SPACETIME_HOST=spacetimedb:3000
+    depends_on:
+      - spacetimedb
+    restart: unless-stopped
+
+volumes:
+  spacetimedb_data: 

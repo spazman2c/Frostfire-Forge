@@ -87,7 +87,7 @@ const routes = {
 } as Record<string, any>;
 
 Bun.serve({
-  port: _https ? 443 : 80,
+  port: _https ? 443 : parseInt(process.env.WEBSRV_PORT || "80"),
   routes: {
     "/docs": routes["/docs"],
     "/benchmark": routes["/benchmark"],

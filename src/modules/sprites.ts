@@ -33,7 +33,10 @@ export default async function generate(data: SpriteSheetData) {
       fs.mkdirSync(output, { recursive: true });
     } else {
       fs.readdirSync(output).forEach((file) => {
-        fs.unlinkSync(path.join(output, file));
+        const filePath = path.join(output, file);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
       });
     }
 
