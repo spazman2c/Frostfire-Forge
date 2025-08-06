@@ -51,6 +51,8 @@ const player = {
         await query("INSERT INTO clientconfig (username, fps, music_volume, effects_volume, muted) VALUES (?, ?, ?, ?, ?)", [username, 60, 50, 50, 0]);
         // Create quest log
         await query("INSERT INTO quest_log (username) VALUES (?)", [username]);
+        // Create currency
+        await query("INSERT INTO currency (username, copper, silver, gold) VALUES (?, ?, ?, ?)", [username, 0, 0, 0]);
         return username;
     },
     verify: async (session_id: string) => {

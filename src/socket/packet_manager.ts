@@ -166,6 +166,7 @@ export const packetManager = {
             sprite: data.sprite,
             ...(data.friends ? { friends: data.friends } : {}),
             ...(data.party ? { party: data.party } : {}),
+            ...(data.currency ? { currency: data.currency } : { copper: 0, silver: 0, gold: 0 }),
           },
         })
       )
@@ -305,5 +306,15 @@ export const packetManager = {
     return [
       packet.encode(JSON.stringify({ type: "UPDATE_PARTY", data })),
     ] as any[];
-  }
+  },
+  currency: (data: Currency) => {
+    return [
+      packet.encode(
+        JSON.stringify({
+          type: "CURRENCY",
+          data,
+        })
+      )
+    ] as any[];
+  },
 };

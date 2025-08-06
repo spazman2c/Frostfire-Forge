@@ -394,6 +394,21 @@ const createPartiesTable = async () => {
   await query(sql);
 }
 
+const createCurrencyTable = async () => {
+  const useDatabaseSql = `USE ${database};`;
+  log.info("Creating currency table...");
+  await query(useDatabaseSql);
+  const sql = `
+    CREATE TABLE IF NOT EXISTS currency (
+      username VARCHAR(255) NOT NULL PRIMARY KEY UNIQUE,
+      copper INT NOT NULL DEFAULT 0,
+      silver INT NOT NULL DEFAULT 0,
+      gold INT NOT NULL DEFAULT 0
+    )
+  `;
+  await query(sql);
+};
+
 // Run the database setup
 const setupDatabase = async () => {
   await createDatabase();
@@ -419,6 +434,7 @@ const setupDatabase = async () => {
   await createQuestLogTable();
   await createFriendsListTable();
   await createPartiesTable();
+  await createCurrencyTable();
 };
 
 try {

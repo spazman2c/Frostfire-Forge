@@ -141,6 +141,33 @@ const packet = {
 let lastDirection = "";
 let pendingRequest = false;
 
+let cachedViewport = {
+  x: 0,
+  y: 0,
+  w: window.innerWidth,
+  h: window.innerHeight,
+  padding: 64,
+};
+
+let cachedPaddedBounds = {
+  x: 0,
+  y: 0,
+  w: 0,
+  h: 0,
+};
+
+// Function to update cached viewport dimensions
+function updateViewportCache() {
+  cachedViewport.w = window.innerWidth;
+  cachedViewport.h = window.innerHeight;
+  
+  // Pre-calculate padded bounds
+  cachedPaddedBounds.w = cachedViewport.w + cachedViewport.padding * 2;
+  cachedPaddedBounds.h = cachedViewport.h + cachedViewport.padding * 2;
+}
+
+updateViewportCache();
+
 animationLoop();
 function animationLoop() {
   if (!ctx) return;
@@ -197,29 +224,21 @@ function animationLoop() {
     lastDirection = "";
   }
 
-  // Cache viewport details once
-  const viewport = {
-    x: window.scrollX,
-    y: window.scrollY,
-    w: window.innerWidth,
-    h: window.innerHeight,
-    padding: 64,
-  };
+  // Update only scroll positions (these change frequently)
+  cachedViewport.x = window.scrollX;
+  cachedViewport.y = window.scrollY;
+  
+  // Update padded bounds with current scroll position
+  cachedPaddedBounds.x = cachedViewport.x - cachedViewport.padding;
+  cachedPaddedBounds.y = cachedViewport.y - cachedViewport.padding;
 
-  const paddedBounds = {
-    x: viewport.x - viewport.padding,
-    y: viewport.y - viewport.padding,
-    w: viewport.w + viewport.padding * 2,
-    h: viewport.h + viewport.padding * 2,
-  };
-
-  ctx.clearRect(viewport.x, viewport.y, viewport.w, viewport.h);
+  ctx.clearRect(cachedViewport.x, cachedViewport.y, cachedViewport.w, cachedViewport.h);
 
   const isInView = (x: number, y: number) =>
-    x >= paddedBounds.x &&
-    y >= paddedBounds.y &&
-    x <= paddedBounds.x + paddedBounds.w &&
-    y <= paddedBounds.y + paddedBounds.h;
+    x >= cachedPaddedBounds.x &&
+    y >= cachedPaddedBounds.y &&
+    x <= cachedPaddedBounds.x + cachedPaddedBounds.w &&
+    y <= cachedPaddedBounds.y + cachedPaddedBounds.h;
 
   const visiblePlayers = players.filter(p =>
     isInView(p.position.x, p.position.y) &&
@@ -258,8 +277,8 @@ function animationLoop() {
       if (layer.zIndex < playerZ) {
         ctx.drawImage(
           layer.canvas,
-          viewport.x, viewport.y, viewport.w, viewport.h,
-          viewport.x, viewport.y, viewport.w, viewport.h
+          cachedViewport.x, cachedViewport.y, cachedViewport.w, cachedViewport.h,
+          cachedViewport.x, cachedViewport.y, cachedViewport.w, cachedViewport.h
         );
       }
     }
@@ -286,8 +305,8 @@ function animationLoop() {
       if (layer.zIndex >= playerZ) {
         ctx.drawImage(
           layer.canvas,
-          viewport.x, viewport.y, viewport.w, viewport.h,
-          viewport.x, viewport.y, viewport.w, viewport.h
+          cachedViewport.x, cachedViewport.y, cachedViewport.w, cachedViewport.h,
+          cachedViewport.x, cachedViewport.y, cachedViewport.w, cachedViewport.h
         );
       }
     }
@@ -1071,6 +1090,11 @@ socket.onmessage = async (event) => {
       }
       break;
     }
+    case "CURRENCY": {
+      const data = JSON.parse(packet.decode(event.data))["data"];
+      console.log("Currency data received:", data);
+      break;
+    }
     default:
       break;
   }
@@ -1706,6 +1730,21 @@ async function createPlayer(data: any) {
     return null;
   };
 
+  console.log(`
+    Username: ${data.username}
+    UserID: ${data.userid}
+    WebSocket ID: ${data.id}
+    Animation: ${data.animation ? "Loaded" : "None"}
+    Friends: ${data.friends ? data.friends.join(", ") : "None"}
+    Position: (${data.location.x}, ${data.location.y})
+    Stealth: ${data.isStealth ? "Yes" : "No"}
+    Admin: ${data.isAdmin ? "Yes" : "No"}
+    Party: ${data.party ? data.party.join(", ") : "None"}
+    Stats: ${JSON.stringify(data.stats, null, 2)}
+  `)
+
+  console.log(data.currency)
+
   const player = {
     id: data.id,
     username: data.username,
@@ -2043,6 +2082,7 @@ function getLines(ctx: any, text: string, maxWidth: number) {
 
 // Snap to player's position on resize
 window.addEventListener("resize", () => {
+  updateViewportCache();
   const currentPlayer = players.find((player) => player.id === cachedPlayerId);
   if (currentPlayer) {
     cameraX = currentPlayer.position.x - window.innerWidth / 2 + 8;

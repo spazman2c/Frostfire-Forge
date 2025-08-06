@@ -12,6 +12,7 @@ import questlog from "../systems/questlog";
 import quests from "../systems/quests";
 import generate from "../modules/sprites";
 import friends from "../systems/friends";
+import currency from "../systems/currency";
 import parties from "../systems/parties.ts";
 const maps = assetCache.get("maps");
 const spritesheets = assetCache.get("spritesheets");
@@ -131,6 +132,9 @@ export default async function packetReceiver(
         // Get the player's stats
         const stats = await player.getStats(username);
 
+        // Get the player's currency
+        const playerCurrency = await currency.get(username) as Currency;
+
         // Get the player's friends list
         const friendsList = await friends.list(username);
 
@@ -226,6 +230,7 @@ export default async function packetReceiver(
           last_attack: null,
           invitations: [],
           party: partyMembers,
+          currency: playerCurrency,
         });
         log.debug(
           `Spawn location for ${username}: ${spawnLocation.map.replace(
@@ -345,6 +350,7 @@ export default async function packetReceiver(
               ...spawnData,
               friends: friendsList,
               party: partyMembers,
+              currency: playerCurrency,
             }));
           } else {
             sendPacket(player.ws, packetManager.spawnPlayer(spawnData));

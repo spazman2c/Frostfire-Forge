@@ -54,4 +54,5 @@ export const packetTypes: PacketType = {
   PARTY_CHAT: "PARTY_CHAT",
   KICK_PARTY_MEMBER: "KICK_PARTY_MEMBER",
   LEAVE_PARTY: "LEAVE_PARTY",
+  CURRENCY: "CURRENCY",
 };

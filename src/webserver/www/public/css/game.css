@@ -57,6 +57,7 @@ body {
   background-repeat: no-repeat;
   background-size: 100% 100%;
   transition: right ease-in-out 1s;
+  will-change: right;
 }
 
 #inventory #grid{
@@ -108,6 +109,7 @@ body {
   background-size: 100% 100%;
   width: 404px;
   height: 388px;
+  will-change: right;
 }
 
 #friends-list {
@@ -203,6 +205,7 @@ body {
   background-size: 100% 100%;
   width: 404px;
   height: 388px;
+  will-change: right;
 }
 
 #spell-book-container #grid {
@@ -372,6 +375,7 @@ body {
   width: 500px;
   height: 226px;
   transition: bottom ease-in-out 1s;
+  will-change: bottom;
 }
 
 #chat-messages {
@@ -867,6 +871,7 @@ input::placeholder {
   transition: bottom ease-in-out 1s;
   background: url("../img/ui/ui-stats-sheet.png");
   background-repeat: no-repeat;
+  will-change: left;
 }
 
 #stats-screen-player-info {
@@ -879,7 +884,7 @@ input::placeholder {
   left: 373px;
   top: 120px;
   z-index: 100;
-  transition: bottom ease-in-out 1s;
+  will-change: left;
 }
 
 #stats-screen-health-label, #stats-screen-mana-label {

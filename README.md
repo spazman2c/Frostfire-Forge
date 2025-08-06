@@ -1407,3 +1407,48 @@ await parties.create(leader, member);
 ```ts
 await parties.leave(username);
 ```
+
+<hr>
+<h3>Currency Management</h3>
+
+```ts
+import currency from "../systems/currency";
+```
+
+<h5>Structure</h5>
+
+```ts
+declare interface Currency {
+  copper: number;
+  silver: number;
+  gold: number;
+}
+```
+
+<h5>currency.get();</h5>
+<p style="font-size:0.75em;">Gets a players currency</p>
+
+```ts
+await currency.get(username);
+```
+
+<h5>currency.add();</h5>
+<p style="font-size:0.75em;">Adds currency to a player</p>
+
+```ts
+await currency.add(username, currency);
+```
+
+<h5>currency.remove();</h5>
+<p style="font-size:0.75em;">Removes currency from a player</p>
+
+```ts
+await currency.remove(username, currency);
+```
+
+<h5>currency.set();</h5>
+<p style="font-size:0.75em;">Sets a players currency</p>
+
+```ts
+await currency.set(username, currency);
+```

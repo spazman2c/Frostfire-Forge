@@ -299,3 +299,9 @@ declare interface WarpObject {
     height: number;
   };
 }
+
+declare interface Currency {
+  copper: number;
+  silver: number;
+  gold: number;
+}
