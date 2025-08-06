@@ -348,6 +348,7 @@ listener.on("onSave", async () => {
   const playerCache = cache.list();
   for (const p in playerCache) {
     if (!playerCache[p]) continue;
+    if (playerCache[p]?.isGuest) continue; // Skip guests
     // Save player stats and location
     await player.setStats(playerCache[p].username, playerCache[p].stats);
     await player.setLocation(
